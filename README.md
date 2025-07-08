@@ -19,117 +19,9 @@ returns the user's profile information. No personal data is stored.
 * You can access the PESUAuth API endpoint [here](https://pesu-auth.onrender.com/).
 * You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
 
-> :warning: **Warning:** The live version is hosted on a free tier server, so you might experience some latency on the
+> **Warning:** The live version is hosted on a free tier server, so you might experience some latency on the
 > first request since the server might not be awake. Subsequent requests will be faster.
 
-## How to run pesu-auth locally
-
-Running the PESUAuth API locally is simple. Clone the repository and follow the steps below to get started.
-
-### Running with Docker
-
-This is the easiest and recommended way to run the API locally. Ensure you have Docker installed on your system. Run the
-following commands to start the API.
-
-1. Build the Docker image either from the source code or pull the pre-built image from Docker Hub.
-
-    1. You can build the Docker image from the source code by running the following command in the root directory of
-       the repository.
-
-   ```bash
-   docker build . --tag pesu-auth
-   ```
-
-    2. You can also pull the pre-built Docker image
-       from [Docker Hub](https://hub.docker.com/repository/docker/aditeyabaral/pesu-auth/general) by running the
-       following command:
-
-   ```bash
-   docker pull aditeyabaral/pesu-auth:latest
-   ````
-
-2. Run the Docker container
-
-```bash
-docker run --name pesu-auth -d -p 5000:5000 pesu-auth
-# If you pulled the pre-built image, use the following command instead:
-docker run --name pesu-auth -d -p 5000:5000 aditeyabaral/pesu-auth:latest
-```
-
-3. Access the API at `http://localhost:5000/`
-
-### Running without Docker
-
-If you don't have Docker installed, you can run the API using Python. Ensure you have Python 3.10 or higher installed
-on your system.
-
-1. Create a virtual environment using `conda`, `uv` or any other virtual environment manager of your choice and activate
-   it. Then, install the dependencies using the following command.
-
-#### For `conda` users:
-
-```bash
-pip install -r requirements.txt
-```
-
-#### For `uv` users:
-
-```bash
-uv sync
-```
-
-2. Run the API using the following command.
-
-#### For `conda` users:
-
-```bash
-python -m app.app
-```
-
-#### For `uv` users:
-
-```bash
-uv run python -m app.app
-```
-
-3. Access the API as previously mentioned.
-
-### Setting up a Development Environment
-
-If you want to contribute to the project, please follow these steps to set up your development environment:
-
-1. Create a virtual environment using `conda`, `uv` or any other virtual environment manager of your choice and activate
-   it. Then, install both the server and development dependencies using the following commands.
-
-#### For `conda` users:
-
-  ```bash
-  pip install -r requirements.txt
-  pip install pytest pytest-cov httpx python-dotenv pre-commit
-  ```
-
-#### For `uv` users:
-
-   ```bash
-   uv sync --all-extras
-   ```
-
-2. Set up environment variables. Copy the `.env.example` file to `.env` and replace all `<YOUR_..._HERE>` placeholders
-   with your actual test user details. Each variable has been documented in the `.env.example` file for clarity.
-
-```bash
-cp .env.example .env
-```
-
-3. Set up pre-commit hooks to ensure code quality and consistency. Run the following command and then test the hooks
-   using the following command.
-
-```bash
-pre-commit install
-pre-commit run --all-files
-```
-
-4. Run the API using the same commands as mentioned in the previous section.
 
 # How to use pesu-auth
 
@@ -248,3 +140,7 @@ curl -X POST http://localhost:5000/authenticate \
   "timestamp": "2024-07-28 22:30:10.103368+05:30"
 }
 ```
+
+# Contribution to auth
+
+Refer [CONTRIBUTING.md](CONTRIBUTING.md) for more details on how to contribute.
