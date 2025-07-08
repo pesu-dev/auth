@@ -6,13 +6,13 @@ import os
 import re
 
 import gh_md_to_html
-from typing import Optional
 import pytz
 from flasgger import Swagger
 from flask import Flask, request
 
 from app.pesu import PESUAcademy
-from app.models.validate_input_model import ValidateInputModel
+from pydantic import ValidationError
+from app.models import RequestModel, ResponseModel
 
 IST = pytz.timezone("Asia/Kolkata")
 app = Flask(__name__)
@@ -34,28 +34,17 @@ def convert_readme_to_html():
     logging.info("README.md converted to HTML successfully.")
 
 
-def validate_input(
-    username: str,
-    password: str,
-    profile: bool,
-    fields: Optional[list[str]],
-):
+def validate_input(data: dict) -> RequestModel:
     """
-    Validate the input provided by the user using Pydantic model.
-    :param username: str: The username of the user.
-    :param password: str: The password of the user.
-    :param profile: bool: Whether to fetch the profile details of the user.
-    :param fields: list: The fields to fetch from the user's profile.
-    :return: ValidateInputModel: The validated input model.
+    Validate the input provided by the user
+    :param data: The input data provided by the user
+    :return: The validated data as a RequestModel object
     """
     logging.info(
-        f"Validating input: user={username}, password={'*****' if password else None}, profile={profile}, fields={fields}"
+        f"Validating input: {data.get('username')=}, password={'*****' if data.get('password') else None}, "
+        f"profile={data.get('profile')}, fields={data.get('fields')}"
     )
-
-    validated_data = ValidateInputModel(
-        username=username, password=password, profile=profile, fields=fields
-    )
-
+    validated_data = RequestModel.model_validate(data)
     logging.info("Input validation successful. All parameters are valid.")
     return validated_data
 
@@ -141,7 +130,6 @@ def authenticate():
                   - campus_code
                   - campus
               example: ["name", "prn", "branch", "branch_short_code", "campus"]
-          x-pydantic-model: ValidateInputModel
     responses:
       200:
         description: Authentication successful
@@ -225,22 +213,16 @@ def authenticate():
               type: string
               example: Error authenticating user
     """
-    # Extract the input provided by the user
     current_time = datetime.datetime.now(IST)
-    username = request.json.get("username")
-    password = request.json.get("password")
-    profile = request.json.get("profile", False)
-    fields = request.json.get("fields")
-
     # Validate the input provided by the user
     try:
         logging.info("Received authentication request. Beginning input validation...")
-        validated_data = validate_input(username, password, profile, fields)
+        validated_data = validate_input(request.json)
         username = validated_data.username
         password = validated_data.password
         profile = validated_data.profile
         fields = validated_data.fields
-    except Exception as e:
+    except ValidationError as e:
         logging.exception("Could not validate request data.")
         return (
             json.dumps(
@@ -253,19 +235,35 @@ def authenticate():
             400,
             {"Content-Type": "application/json"},
         )
+    except Exception as e:
+        logging.exception("Unexpected error during input validation.")
+        return (
+            json.dumps(
+                {
+                    "status": False,
+                    "message": f"Unexpected error during input validation: {e}",
+                    "timestamp": str(current_time),
+                }
+            ),
+            500,
+            {"Content-Type": "application/json"},
+        )
 
     # Authenticate the user
     try:
+        authentication_result = {"timestamp": str(current_time)}
         logging.info(f"Authenticating user={username} with PESU Academy...")
-        authentication_result = pesu_academy.authenticate(
-            username, password, profile, fields
+        authentication_result.update(
+            pesu_academy.authenticate(
+                username=username, password=password, profile=profile, fields=fields
+            )
         )
-        authentication_result["timestamp"] = str(current_time)
+        authentication_result = ResponseModel.model_validate(authentication_result)
         logging.info(
             f"Returning auth result for user={username}: {authentication_result}"
         )
         return (
-            json.dumps(authentication_result),
+            authentication_result.model_dump_json(exclude_none=True, indent=4),
             200,
             {"Content-Type": "application/json"},
         )

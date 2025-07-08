@@ -5,52 +5,111 @@ from app.app import validate_input
 
 
 def test_valid_input_username_prn():
-    validate_input("PES1201800001", "mypassword", True, ["name", "prn"])
+    data = {
+        "username": "PES1201800001",
+        "password": "mypassword",
+        "profile": True,
+        "fields": ["name", "prn"],
+    }
+    validate_input(data)
 
 
 def test_valid_input_username_email():
-    validate_input("john.doe@gmail.com", "mypassword", True, ["name", "prn"])
+    data = {
+        "username": "john.doe@gmail.com",
+        "password": "mypassword",
+        "profile": True,
+        "fields": ["name", "prn"],
+    }
+    validate_input(data)
 
 
 def test_valid_input_username_phone():
-    validate_input("1234567890", "mypassword", True, ["name", "prn"])
+    data = {
+        "username": "1234567890",
+        "password": "mypassword",
+        "profile": True,
+        "fields": ["name", "prn"],
+    }
+    validate_input(data)
 
 
 def test_valid_input_with_fields_none():
-    validate_input("PES1201800001", "mypassword", False, None)
+    data = {
+        "username": "PES1201800001",
+        "password": "mypassword",
+        "profile": False,
+        "fields": None,
+    }
+    validate_input(data)
 
 
 def test_missing_username():
+    data = {
+        "password": "pass",
+        "profile": True,
+        "fields": ["name"],
+    }
     with pytest.raises(ValidationError) as exc_info:
-        validate_input(None, "pass", True, ["name"])
-    assert "Input should be a valid string" in str(exc_info.value)
+        validate_input(data)
+    assert "Field required" in str(exc_info.value)
 
 
 def test_non_string_username():
+    data = {
+        "username": 1234,
+        "password": "pass",
+        "profile": False,
+        "fields": None,
+    }
     with pytest.raises(ValidationError) as exc_info:
-        validate_input(1234, "pass", False, None)
+        validate_input(data)
     assert "Input should be a valid string" in str(exc_info.value)
 
 
 def test_missing_password():
+    data = {
+        "username": "user",
+        "profile": False,
+        "fields": None,
+    }
     with pytest.raises(ValidationError) as exc_info:
-        validate_input("user", None, False, None)
-    assert "Input should be a valid string" in str(exc_info.value)
+        validate_input(data)
+    assert "Field required" in str(exc_info.value)
 
 
 def test_profile_not_boolean():
+    data = {
+        "username": "user",
+        "password": "pass",
+        "profile": "invalid_bool",
+        "fields": None,
+    }
     with pytest.raises(ValidationError) as exc_info:
-        validate_input("user", "pass", "invalid_bool", None)
+        validate_input(data)
     assert "Input should be a valid boolean" in str(exc_info.value)
 
 
 def test_fields_invalid_type():
+    data = {
+        "username": "user",
+        "password": "pass",
+        "profile": False,
+        "fields": {},
+    }
     with pytest.raises(ValidationError) as exc_info:
-        validate_input("user", "pass", False, {})
+        validate_input(data)
     assert "Input should be a valid list" in str(exc_info.value)
 
 
 def test_fields_with_invalid_field_name():
+    data = {
+        "username": "user",
+        "password": "pass",
+        "profile": True,
+        "fields": ["not_a_field"],
+    }
     with pytest.raises(ValidationError) as exc_info:
-        validate_input("user", "pass", True, ["not_a_field"])
-    assert "Invalid field" in str(exc_info.value)
+        validate_input(data)
+    assert "Input should be" in str(exc_info.value)
+    assert "input_value='not_a_field'" in str(exc_info.value)

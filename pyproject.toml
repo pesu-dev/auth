@@ -3,7 +3,7 @@ name = "pesu-auth"
 version = "0.1.0"
 description = "A simple API to authenticate PESU credentials using PESU Academy."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
     { name = "Aditeya Baral", email = "aditeya.baral@gmail.com" }
