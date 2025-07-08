@@ -1,9 +1,9 @@
 # pesu-auth
 
-[![Docker Image Build](https://github.com/HackerSpace-PESU/pesu-auth/actions/workflows/docker.yaml/badge.svg)](https://github.com/HackerSpace-PESU/pesu-auth/actions/workflows/docker.yml)
-[![Pre-Commit Checks](https://github.com/HackerSpace-PESU/pesu-auth/actions/workflows/pre-commit.yaml/badge.svg)](https://github.com/HackerSpace-PESU/pesu-auth/actions/workflows/pre-commit.yaml)
-[![Python Version Compatibility](https://github.com/HackerSpace-PESU/pesu-auth/actions/workflows/flake8.yaml/badge.svg)](https://github.com/HackerSpace-PESU/pesu-auth/actions/workflows/flake8.yml)
-[![Deploy](https://github.com/HackerSpace-PESU/pesu-auth/actions/workflows/deploy.yaml/badge.svg)](https://github.com/HackerSpace-PESU/pesu-auth/actions/workflows/deploy.yaml)
+[![Docker Image Build](https://github.com/pesu-dev/auth/actions/workflows/docker.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/docker.yml)
+[![Pre-Commit Checks](https://github.com/pesu-dev/auth/actions/workflows/pre-commit.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/pre-commit.yaml)
+[![Python Version Compatibility](https://github.com/pesu-dev/auth/actions/workflows/flake8.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/flake8.yml)
+[![Deploy](https://github.com/pesu-dev/auth/actions/workflows/deploy.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/deploy.yaml)
 
 ![Docker Automated build](https://img.shields.io/docker/automated/aditeyabaral/pesu-auth?logo=docker)
 ![Docker Image Version (tag)](https://img.shields.io/docker/v/aditeyabaral/pesu-auth/latest?logo=docker&label=build%20commit)
