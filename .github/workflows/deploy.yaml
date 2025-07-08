@@ -46,6 +46,32 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/pesu-auth:${{ steps.vars.outputs.tag }}
           docker push ${{ secrets.DOCKER_USERNAME }}/pesu-auth:latest
 
+  push-to-ghcr:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v3
+      - name: Get short commit hash
+        id: vars
+        run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and tag image for GHCR
+        run: |
+          docker build . --tag ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ steps.vars.outputs.tag }}
+          docker tag ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ steps.vars.outputs.tag }} ghcr.io/${{ github.repository_owner }}/pesu-auth:latest
+      - name: Push image to GitHub Container Registry
+        run: |
+          docker push ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ steps.vars.outputs.tag }}
+          docker push ghcr.io/${{ github.repository_owner }}/pesu-auth:latest
+
   deploy-to-render:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
