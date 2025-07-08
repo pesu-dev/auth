@@ -317,8 +317,8 @@ def test_integration_fields_invalid_field(client):
     assert response.status_code == 400
     data = response.get_json()
     assert data["status"] is False
-    assert "invalid_field" in data["message"].lower()
-    assert "valid fields" in data["message"].lower()
+    assert "Input should be" in data["message"]
+    assert "input_value='invalid_field'" in data["message"]
 
 
 def test_integration_readme_route(client):

@@ -3,7 +3,7 @@ name = "pesu-auth"
 version = "0.1.0"
 description = "A simple API to authenticate PESU credentials using PESU Academy."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
     { name = "Aditeya Baral", email = "aditeya.baral@gmail.com" }
@@ -14,6 +14,7 @@ dependencies = [
     "gh-md-to-html>=1.21.3",
     "httpx>=0.28.1",
     "lxml-html-clean>=0.4.2",
+    "pydantic>=2.6.0",
     "pytz>=2025.2",
     "selectolax>=0.3.30",
 ]
