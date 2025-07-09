@@ -1,14 +1,14 @@
 import os
 
 import pytest
+from fastapi.testclient import TestClient
 
 from app.app import app
 
 
 @pytest.fixture(scope="module")
 def client():
-    app.config["TESTING"] = True
-    with app.test_client() as client:
+    with TestClient(app) as client:
         yield client
 
 
@@ -75,9 +75,9 @@ def test_integration_authenticate_with_specific_profile_fields(client):
     assert password is not None, "TEST_PASSWORD environment variable not set"
     assert prn is not None, "TEST_PRN environment variable not set"
     assert branch is not None, "TEST_BRANCH environment variable not set"
-    assert branch_short_code is not None, (
-        "TEST_BRANCH_SHORT_CODE environment variable not set"
-    )
+    assert (
+        branch_short_code is not None
+    ), "TEST_BRANCH_SHORT_CODE environment variable not set"
     assert campus is not None, "TEST_CAMPUS environment variable not set"
 
     expected_fields = ["prn", "branch", "branch_short_code", "campus"]
@@ -96,9 +96,9 @@ def test_integration_authenticate_with_specific_profile_fields(client):
     assert data["message"] == "Login successful."
     assert "profile" in data
     profile = data["profile"]
-    assert len(profile) == len(expected_fields), (
-        f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
-    )
+    assert len(profile) == len(
+        expected_fields
+    ), f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
 
     assert profile["prn"] == prn
     assert profile["branch"] == branch
@@ -118,7 +118,7 @@ def test_integration_authenticate_with_all_profile_fields(client):
     semester = os.getenv("TEST_SEMESTER")
     section = os.getenv("TEST_SECTION")
     phone = os.getenv("TEST_PHONE")
-    campus_code = int(os.getenv("TEST_CAMPUS_CODE"))
+    campus_code_str = os.getenv("TEST_CAMPUS_CODE")
     branch = os.getenv("TEST_BRANCH")
     branch_short_code = os.getenv("TEST_BRANCH_SHORT_CODE")
     campus = os.getenv("TEST_CAMPUS")
@@ -128,9 +128,9 @@ def test_integration_authenticate_with_all_profile_fields(client):
     assert password is not None, "TEST_PASSWORD environment variable not set"
     assert prn is not None, "TEST_PRN environment variable not set"
     assert branch is not None, "TEST_BRANCH environment variable not set"
-    assert branch_short_code is not None, (
-        "TEST_BRANCH_SHORT_CODE environment variable not set"
-    )
+    assert (
+        branch_short_code is not None
+    ), "TEST_BRANCH_SHORT_CODE environment variable not set"
     assert campus is not None, "TEST_CAMPUS environment variable not set"
     assert srn is not None, "TEST_SRN environment variable not set"
     assert program is not None, "TEST_PROGRAM environment variable not set"
@@ -138,7 +138,9 @@ def test_integration_authenticate_with_all_profile_fields(client):
     assert section is not None, "TEST_SECTION environment variable not set"
     assert email is not None, "TEST_EMAIL environment variable not set"
     assert phone is not None, "TEST_PHONE environment variable not set"
-    assert campus_code is not None, "TEST_CAMPUS_CODE environment variable not set"
+    assert campus_code_str is not None, "TEST_CAMPUS_CODE environment variable not set"
+
+    campus_code = int(campus_code_str)
 
     all_fields = [
         "name",
@@ -169,9 +171,9 @@ def test_integration_authenticate_with_all_profile_fields(client):
     assert data["message"] == "Login successful."
     assert "profile" in data
     profile = data["profile"]
-    assert len(profile) == len(all_fields), (
-        f"Expected {len(all_fields)} fields in profile, got {len(profile)}"
-    )
+    assert len(profile) == len(
+        all_fields
+    ), f"Expected {len(all_fields)} fields in profile, got {len(profile)}"
 
     assert profile["name"] == name
     assert profile["prn"] == prn
