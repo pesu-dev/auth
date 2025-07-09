@@ -3,16 +3,12 @@
 annotated-types==0.7.0
     # via pydantic
 anyio==4.9.0
-    # via httpx
-attrs==25.3.0
     # via
-    #   jsonschema
-    #   referencing
+    #   httpx
+    #   starlette
 beautifulsoup4==4.13.4
     # via gh-md-to-html
-blinker==1.9.0
-    # via flask
-certifi==2025.6.15
+certifi==2025.7.9
     # via
     #   httpcore
     #   httpx
@@ -20,19 +16,17 @@ certifi==2025.6.15
 charset-normalizer==3.4.2
     # via requests
 click==8.2.1
-    # via flask
+    # via uvicorn
 emoji==2.14.1
     # via gh-md-to-html
-flasgger==0.9.7.1
+fastapi==0.116.0
     # via pesu-auth (pyproject.toml)
-flask==3.1.1
-    # via
-    #   pesu-auth (pyproject.toml)
-    #   flasgger
 gh-md-to-html==1.21.3
     # via pesu-auth (pyproject.toml)
 h11==0.16.0
-    # via httpcore
+    # via
+    #   httpcore
+    #   uvicorn
 httpcore==1.0.9
     # via httpx
 httpx==0.28.1
@@ -42,70 +36,45 @@ idna==3.10
     #   anyio
     #   httpx
     #   requests
-itsdangerous==2.2.0
-    # via flask
-jinja2==3.1.6
-    # via flask
-jsonschema==4.24.0
-    # via flasgger
-jsonschema-specifications==2025.4.1
-    # via jsonschema
 lxml==6.0.0
     # via lxml-html-clean
 lxml-html-clean==0.4.2
     # via pesu-auth (pyproject.toml)
-markupsafe==3.0.2
-    # via
-    #   flask
-    #   jinja2
-    #   werkzeug
-mistune==3.1.3
-    # via flasgger
-packaging==25.0
-    # via flasgger
 pillow==11.3.0
     # via gh-md-to-html
 pydantic==2.11.7
-    # via pesu-auth (pyproject.toml)
+    # via
+    #   pesu-auth (pyproject.toml)
+    #   fastapi
 pydantic-core==2.33.2
     # via pydantic
 pytz==2025.2
     # via pesu-auth (pyproject.toml)
-pyyaml==6.0.2
-    # via flasgger
-referencing==0.36.2
-    # via
-    #   jsonschema
-    #   jsonschema-specifications
 requests==2.32.4
     # via gh-md-to-html
-rpds-py==0.26.0
-    # via
-    #   jsonschema
-    #   referencing
 selectolax==0.3.31
     # via pesu-auth (pyproject.toml)
 shellescape==3.8.1
     # via gh-md-to-html
-six==1.17.0
-    # via flasgger
 sniffio==1.3.1
     # via anyio
 soupsieve==2.7
     # via beautifulsoup4
+starlette==0.46.2
+    # via fastapi
 typing-extensions==4.14.1
     # via
     #   anyio
     #   beautifulsoup4
+    #   fastapi
     #   pydantic
     #   pydantic-core
-    #   referencing
     #   typing-inspection
 typing-inspection==0.4.1
     # via pydantic
 urllib3==2.5.0
     # via requests
+uvicorn==0.35.0
+    # via pesu-auth (pyproject.toml)
 webcolors==24.11.1
     # via gh-md-to-html
-werkzeug==3.1.3
-    # via flask
