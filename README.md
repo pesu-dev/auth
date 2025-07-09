@@ -14,7 +14,7 @@ A simple API to authenticate PESU credentials using PESU Academy.
 The API is secure and protects user privacy by not storing any user credentials. It only validates credentials and
 returns the user's profile information. No personal data is stored.
 
-### PESUAuth LIVE Deployment
+## PESUAuth LIVE Deployment
 
 * You can access the PESUAuth API endpoint [here](https://pesu-auth.onrender.com/).
 * You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
@@ -94,44 +94,7 @@ uv run python -m app.app
 
 3. Access the API as previously mentioned.
 
-### Setting up a Development Environment
-
-If you want to contribute to the project, please follow these steps to set up your development environment:
-
-1. Create a virtual environment using `conda`, `uv` or any other virtual environment manager of your choice and activate
-   it. Then, install both the server and development dependencies using the following commands.
-
-#### For `conda` users:
-
-  ```bash
-  pip install -r requirements.txt
-  pip install pytest pytest-cov httpx python-dotenv pre-commit
-  ```
-
-#### For `uv` users:
-
-   ```bash
-   uv sync --all-extras
-   ```
-
-2. Set up environment variables. Copy the `.env.example` file to `.env` and replace all `<YOUR_..._HERE>` placeholders
-   with your actual test user details. Each variable has been documented in the `.env.example` file for clarity.
-
-```bash
-cp .env.example .env
-```
-
-3. Set up pre-commit hooks to ensure code quality and consistency. Run the following command and then test the hooks
-   using the following command.
-
-```bash
-pre-commit install
-pre-commit run --all-files
-```
-
-4. Run the API using the same commands as mentioned in the previous section.
-
-# How to use pesu-auth
+## How to use pesu-auth
 
 You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON
 object,
@@ -181,13 +144,13 @@ If the authentication fails, this field will not be present in the response.
 | `campus`            | Abbreviation of the user's campus name                 |
 | `error`             | The error name and stack trace, if an error occurs     |
 
-## Integrating your application with pesu-auth
+### Integrating your application with pesu-auth
 
 Here are some examples of how you can integrate your application with the PESUAuth API using Python and cURL.
 
-### Python
+#### Python
 
-#### Request
+##### Request
 
 ```python
 import requests
@@ -202,7 +165,7 @@ response = requests.post("http://localhost:5000/authenticate", json=data)
 print(response.json())
 ```
 
-#### Response
+##### Response
 
 ```json
 {
@@ -226,9 +189,9 @@ print(response.json())
 }
 ```
 
-### cURL
+#### cURL
 
-#### Request
+##### Request
 
 ```bash
 curl -X POST http://localhost:5000/authenticate \
@@ -248,3 +211,7 @@ curl -X POST http://localhost:5000/authenticate \
   "timestamp": "2024-07-28 22:30:10.103368+05:30"
 }
 ```
+
+## Contributing to auth
+
+If you want to contribute to the project, please follow the [contribution guidelines](CONTRIBUTING.md).

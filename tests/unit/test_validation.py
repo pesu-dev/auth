@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.app import validate_input
+from app.util import validate_input
 
 
 def test_valid_input_username_prn():
