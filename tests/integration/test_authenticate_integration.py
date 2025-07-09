@@ -20,9 +20,9 @@ def test_integration_authenticate_success_username_email(client):
         "profile": False,
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 200
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is True
     assert "profile" not in data
     assert "timestamp" in data
@@ -37,9 +37,9 @@ def test_integration_authenticate_success_username_prn(client):
         "profile": False,
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 200
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is True
     assert "profile" not in data
     assert "timestamp" in data
@@ -54,9 +54,9 @@ def test_integration_authenticate_success_username_phone(client):
         "profile": False,
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 200
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is True
     assert "profile" not in data
     assert "timestamp" in data
@@ -75,9 +75,9 @@ def test_integration_authenticate_with_specific_profile_fields(client):
     assert password is not None, "TEST_PASSWORD environment variable not set"
     assert prn is not None, "TEST_PRN environment variable not set"
     assert branch is not None, "TEST_BRANCH environment variable not set"
-    assert (
-        branch_short_code is not None
-    ), "TEST_BRANCH_SHORT_CODE environment variable not set"
+    assert branch_short_code is not None, (
+        "TEST_BRANCH_SHORT_CODE environment variable not set"
+    )
     assert campus is not None, "TEST_CAMPUS environment variable not set"
 
     expected_fields = ["prn", "branch", "branch_short_code", "campus"]
@@ -88,17 +88,17 @@ def test_integration_authenticate_with_specific_profile_fields(client):
         "fields": expected_fields,
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 200
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is True
     assert "timestamp" in data
     assert data["message"] == "Login successful."
     assert "profile" in data
     profile = data["profile"]
-    assert len(profile) == len(
-        expected_fields
-    ), f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
+    assert len(profile) == len(expected_fields), (
+        f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
+    )
 
     assert profile["prn"] == prn
     assert profile["branch"] == branch
@@ -128,9 +128,9 @@ def test_integration_authenticate_with_all_profile_fields(client):
     assert password is not None, "TEST_PASSWORD environment variable not set"
     assert prn is not None, "TEST_PRN environment variable not set"
     assert branch is not None, "TEST_BRANCH environment variable not set"
-    assert (
-        branch_short_code is not None
-    ), "TEST_BRANCH_SHORT_CODE environment variable not set"
+    assert branch_short_code is not None, (
+        "TEST_BRANCH_SHORT_CODE environment variable not set"
+    )
     assert campus is not None, "TEST_CAMPUS environment variable not set"
     assert srn is not None, "TEST_SRN environment variable not set"
     assert program is not None, "TEST_PROGRAM environment variable not set"
@@ -163,17 +163,17 @@ def test_integration_authenticate_with_all_profile_fields(client):
         "profile": True,
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 200
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is True
     assert "timestamp" in data
     assert data["message"] == "Login successful."
     assert "profile" in data
     profile = data["profile"]
-    assert len(profile) == len(
-        all_fields
-    ), f"Expected {len(all_fields)} fields in profile, got {len(profile)}"
+    assert len(profile) == len(all_fields), (
+        f"Expected {len(all_fields)} fields in profile, got {len(profile)}"
+    )
 
     assert profile["name"] == name
     assert profile["prn"] == prn
@@ -197,9 +197,9 @@ def test_integration_invalid_password(client):
         "profile": True,
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code in (200, 500)
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is False
     assert "Invalid" in data["message"] or "error" in data["message"].lower()
 
@@ -210,9 +210,9 @@ def test_integration_missing_username(client):
         "profile": True,
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 400
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is False
     assert "username" in data["message"].lower()
 
@@ -223,9 +223,9 @@ def test_integration_missing_password(client):
         "profile": True,
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 400
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is False
     assert "password" in data["message"].lower()
 
@@ -237,9 +237,9 @@ def test_integration_username_wrong_type(client):
         "profile": True,
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 400
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is False
     assert "username" in data["message"].lower()
     assert "string" in data["message"].lower()
@@ -252,9 +252,9 @@ def test_integration_password_wrong_type(client):
         "profile": True,
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 400
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is False
     assert "password" in data["message"].lower()
     assert "string" in data["message"].lower()
@@ -267,9 +267,9 @@ def test_integration_profile_wrong_type(client):
         "profile": "true",
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 400
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is False
     assert "profile" in data["message"].lower()
     assert "boolean" in data["message"].lower()
@@ -283,9 +283,9 @@ def test_integration_fields_wrong_type(client):
         "fields": "prn,branch",
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 400
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is False
     assert "fields" in data["message"].lower()
     assert "list" in data["message"].lower()
@@ -299,9 +299,9 @@ def test_integration_fields_empty_list(client):
         "fields": [],
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 400
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is False
     assert "fields" in data["message"].lower()
     assert "non-empty" in data["message"].lower()
@@ -315,15 +315,15 @@ def test_integration_fields_invalid_field(client):
         "fields": ["invalid_field"],
     }
 
-    response = client.post("/authenticate", json=payload)
+    response = client.post("/", json=payload)
     assert response.status_code == 400
-    data = response.get_json()
+    data = response.json()
     assert data["status"] is False
     assert "Input should be" in data["message"]
     assert "input_value='invalid_field'" in data["message"]
 
 
 def test_integration_readme_route(client):
-    response = client.get("/readme")
+    response = client.get("/")
     assert response.status_code == 200
-    assert "html" in response.content_type
+    assert "html" in response.headers["content-type"]

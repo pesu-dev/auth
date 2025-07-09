@@ -48,6 +48,8 @@ pydantic==2.11.7
     #   fastapi
 pydantic-core==2.33.2
     # via pydantic
+pytest-asyncio==0.22.0
+    # via pesu-auth (pyproject.toml)
 pytz==2025.2
     # via pesu-auth (pyproject.toml)
 requests==2.32.4
