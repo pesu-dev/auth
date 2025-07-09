@@ -110,6 +110,75 @@ async def authenticate(request: Request):
         )
 
 
+@app.post("/authenticate", tags=["Authentication"])
+async def authenticate_old(request: Request):
+    """
+    Authenticate a user with their PESU credentials using PESU Academy. Added for backwards compatibility.
+
+    Request body should contain:
+    - username: str - The user's SRN, PRN, email, or phone number
+    - password: str - The user's password
+    - profile: bool (optional) - Whether to fetch user profile
+    - fields: List[str] (optional) - Profile fields to return
+    """
+    current_time = datetime.datetime.now(IST)
+    # Validate the input provided by the user
+    try:
+        logging.info("Received authentication request. Beginning input validation...")
+        body = await request.json()
+        validated_data = util.validate_input(body)
+        username = validated_data.username
+        password = validated_data.password
+        profile = validated_data.profile
+        fields = validated_data.fields
+    except ValidationError as e:
+        logging.exception("Could not validate request data.")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": False,
+                "message": f"Could not validate request data: {e}",
+                "timestamp": str(current_time),
+            },
+        )
+    except Exception as e:
+        logging.exception("Unexpected error during input validation.")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": False,
+                "message": f"Unexpected error during input validation: {e}",
+                "timestamp": str(current_time),
+            },
+        )
+
+    # Authenticate the user
+    try:
+        authentication_result = {"timestamp": str(current_time)}
+        logging.info(f"Authenticating user={username} with PESU Academy...")
+        authentication_result.update(
+            pesu_academy.authenticate(
+                username=username, password=password, profile=profile, fields=fields
+            )
+        )
+        authentication_result = ResponseModel.model_validate(authentication_result)
+        logging.info(
+            f"Returning auth result for user={username}: {authentication_result}"
+        )
+        return JSONResponse(
+            content=json.loads(
+                authentication_result.model_dump_json(exclude_none=True)
+            ),
+            status_code=200,
+        )
+    except Exception as e:
+        logging.exception(f"Error authenticating user={username}.")
+        return JSONResponse(
+            status_code=500,
+            content={"status": False, "message": f"Error authenticating user: {e}"},
+        )
+
+
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
