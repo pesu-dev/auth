@@ -75,9 +75,7 @@ def test_integration_authenticate_with_specific_profile_fields(client):
     assert password is not None, "TEST_PASSWORD environment variable not set"
     assert prn is not None, "TEST_PRN environment variable not set"
     assert branch is not None, "TEST_BRANCH environment variable not set"
-    assert branch_short_code is not None, (
-        "TEST_BRANCH_SHORT_CODE environment variable not set"
-    )
+    assert branch_short_code is not None, "TEST_BRANCH_SHORT_CODE environment variable not set"
     assert campus is not None, "TEST_CAMPUS environment variable not set"
 
     expected_fields = ["prn", "branch", "branch_short_code", "campus"]
@@ -128,9 +126,7 @@ def test_integration_authenticate_with_all_profile_fields(client):
     assert password is not None, "TEST_PASSWORD environment variable not set"
     assert prn is not None, "TEST_PRN environment variable not set"
     assert branch is not None, "TEST_BRANCH environment variable not set"
-    assert branch_short_code is not None, (
-        "TEST_BRANCH_SHORT_CODE environment variable not set"
-    )
+    assert branch_short_code is not None, "TEST_BRANCH_SHORT_CODE environment variable not set"
     assert campus is not None, "TEST_CAMPUS environment variable not set"
     assert srn is not None, "TEST_SRN environment variable not set"
     assert program is not None, "TEST_PROGRAM environment variable not set"
@@ -304,10 +300,7 @@ def test_integration_fields_empty_list(client):
     data = response.json()
     assert data["status"] is False
     assert data["message"] == "Could not validate request data."
-    assert (
-        data["details"]
-        == "body.fields: Value error, Fields must be a non-empty list or None."
-    )
+    assert data["details"] == "body.fields: Value error, Fields must be a non-empty list or None."
 
 
 def test_integration_fields_invalid_field(client):

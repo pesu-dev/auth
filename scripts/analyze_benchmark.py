@@ -35,9 +35,7 @@ def analyze_benchmark(csv_file: str):
     avg_time = sum(times) / total_requests
     successful_times = [t for s, t in zip(success, times) if s == 1]
     avg_success_time = (
-        sum(successful_times) / len(successful_times)
-        if successful_times
-        else float("nan")
+        sum(successful_times) / len(successful_times) if successful_times else float("nan")
     )
 
     min_time = min(times)

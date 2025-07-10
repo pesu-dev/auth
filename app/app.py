@@ -43,9 +43,7 @@ pesu_academy = PESUAcademy()
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logging.exception("Request data could not be validated.")
     errors = exc.errors()
-    message = "; ".join(
-        [f"{'.'.join(str(loc) for loc in e['loc'])}: {e['msg']}" for e in errors]
-    )
+    message = "; ".join([f"{'.'.join(str(loc) for loc in e['loc'])}: {e['msg']}" for e in errors])
     return JSONResponse(
         status_code=400,
         content={
@@ -127,9 +125,7 @@ async def authenticate(payload: RequestModel):
         )
         try:
             authentication_result = ResponseModel.model_validate(authentication_result)
-            logging.info(
-                f"Returning auth result for user={username}: {authentication_result}"
-            )
+            logging.info(f"Returning auth result for user={username}: {authentication_result}")
             authentication_result = authentication_result.model_dump(exclude_none=True)
             authentication_result["timestamp"] = current_time.isoformat()
             return JSONResponse(

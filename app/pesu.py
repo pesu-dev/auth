@@ -30,9 +30,7 @@ class PESUAcademy:
         )
         return PESUAcademyConstants.BRANCH_SHORT_CODES.get(branch)
 
-    def get_profile_information(
-        self, client: httpx.Client, username: str
-    ) -> dict[str, Any]:
+    def get_profile_information(self, client: httpx.Client, username: str) -> dict[str, Any]:
         """
         Get the profile information of the user.
 
@@ -48,9 +46,7 @@ class PESUAcademy:
             logging.info(
                 f"Fetching profile data for user={username} from the student profile page..."
             )
-            profile_url = (
-                "https://www.pesuacademy.com/Academy/s/studentProfilePESUAdmin"
-            )
+            profile_url = "https://www.pesuacademy.com/Academy/s/studentProfilePESUAdmin"
             query = {
                 "menuId": "670",
                 "url": "studentProfilePESUAdmin",
@@ -63,9 +59,7 @@ class PESUAcademy:
             response = client.get(profile_url, params=query)
             # If the status code is not 200, raise an exception because the profile page is not accessible
             if response.status_code != 200:
-                raise Exception(
-                    "Unable to fetch profile data. Profile page not accessible."
-                )
+                raise Exception("Unable to fetch profile data. Profile page not accessible.")
             logging.debug("Profile data fetched successfully.")
             # Parse the response text
             soup = HTMLParser(response.text)
@@ -95,9 +89,7 @@ class PESUAcademy:
                 "semester",
                 "section",
             ]:
-                if key == "branch" and (
-                    branch_short_code := self.map_branch_to_short_code(value)
-                ):
+                if key == "branch" and (branch_short_code := self.map_branch_to_short_code(value)):
                     profile["branch_short_code"] = branch_short_code
                 key = "prn" if key == "pesu_id" else key
                 logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
@@ -119,9 +111,7 @@ class PESUAcademy:
             profile["campus_code"] = int(campus_code)
             profile["campus"] = "RR" if campus_code == "1" else "EC"
 
-        logging.info(
-            f"Complete profile information retrieved for user={username}: {profile}"
-        )
+        logging.info(f"Complete profile information retrieved for user={username}: {profile}")
         return profile
 
     def authenticate(
@@ -222,25 +212,19 @@ class PESUAcademy:
         result = {"status": status, "message": "Login successful."}
 
         if profile:
-            logging.info(
-                f"Profile data requested for user={username}. Fetching profile data..."
-            )
+            logging.info(f"Profile data requested for user={username}. Fetching profile data...")
             # Fetch the profile information
             result["profile"] = self.get_profile_information(client, username)
             # Filter the fields if field filtering is enabled
             if field_filtering:
                 result["profile"] = {
-                    key: value
-                    for key, value in result["profile"].items()
-                    if key in fields
+                    key: value for key, value in result["profile"].items() if key in fields
                 }
                 logging.info(
                     f"Field filtering enabled. Filtered profile data for user={username}: {result['profile']}"
                 )
 
-        logging.info(
-            f"Authentication process for user={username} completed successfully."
-        )
+        logging.info(f"Authentication process for user={username} completed successfully.")
         # Close the client session and return the result
         client.close()
         return result
