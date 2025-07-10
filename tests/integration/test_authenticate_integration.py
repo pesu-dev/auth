@@ -118,7 +118,7 @@ def test_integration_authenticate_with_all_profile_fields(client):
     semester = os.getenv("TEST_SEMESTER")
     section = os.getenv("TEST_SECTION")
     phone = os.getenv("TEST_PHONE")
-    campus_code_str = os.getenv("TEST_CAMPUS_CODE")
+    campus_code = int(os.getenv("TEST_CAMPUS_CODE"))
     branch = os.getenv("TEST_BRANCH")
     branch_short_code = os.getenv("TEST_BRANCH_SHORT_CODE")
     campus = os.getenv("TEST_CAMPUS")
@@ -138,9 +138,7 @@ def test_integration_authenticate_with_all_profile_fields(client):
     assert section is not None, "TEST_SECTION environment variable not set"
     assert email is not None, "TEST_EMAIL environment variable not set"
     assert phone is not None, "TEST_PHONE environment variable not set"
-    assert campus_code_str is not None, "TEST_CAMPUS_CODE environment variable not set"
-
-    campus_code = int(campus_code_str)
+    assert campus_code is not None, "TEST_CAMPUS_CODE environment variable not set"
 
     all_fields = [
         "name",
