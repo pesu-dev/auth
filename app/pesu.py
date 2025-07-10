@@ -18,8 +18,12 @@ class PESUAcademy:
     def map_branch_to_short_code(branch: str) -> Optional[str]:
         """
         Map the branch name to its short code.
-        :param branch: Branch name
-        :return: Short code of the branch
+
+        Args:
+            branch (str): The full name of the branch.
+
+        Returns:
+            Optional[str]: The short code for the branch if it exists, otherwise None.
         """
         logging.warning(
             "Branch short code mapping will be deprecated in future versions. If you require acronyms, please do it application-side."
@@ -31,9 +35,13 @@ class PESUAcademy:
     ) -> dict[str, Any]:
         """
         Get the profile information of the user.
-        :param client: The httpx client session to use for making requests
-        :param username: The username of the user
-        :return: The profile information
+
+        Args:
+            client (httpx.Client): The HTTP client to use for making requests.
+            username (str): The username of the user, usually their PRN/email/phone number.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the user's profile information.
         """
         try:
             # Fetch the profile data from the student profile page
@@ -125,11 +133,15 @@ class PESUAcademy:
     ) -> dict[str, Any]:
         """
         Authenticate the user with the provided username and password.
-        :param username: Username of the user, usually their PRN/email/phone number
-        :param password: Password of the user
-        :param profile: Whether to fetch the profile information or not
-        :param fields: The fields to fetch from the profile and know your class and section data. Defaults to all fields if not provided.
-        :return: The authentication result
+
+        Args:
+            username (str): The username of the user, usually their PRN/email/phone number.
+            password (str): The password of the user.
+            profile (bool, optional): Whether to fetch the profile information or not. Defaults to False.
+            fields (Optional[list[str]], optional): The fields to fetch from the profile. Defaults to None, which means all default fields will be fetched.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the authentication status, message, and optionally the profile information.
         """
         # Create a new client session
         client = httpx.Client(follow_redirects=True, timeout=httpx.Timeout(10.0))

@@ -23,8 +23,16 @@ def convert_readme_to_html():
 def validate_input(data: dict) -> RequestModel:
     """
     Validate the input provided by the user
-    :param data: The input data provided by the user
-    :return: The validated data as a RequestModel object
+
+    Args:
+        data (dict): The input data to validate. Should contain:
+            - username: str - The user's SRN, PRN, email, or phone number
+            - password: str - The user's password
+            - profile: bool (optional) - Whether to fetch user profile
+            - fields: List[str] (optional) - Profile fields to return
+
+    Returns:
+        RequestModel: The validated input data as a RequestModel instance.
     """
     logging.info(
         f"Validating input: {data.get('username')=}, password={'*****' if data.get('password') else None}, "
