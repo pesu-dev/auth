@@ -9,21 +9,24 @@ class RequestModel(BaseModel):
     username: str = Field(
         ...,
         title="Username",
-        description="User's identifier: SRN, PRN, email, or phone number.",
+        description="User's identifier for authentication. Can be SRN, PRN, email, or phone number.",
         json_schema_extra={"example": "PES1201800001"},
     )
+
     password: str = Field(
         ...,
         title="Password",
         description="User's password for authentication.",
         json_schema_extra={"example": "mySecurePassword123"},
     )
+
     profile: bool = Field(
         False,
         title="Profile Flag",
         description="Whether to fetch the user's profile information.",
         json_schema_extra={"example": True},
     )
+
     fields: list[Literal[*PESUAcademyConstants.DEFAULT_FIELDS]] | None = Field(
         None,
         title="Profile Fields",
