@@ -1,5 +1,4 @@
 from pydantic import BaseModel, field_validator, ConfigDict, Field
-from typing import Literal
 from app.constants import PESUAcademyConstants
 
 
@@ -10,27 +9,29 @@ class RequestModel(BaseModel):
         ...,
         title="Username",
         description="User's identifier: SRN, PRN, email, or phone number.",
-        example="PES1201800001",
+        json_schema_extra={"example": "PES1201800001"},
     )
     password: str = Field(
         ...,
         title="Password",
         description="User's password for authentication.",
-        example="mySecurePassword123",
+        json_schema_extra={"example": "mySecurePassword123"},
     )
     profile: bool = Field(
         False,
         title="Profile Flag",
         description="Whether to fetch the user's profile information.",
-        example=True,
+        json_schema_extra={"example": True},
     )
-    fields: list[Literal[*PESUAcademyConstants.DEFAULT_FIELDS]] | None = Field(
+    fields: list[str] | None = Field(
         None,
         title="Profile Fields",
         description=(
             "List of profile fields to fetch. If omitted, all default fields will be returned."
         ),
-        example=["name", "email", "campus", "branch", "semester"],
+        json_schema_extra={
+            "example": ["name", "email", "campus", "branch", "semester"]
+        },
     )
 
     @field_validator("username")

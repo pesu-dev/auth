@@ -323,7 +323,10 @@ def test_integration_fields_invalid_field(client):
     data = response.json()
     assert data["status"] is False
     assert data["message"] == "Could not validate request data."
-    assert data["details"].startswith("body.fields.0")
+    assert (
+        data["details"]
+        == "body.fields: Value error, Invalid fields: invalid_field. Valid fields are: name, prn, srn, program, branch_short_code, branch, semester, section, email, phone, campus_code, campus"
+    )
 
 
 def test_integration_readme_route(client):
