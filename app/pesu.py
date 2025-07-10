@@ -2,7 +2,7 @@ import logging
 import re
 import traceback
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from selectolax.parser import HTMLParser
@@ -15,7 +15,7 @@ class PESUAcademy:
     """
 
     @staticmethod
-    def map_branch_to_short_code(branch: str) -> Optional[str]:
+    def map_branch_to_short_code(branch: str) -> str | None:
         """
         Map the branch name to its short code.
 
@@ -129,7 +129,7 @@ class PESUAcademy:
         username: str,
         password: str,
         profile: bool = False,
-        fields: Optional[list[str]] = None,
+        fields: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Authenticate the user with the provided username and password.

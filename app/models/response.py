@@ -1,4 +1,3 @@
-from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 from app.models import ProfileModel
 from datetime import datetime
@@ -25,7 +24,7 @@ class ResponseModel(BaseModel):
         description="Timestamp of the authentication attempt with timezone info.",
         example="2024-07-28T22:30:10.103368+05:30",
     )
-    profile: Optional[ProfileModel] = Field(
+    profile: ProfileModel | None = Field(
         None,
         title="User Profile Data",
         description="The user's profile data returned only if authentication succeeds and profile data was requested.",

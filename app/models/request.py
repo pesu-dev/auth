@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator, ConfigDict, Field
-from typing import Optional, Literal
+from typing import Literal
 from app.constants import PESUAcademyConstants
 
 
@@ -24,7 +24,7 @@ class RequestModel(BaseModel):
         description="Whether to fetch the user's profile information.",
         example=True,
     )
-    fields: Optional[list[Literal[*PESUAcademyConstants.DEFAULT_FIELDS]]] = Field(
+    fields: list[Literal[*PESUAcademyConstants.DEFAULT_FIELDS]] | None = Field(
         None,
         title="Profile Fields",
         description=(
@@ -57,7 +57,7 @@ class RequestModel(BaseModel):
 
     @field_validator("fields")
     @classmethod
-    def validate_fields(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+    def validate_fields(cls, v: list[str] | None) -> list[str] | None:
         """
         Validate that fields is either None or a non-empty list containing only allowed field names.
         """
