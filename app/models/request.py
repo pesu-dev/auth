@@ -1,5 +1,6 @@
 from pydantic import BaseModel, field_validator, ConfigDict, Field
 from app.constants import PESUAcademyConstants
+from typing import Literal
 
 
 class RequestModel(BaseModel):
@@ -23,7 +24,7 @@ class RequestModel(BaseModel):
         description="Whether to fetch the user's profile information.",
         json_schema_extra={"example": True},
     )
-    fields: list[str] | None = Field(
+    fields: list[Literal[*PESUAcademyConstants.DEFAULT_FIELDS]] | None = Field(
         None,
         title="Profile Fields",
         description=(
