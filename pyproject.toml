@@ -26,6 +26,7 @@ dev = [
     "pytest-asyncio>=1.0.0",
     "pytest-cov>=6.2.1",
     "python-dotenv>=1.1.0",
+    "ruff>=0.12.2",
 ]
 
 [build-system]
@@ -43,3 +44,10 @@ markers = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.format]
+quote-style = "double"
