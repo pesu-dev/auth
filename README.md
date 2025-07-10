@@ -16,8 +16,8 @@ returns the user's profile information. No personal data is stored.
 
 ## PESUAuth LIVE Deployment
 
-- You can access the PESUAuth API endpoint [here](https://pesu-auth.onrender.com/).
-- You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
+* You can access the PESUAuth API endpoint [here](https://pesu-auth.onrender.com/).
+* You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
 
 > :warning: **Warning:** The live version is hosted on a free tier server, so you might experience some latency on the
 > first request since the server might not be awake. Subsequent requests will be faster.
@@ -33,16 +33,16 @@ following commands to start the API.
 
 1. Build the Docker image either from the source code or pull the pre-built image from Docker Hub.
 
-   1. You can build the Docker image from the source code by running the following command in the root directory of
-      the repository.
+    1. You can build the Docker image from the source code by running the following command in the root directory of
+       the repository.
 
    ```bash
    docker build . --tag pesu-auth
    ```
 
-   2. You can also pull the pre-built Docker image
-      from [Docker Hub](https://hub.docker.com/repository/docker/aditeyabaral/pesu-auth/general) by running the
-      following command:
+    2. You can also pull the pre-built Docker image
+       from [Docker Hub](https://hub.docker.com/repository/docker/aditeyabaral/pesu-auth/general) by running the
+       following command:
 
    ```bash
    docker pull aditeyabaral/pesu-auth:latest
@@ -96,14 +96,14 @@ uv run python -m app.app
 
 ## How to use pesu-auth
 
-You can send a POST request to the `/` endpoint with the user's credentials and the API will return a JSON
+You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON
 object,
 with the user's profile information if requested.
 
 ### Request Parameters
 
 | **Parameter** | **Optional** | **Type**    | **Default** | **Description**                                                                                 |
-| ------------- | ------------ | ----------- | ----------- | ----------------------------------------------------------------------------------------------- |
+|---------------|--------------|-------------|-------------|-------------------------------------------------------------------------------------------------|
 | `username`    | No           | `str`       |             | The user's SRN or PRN                                                                           |
 | `password`    | No           | `str`       |             | The user's password                                                                             |
 | `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information                                                            |
@@ -116,12 +116,12 @@ profile data was requested, the response's `profile` key will store a dictionary
 **On an unsuccessful sign-in, this field will not exist**.
 
 | **Field**   | **Type**        | **Description**                                                          |
-| ----------- | --------------- | ------------------------------------------------------------------------ |
+|-------------|-----------------|--------------------------------------------------------------------------|
 | `status`    | `boolean`       | A flag indicating whether the overall request was successful             |
 | `profile`   | `ProfileObject` | A nested map storing the profile information, returned only if requested |
 | `message`   | `str`           | A message that provides information corresponding to the status          |
 | `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
-| `error`     | `str`           | The error name and stack trace, if an application side error occurs      |
+| `details`   | `str`           | Information about the error, if an error occurs.                         |
 
 #### `ProfileObject`
 
@@ -129,7 +129,7 @@ This object contains the user's profile information, which is returned only if t
 If the authentication fails, this field will not be present in the response.
 
 | **Field**           | **Description**                                        |
-| ------------------- | ------------------------------------------------------ |
+|---------------------|--------------------------------------------------------|
 | `name`              | Name of the user                                       |
 | `prn`               | PRN of the user                                        |
 | `srn`               | SRN of the user                                        |
@@ -142,7 +142,6 @@ If the authentication fails, this field will not be present in the response.
 | `phone`             | Phone number of the user registered with PESU          |
 | `campus_code`       | The integer code of the campus (1 for RR and 2 for EC) |
 | `campus`            | Abbreviation of the user's campus name                 |
-| `error`             | The error name and stack trace, if an error occurs     |
 
 ### Integrating your application with pesu-auth
 
@@ -161,7 +160,7 @@ data = {
     "profile": True,  # Optional, defaults to False
 }
 
-response = requests.post("http://localhost:5000/", json=data)
+response = requests.post("http://localhost:5000/authenticate", json=data)
 print(response.json())
 ```
 
@@ -194,7 +193,7 @@ print(response.json())
 ##### Request
 
 ```bash
-curl -X POST http://localhost:5000/ \
+curl -X POST http://localhost:5000/authenticate \
 -H "Content-Type: application/json" \
 -d '{
     "username": "your SRN or PRN here",
