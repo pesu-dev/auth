@@ -3,11 +3,6 @@
 Thank you for your interest in contributing to auth! This document provides guidelines and instructions for setting up
 your development environment and contributing to the project.
 
-# 🤝 Contributing to auth
-
-Thank you for your interest in contributing to auth! This document provides guidelines and instructions for setting up
-your development environment and contributing to the project.
-
 ---
 
 <details>

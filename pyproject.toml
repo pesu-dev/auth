@@ -1,6 +1,6 @@
 [project]
 name = "pesu-auth"
-version = "0.1.0"
+version = "2.0.0"
 description = "A simple API to authenticate PESU credentials using PESU Academy."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -9,8 +9,8 @@ authors = [
     { name = "Aditeya Baral", email = "aditeya.baral@gmail.com" }
 ]
 dependencies = [
-    "flasgger>=0.9.7.1",
-    "flask>=3.1.1",
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
     "gh-md-to-html>=1.21.3",
     "httpx>=0.28.1",
     "lxml-html-clean>=0.4.2",
@@ -23,8 +23,10 @@ dependencies = [
 dev = [
     "pre-commit>=4.2.0",
     "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
     "pytest-cov>=6.2.1",
     "python-dotenv>=1.1.0",
+    "ruff>=0.12.2",
 ]
 
 [build-system]
@@ -39,3 +41,13 @@ pythonpath = ["."]
 markers = [
     "secret_required: marks tests that require secrets or environment variables (e.g. TEST_PRN, TEST_PASSWORD)"
 ]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.format]
+quote-style = "double"

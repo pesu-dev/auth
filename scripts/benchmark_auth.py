@@ -34,9 +34,7 @@ def make_request(profile: bool = True) -> tuple[dict, float]:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Benchmark the authentication endpoint."
-    )
+    parser = argparse.ArgumentParser(description="Benchmark the authentication endpoint.")
     parser.add_argument(
         "--max-workers",
         type=int,
@@ -73,10 +71,7 @@ if __name__ == "__main__":
             f"Running benchmark with max {max_workers} workers and {num_requests} requests in parallel..."
         )
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [
-                executor.submit(make_request, profile=profile)
-                for _ in range(num_requests)
-            ]
+            futures = [executor.submit(make_request, profile=profile) for _ in range(num_requests)]
             for future in as_completed(futures):
                 try:
                     response, elapsed = future.result()
@@ -107,8 +102,6 @@ if __name__ == "__main__":
         for s, t in zip(success, times):
             f.write(f"{s},{t}\n")
 
-    print(
-        f"Benchmark completed. Successful requests: {sum(success)} out of {len(success)}"
-    )
+    print(f"Benchmark completed. Successful requests: {sum(success)} out of {len(success)}")
     print(f"Average time per request: {sum(times) / len(times):.2f} seconds")
     print(f"Total time taken: {sum(times):.2f} seconds")

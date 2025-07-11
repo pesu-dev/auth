@@ -2,7 +2,7 @@ import logging
 import re
 import traceback
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from selectolax.parser import HTMLParser
@@ -15,34 +15,38 @@ class PESUAcademy:
     """
 
     @staticmethod
-    def map_branch_to_short_code(branch: str) -> Optional[str]:
+    def map_branch_to_short_code(branch: str) -> str | None:
         """
         Map the branch name to its short code.
-        :param branch: Branch name
-        :return: Short code of the branch
+
+        Args:
+            branch (str): The full name of the branch.
+
+        Returns:
+            Optional[str]: The short code for the branch if it exists, otherwise None.
         """
         logging.warning(
             "Branch short code mapping will be deprecated in future versions. If you require acronyms, please do it application-side."
         )
         return PESUAcademyConstants.BRANCH_SHORT_CODES.get(branch)
 
-    def get_profile_information(
-        self, client: httpx.Client, username: str
-    ) -> dict[str, Any]:
+    def get_profile_information(self, client: httpx.Client, username: str) -> dict[str, Any]:
         """
         Get the profile information of the user.
-        :param client: The httpx client session to use for making requests
-        :param username: The username of the user
-        :return: The profile information
+
+        Args:
+            client (httpx.Client): The HTTP client to use for making requests.
+            username (str): The username of the user, usually their PRN/email/phone number.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the user's profile information.
         """
         try:
             # Fetch the profile data from the student profile page
             logging.info(
                 f"Fetching profile data for user={username} from the student profile page..."
             )
-            profile_url = (
-                "https://www.pesuacademy.com/Academy/s/studentProfilePESUAdmin"
-            )
+            profile_url = "https://www.pesuacademy.com/Academy/s/studentProfilePESUAdmin"
             query = {
                 "menuId": "670",
                 "url": "studentProfilePESUAdmin",
@@ -55,9 +59,7 @@ class PESUAcademy:
             response = client.get(profile_url, params=query)
             # If the status code is not 200, raise an exception because the profile page is not accessible
             if response.status_code != 200:
-                raise Exception(
-                    "Unable to fetch profile data. Profile page not accessible."
-                )
+                raise Exception("Unable to fetch profile data. Profile page not accessible.")
             logging.debug("Profile data fetched successfully.")
             # Parse the response text
             soup = HTMLParser(response.text)
@@ -87,9 +89,7 @@ class PESUAcademy:
                 "semester",
                 "section",
             ]:
-                if key == "branch" and (
-                    branch_short_code := self.map_branch_to_short_code(value)
-                ):
+                if key == "branch" and (branch_short_code := self.map_branch_to_short_code(value)):
                     profile["branch_short_code"] = branch_short_code
                 key = "prn" if key == "pesu_id" else key
                 logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
@@ -111,9 +111,7 @@ class PESUAcademy:
             profile["campus_code"] = int(campus_code)
             profile["campus"] = "RR" if campus_code == "1" else "EC"
 
-        logging.info(
-            f"Complete profile information retrieved for user={username}: {profile}"
-        )
+        logging.info(f"Complete profile information retrieved for user={username}: {profile}")
         return profile
 
     def authenticate(
@@ -121,15 +119,19 @@ class PESUAcademy:
         username: str,
         password: str,
         profile: bool = False,
-        fields: Optional[list[str]] = None,
+        fields: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Authenticate the user with the provided username and password.
-        :param username: Username of the user, usually their PRN/email/phone number
-        :param password: Password of the user
-        :param profile: Whether to fetch the profile information or not
-        :param fields: The fields to fetch from the profile and know your class and section data. Defaults to all fields if not provided.
-        :return: The authentication result
+
+        Args:
+            username (str): The username of the user, usually their PRN/email/phone number.
+            password (str): The password of the user.
+            profile (bool, optional): Whether to fetch the profile information or not. Defaults to False.
+            fields (Optional[list[str]], optional): The fields to fetch from the profile. Defaults to None, which means all default fields will be fetched.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the authentication status, message, and optionally the profile information.
         """
         # Create a new client session
         client = httpx.Client(follow_redirects=True, timeout=httpx.Timeout(10.0))
@@ -210,25 +212,19 @@ class PESUAcademy:
         result = {"status": status, "message": "Login successful."}
 
         if profile:
-            logging.info(
-                f"Profile data requested for user={username}. Fetching profile data..."
-            )
+            logging.info(f"Profile data requested for user={username}. Fetching profile data...")
             # Fetch the profile information
             result["profile"] = self.get_profile_information(client, username)
             # Filter the fields if field filtering is enabled
             if field_filtering:
                 result["profile"] = {
-                    key: value
-                    for key, value in result["profile"].items()
-                    if key in fields
+                    key: value for key, value in result["profile"].items() if key in fields
                 }
                 logging.info(
                     f"Field filtering enabled. Filtered profile data for user={username}: {result['profile']}"
                 )
 
-        logging.info(
-            f"Authentication process for user={username} completed successfully."
-        )
+        logging.info(f"Authentication process for user={username} completed successfully.")
         # Close the client session and return the result
         client.close()
         return result

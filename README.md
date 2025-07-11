@@ -16,13 +16,13 @@ returns the user's profile information. No personal data is stored.
 
 ## PESUAuth LIVE Deployment
 
-* You can access the PESUAuth API endpoint [here](https://pesu-auth.onrender.com/).
+* You can access the PESUAuth API endpoints [here](https://pesu-auth.onrender.com/).
 * You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
 
 > :warning: **Warning:** The live version is hosted on a free tier server, so you might experience some latency on the
 > first request since the server might not be awake. Subsequent requests will be faster.
 
-## How to run pesu-auth locally
+## How to run PESUAuth locally
 
 Running the PESUAuth API locally is simple. Clone the repository and follow the steps below to get started.
 
@@ -46,7 +46,7 @@ following commands to start the API.
 
    ```bash
    docker pull aditeyabaral/pesu-auth:latest
-   ````
+   ```
 
 2. Run the Docker container
 
@@ -94,7 +94,7 @@ uv run python -m app.app
 
 3. Access the API as previously mentioned.
 
-## How to use pesu-auth
+## How to use the PESUAuth API
 
 You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON
 object,
@@ -121,7 +121,7 @@ profile data was requested, the response's `profile` key will store a dictionary
 | `profile`   | `ProfileObject` | A nested map storing the profile information, returned only if requested |
 | `message`   | `str`           | A message that provides information corresponding to the status          |
 | `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
-| `error`     | `str`           | The error name and stack trace, if an application side error occurs      |#### Profile Ob    ject
+| `details`   | `str`           | Information about the error, if an error occurs.                         |
 
 #### `ProfileObject`
 
@@ -142,9 +142,8 @@ If the authentication fails, this field will not be present in the response.
 | `phone`             | Phone number of the user registered with PESU          |
 | `campus_code`       | The integer code of the campus (1 for RR and 2 for EC) |
 | `campus`            | Abbreviation of the user's campus name                 |
-| `error`             | The error name and stack trace, if an error occurs     |
 
-### Integrating your application with pesu-auth
+### Integrating your application with the PESUAuth API
 
 Here are some examples of how you can integrate your application with the PESUAuth API using Python and cURL.
 
@@ -212,6 +211,6 @@ curl -X POST http://localhost:5000/authenticate \
 }
 ```
 
-## Contributing to auth
+## Contributing to PESUAuth
 
 If you want to contribute to the project, please follow the [contribution guidelines](CONTRIBUTING.md).

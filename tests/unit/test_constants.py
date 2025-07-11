@@ -41,9 +41,7 @@ def test_branch_short_code_map_contains_all_branches():
             f"Branch '{branch}' short code mismatch."
         )
 
-    unexpected_branches = set(PESUAcademyConstants.BRANCH_SHORT_CODES) - set(
-        expected_map
-    )
+    unexpected_branches = set(PESUAcademyConstants.BRANCH_SHORT_CODES) - set(expected_map)
     assert not unexpected_branches, (
         f"Unexpected branches found in constants: {unexpected_branches}. Please update the test or constants."
     )

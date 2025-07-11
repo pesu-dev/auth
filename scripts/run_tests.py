@@ -10,9 +10,7 @@ from dotenv import load_dotenv
 def run_tests():
     load_dotenv()
 
-    test_username = (
-        os.getenv("TEST_EMAIL") and os.getenv("TEST_PRN") and os.getenv("TEST_PHONE")
-    )
+    test_username = os.getenv("TEST_EMAIL") and os.getenv("TEST_PRN") and os.getenv("TEST_PHONE")
     test_password = os.getenv("TEST_PASSWORD")
 
     if not test_username or not test_password:

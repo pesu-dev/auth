@@ -1,7 +1,8 @@
 from unittest.mock import mock_open, patch
-
+import pytest
 
 import app.app as app_module
+from fastapi import HTTPException
 
 
 def test_convert_readme_to_html_writes_html():
@@ -16,12 +17,15 @@ def test_convert_readme_to_html_writes_html():
     handle.write.assert_any_call("<h1>Title</h1>")
 
 
-def test_readme_raises_exception(monkeypatch):
+@pytest.mark.asyncio()
+async def test_readme_raises_exception(monkeypatch):
     def raise_exception():
         raise Exception("fail")
 
-    monkeypatch.setattr(app_module.os, "listdir", lambda: [])
+    monkeypatch.setattr("pathlib.Path.exists", lambda self: False)
     monkeypatch.setattr(app_module.util, "convert_readme_to_html", raise_exception)
-    response, status_code = app_module.readme()
-    assert status_code == 500
-    assert "Error occurred" in response
+    with pytest.raises(HTTPException) as exc_info:
+        await app_module.readme()
+
+    assert exc_info.value.status_code == 500
+    assert "Internal Server Error" in exc_info.value.detail
