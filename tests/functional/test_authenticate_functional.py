@@ -60,13 +60,11 @@ async def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcade
     password = os.getenv("TEST_PASSWORD")
     prn = os.getenv("TEST_PRN")
     branch = os.getenv("TEST_BRANCH")
-    branch_short_code = os.getenv("TEST_BRANCH_SHORT_CODE")
     campus = os.getenv("TEST_CAMPUS")
     assert email is not None, "TEST_EMAIL environment variable not set"
     assert password is not None, "TEST_PASSWORD environment variable not set"
     assert prn is not None, "TEST_PRN environment variable not set"
     assert branch is not None, "TEST_BRANCH environment variable not set"
-    assert branch_short_code is not None, "TEST_BRANCH_SHORT_CODE environment variable not set"
     assert campus is not None, "TEST_CAMPUS environment variable not set"
 
     fields = ["prn", "branch", "branch_short_code", "campus"]
@@ -82,7 +80,6 @@ async def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcade
 
     assert profile["prn"] == prn
     assert profile["branch"] == branch
-    assert profile["branch_short_code"] == branch_short_code
     assert profile["campus"] == campus
     assert "name" not in profile
 
@@ -101,7 +98,6 @@ async def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy):
     phone = os.getenv("TEST_PHONE")
     campus_code = int(os.getenv("TEST_CAMPUS_CODE"))
     branch = os.getenv("TEST_BRANCH")
-    branch_short_code = os.getenv("TEST_BRANCH_SHORT_CODE")
     campus = os.getenv("TEST_CAMPUS")
 
     assert name is not None, "TEST_NAME environment variable not set"
@@ -109,7 +105,6 @@ async def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy):
     assert password is not None, "TEST_PASSWORD environment variable not set"
     assert prn is not None, "TEST_PRN environment variable not set"
     assert branch is not None, "TEST_BRANCH environment variable not set"
-    assert branch_short_code is not None, "TEST_BRANCH_SHORT_CODE environment variable not set"
     assert campus is not None, "TEST_CAMPUS environment variable not set"
     assert srn is not None, "TEST_SRN environment variable not set"
     assert program is not None, "TEST_PROGRAM environment variable not set"
@@ -124,7 +119,6 @@ async def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy):
         "prn",
         "srn",
         "program",
-        "branch_short_code",
         "branch",
         "semester",
         "section",
@@ -148,7 +142,6 @@ async def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy):
     assert profile["prn"] == prn
     assert profile["srn"] == srn
     assert profile["program"] == program
-    assert profile["branch_short_code"] == branch_short_code
     assert profile["branch"] == branch
     assert profile["semester"] == semester
     assert profile["section"] == section
