@@ -61,11 +61,13 @@ async def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcade
     prn = os.getenv("TEST_PRN")
     branch = os.getenv("TEST_BRANCH")
     campus = os.getenv("TEST_CAMPUS")
+    name = os.getenv("TEST_NAME")
     assert email is not None, "TEST_EMAIL environment variable not set"
     assert password is not None, "TEST_PASSWORD environment variable not set"
     assert prn is not None, "TEST_PRN environment variable not set"
     assert branch is not None, "TEST_BRANCH environment variable not set"
     assert campus is not None, "TEST_CAMPUS environment variable not set"
+    assert name is not None, "TEST_NAME environment variable not set"
 
     fields = ["prn", "branch", "branch_short_code", "campus"]
     result = await pesu_academy.authenticate(email, password, profile=True, fields=fields)
@@ -81,7 +83,8 @@ async def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcade
     assert profile["prn"] == prn
     assert profile["branch"] == branch
     assert profile["campus"] == campus
-    assert "name" not in profile
+    assert profile["name"] == name
+    assert "email" not in profile
 
 
 @pytest.mark.secret_required

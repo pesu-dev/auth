@@ -80,13 +80,15 @@ def test_integration_authenticate_with_specific_profile_fields(client):
     prn = os.getenv("TEST_PRN")
     branch = os.getenv("TEST_BRANCH")
     campus = os.getenv("TEST_CAMPUS")
+    name = os.getenv("TEST_NAME")
     assert email is not None, "TEST_EMAIL environment variable not set"
     assert password is not None, "TEST_PASSWORD environment variable not set"
     assert prn is not None, "TEST_PRN environment variable not set"
     assert branch is not None, "TEST_BRANCH environment variable not set"
     assert campus is not None, "TEST_CAMPUS environment variable not set"
+    assert name is not None, "TEST_NAME environment variable not set"
 
-    expected_fields = ["prn", "branch", "campus"]
+    expected_fields = ["prn", "branch", "campus", "name"]
     payload = {
         "username": email,
         "password": password,
@@ -109,7 +111,8 @@ def test_integration_authenticate_with_specific_profile_fields(client):
     assert profile["prn"] == prn
     assert profile["branch"] == branch
     assert profile["campus"] == campus
-    assert "name" not in profile
+    assert profile["name"] == name
+    assert "email" not in profile
 
 
 @pytest.mark.secret_required
