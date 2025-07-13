@@ -61,9 +61,7 @@ class PESUAcademy:
             response = client.get(profile_url, params=query)
             # If the status code is not 200, raise an exception because the profile page is not accessible
             if response.status_code != 200:
-                raise ProfileFetchError(
-                    "Unable to fetch profile data. Profile page not accessible."
-                )
+                raise ProfileFetchError()
             logging.debug("Profile data fetched successfully.")
             # Parse the response text
             soup = HTMLParser(response.text)
