@@ -8,6 +8,8 @@ import httpx
 from selectolax.parser import HTMLParser
 from app.constants import PESUAcademyConstants
 
+from app.exceptions.exceptions import ProfileFetchError, CSRFTokenError
+
 
 class PESUAcademy:
     """
@@ -59,12 +61,14 @@ class PESUAcademy:
             response = client.get(profile_url, params=query)
             # If the status code is not 200, raise an exception because the profile page is not accessible
             if response.status_code != 200:
-                raise Exception("Unable to fetch profile data. Profile page not accessible.")
+                raise ProfileFetchError(
+                    "Unable to fetch profile data. Profile page not accessible."
+                )
             logging.debug("Profile data fetched successfully.")
             # Parse the response text
             soup = HTMLParser(response.text)
 
-        except Exception:
+        except ProfileFetchError:
             logging.exception("Unable to fetch profile data.")
             return {"error": f"Unable to fetch profile data: {traceback.format_exc()}"}
 
@@ -154,15 +158,15 @@ class PESUAcademy:
                 csrf_token = csrf_node.attributes.get("content")
                 logging.debug(f"CSRF token fetched: {csrf_token}")
             else:
-                raise ValueError("CSRF token not found in the response.")
-        except Exception as e:
+                raise CSRFTokenError("CSRF token not found in the response.")
+        except CSRFTokenError as err:
             # Log the error and return the error message
             logging.exception("Unable to fetch csrf token.")
             client.close()
             return {
                 "status": False,
                 "message": "Unable to fetch csrf token.",
-                "error": str(e),
+                "error": str(err),
             }
 
         # Prepare the login data for auth call
@@ -185,7 +189,7 @@ class PESUAcademy:
             client.close()
             return {
                 "status": False,
-                "message": "Unable to authenticate.",
+                "message": "Invalid username or password.",
                 "error": str(e),
             }
 
