@@ -29,12 +29,6 @@ class ProfileModel(BaseModel):
         description="Academic program that the user is enrolled in.",
         json_schema_extra={"example": "Bachelor of Technology"},
     )
-    branch_short_code: str | None = Field(
-        None,
-        title="Branch Short Code",
-        description="Abbreviation of the branch the user is pursuing.",
-        json_schema_extra={"example": "CSE"},
-    )
     branch: str | None = Field(
         None,
         title="Branch",
