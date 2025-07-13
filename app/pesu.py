@@ -8,7 +8,7 @@ import httpx
 from selectolax.parser import HTMLParser
 from app.constants import PESUAcademyConstants
 
-from app.exceptions.exceptions import ProfileFetchError, CSRFTokenError
+from app.exceptions.exceptions import ProfileFetchError, CSRFTokenError, AuthenticationError
 
 
 class PESUAcademy:
@@ -183,14 +183,14 @@ class PESUAcademy:
             response = client.post(auth_url, data=data)
             soup = HTMLParser(response.text)
             logging.debug("Authentication response received.")
-        except Exception as e:
+        except Exception:
             # Log the error and return the error message
             logging.exception("Unable to authenticate.")
             client.close()
             return {
                 "status": False,
                 "message": "Invalid username or password.",
-                "error": str(e),
+                "error": str(AuthenticationError()),
             }
 
         # If class login-form is present, login failed
@@ -201,6 +201,7 @@ class PESUAcademy:
             return {
                 "status": False,
                 "message": "Invalid username or password, or the user does not exist.",
+                "error": str(AuthenticationError()),
             }
 
         # If the user is successfully authenticated
