@@ -71,6 +71,10 @@ class PESUAcademy:
         except ProfileFetchError:
             logging.exception("Unable to fetch profile data.")
             return {"error": f"Unable to fetch profile data: {traceback.format_exc()}"}
+        except Exception:
+            # Catch exceptions caused by profile parsing errors
+            logging.exception("Error parsing profile from PESUAcademy response.")
+            return {"error": f"Unable to parse profile data: {traceback.format_exc()}"}
 
         profile = dict()
         for div in soup.css("div.form-group")[:7]:
@@ -165,8 +169,7 @@ class PESUAcademy:
             client.close()
             return {
                 "status": False,
-                "message": "Unable to fetch csrf token.",
-                "error": str(err),
+                "message": f"Unable to fetch csrf token. {str(err)}",
             }
 
         # Prepare the login data for auth call
@@ -189,8 +192,7 @@ class PESUAcademy:
             client.close()
             return {
                 "status": False,
-                "message": "Invalid username or password.",
-                "error": str(AuthenticationError()),
+                "message": str(AuthenticationError()),
             }
 
         # If class login-form is present, login failed
@@ -198,11 +200,7 @@ class PESUAcademy:
             # Log the error and return the error message
             logging.error("Login unsuccessful. Invalid username or password.")
             client.close()
-            return {
-                "status": False,
-                "message": "Invalid username or password, or the user does not exist.",
-                "error": str(AuthenticationError()),
-            }
+            return {"status": False, "message": str(AuthenticationError())}
 
         # If the user is successfully authenticated
         logging.info(f"Login successful for user={username}.")

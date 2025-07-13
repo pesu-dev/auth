@@ -4,7 +4,7 @@ from app.exceptions.base import PESUAuthError
 class AuthenticationError(PESUAuthError):
     """Raised when authentication with PESU Academy fails."""
 
-    def __init__(self, message="Invalid username or password."):
+    def __init__(self, message="Invalid username or password, or user does not exist."):
         super().__init__(message, status_code=401)
 
 
