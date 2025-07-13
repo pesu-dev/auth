@@ -2,7 +2,7 @@
 
 [![Docker Image Build](https://github.com/pesu-dev/auth/actions/workflows/docker.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/docker.yml)
 [![Pre-Commit Checks](https://github.com/pesu-dev/auth/actions/workflows/pre-commit.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/pre-commit.yaml)
-[![Lint](https://github.com/pesu-dev/auth/actions/workflows/flake8.yaml/badge.svg)](https://github.com/pesu-dev/auth/blob/main/.github/workflows/lint.yaml)
+[![Lint](https://github.com/pesu-dev/auth/actions/workflows/lint.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/lint.yaml)
 [![Deploy](https://github.com/pesu-dev/auth/actions/workflows/deploy.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/deploy.yaml)
 
 ![Docker Automated build](https://img.shields.io/docker/automated/aditeyabaral/pesu-auth?logo=docker)
