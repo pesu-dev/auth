@@ -157,6 +157,3 @@ def test_authenticate_invalid_credentials(pesu_academy: PESUAcademy):
     assert result["status"] is False
     assert "Invalid username or password" in result["message"]
     assert "profile" not in result
-
-
-

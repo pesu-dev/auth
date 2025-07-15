@@ -142,6 +142,8 @@ async def authenticate(payload: RequestModel):
         raise HTTPException(
             status_code=500, detail="Internal Server Error. Please try again later."
         )
+
+
 if __name__ == "__main__":
     # Set up argument parser for command line arguments
     parser = argparse.ArgumentParser(

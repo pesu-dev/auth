@@ -1,4 +1,4 @@
-from app.app import app  
+from app.app import app
 from fastapi.testclient import TestClient
 
 
@@ -8,12 +8,11 @@ async def error_endpoint():
 
 
 def test_exception_handler():
-    client=TestClient(app,raise_server_exceptions=False)
-    response =client.get("/error")
-    
-    assert response.status_code==500
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.get("/error")
+
+    assert response.status_code == 500
     assert response.json() == {
-            "status": False,
-            "message":"Internal Server Error. Please try again later."
-        }
-    
+        "status": False,
+        "message": "Internal Server Error. Please try again later.",
+    }
