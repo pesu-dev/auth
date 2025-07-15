@@ -5,9 +5,9 @@
 [![Lint](https://github.com/pesu-dev/auth/actions/workflows/lint.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/lint.yaml)
 [![Deploy](https://github.com/pesu-dev/auth/actions/workflows/deploy.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/deploy.yaml)
 
-![Docker Automated build](https://img.shields.io/docker/automated/aditeyabaral/pesu-auth?logo=docker)
-![Docker Image Version (tag)](https://img.shields.io/docker/v/aditeyabaral/pesu-auth/latest?logo=docker&label=build%20commit)
-![Docker Image Size (tag)](https://img.shields.io/docker/image-size/aditeyabaral/pesu-auth/latest?logo=docker)
+[![Docker Automated build](https://img.shields.io/docker/automated/aditeyabaral/pesu-auth?logo=docker)](https://hub.docker.com/r/aditeyabaral/pesu-auth/builds)
+[![Docker Image Version (tag)](https://img.shields.io/docker/v/aditeyabaral/pesu-auth/latest?logo=docker&label=build%20commit)](https://hub.docker.com/r/aditeyabaral/pesu-auth/tags)
+[![Docker Image Size (tag)](https://img.shields.io/docker/image-size/aditeyabaral/pesu-auth/latest?logo=docker)](https://hub.docker.com/r/aditeyabaral/pesu-auth)
 
 A simple API to authenticate PESU credentials using PESU Academy.
 
