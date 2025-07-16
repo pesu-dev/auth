@@ -183,5 +183,5 @@ def main():
     uvicorn.run("app.app:app", host=args.host, port=args.port, reload=args.debug)
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__":  # pragma: no cover
+    main()  # pragma: no cover
