@@ -2,13 +2,23 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
-
+from fastapi import APIRouter
 from app.app import app
+
+unhandled_router = APIRouter()
+
+
+@unhandled_router.get("/raiseUnhandled")
+async def raise_unhandled():
+    raise RuntimeError("Simulated internal server error")
+
+
+app.include_router(unhandled_router)
 
 
 @pytest.fixture(scope="module")
 def client():
-    with TestClient(app) as client:
+    with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 
 
@@ -184,7 +194,7 @@ def test_integration_authenticate_with_all_profile_fields(client):
 
 
 @pytest.mark.secret_required
-def test_integration_invalid_password(client):
+def test_integration_authenticate_invalid_password(client):
     payload = {
         "username": os.getenv("TEST_EMAIL"),
         "password": "wrongpass",
@@ -198,7 +208,7 @@ def test_integration_invalid_password(client):
     assert "Invalid" in data["message"] or "error" in data["message"].lower()
 
 
-def test_integration_missing_username(client):
+def test_integration_authenticate_missing_username(client):
     payload = {
         "password": "password",
         "profile": True,
@@ -212,7 +222,7 @@ def test_integration_missing_username(client):
     assert data["details"] == "body.username: Field required"
 
 
-def test_integration_missing_password(client):
+def test_integration_authenticate_missing_password(client):
     payload = {
         "username": "username",
         "profile": True,
@@ -226,7 +236,7 @@ def test_integration_missing_password(client):
     assert data["details"] == "body.password: Field required"
 
 
-def test_integration_username_wrong_type(client):
+def test_integration_authenticate_username_wrong_type(client):
     payload = {
         "username": 12345,  # not a string
         "password": "password",
@@ -241,7 +251,7 @@ def test_integration_username_wrong_type(client):
     assert data["details"] == "body.username: Input should be a valid string"
 
 
-def test_integration_password_wrong_type(client):
+def test_integration_authenticate_password_wrong_type(client):
     payload = {
         "username": "username",
         "password": 12345,
@@ -256,7 +266,7 @@ def test_integration_password_wrong_type(client):
     assert data["details"] == "body.password: Input should be a valid string"
 
 
-def test_integration_profile_wrong_type(client):
+def test_integration_authenticate_profile_wrong_type(client):
     payload = {
         "username": "username",
         "password": "password",
@@ -271,7 +281,7 @@ def test_integration_profile_wrong_type(client):
     assert data["details"] == "body.profile: Input should be a valid boolean"
 
 
-def test_integration_fields_wrong_type(client):
+def test_integration_authenticate_fields_wrong_type(client):
     payload = {
         "username": "username",
         "password": "password",
@@ -287,7 +297,7 @@ def test_integration_fields_wrong_type(client):
     assert data["details"] == "body.fields: Input should be a valid list"
 
 
-def test_integration_fields_empty_list(client):
+def test_integration_authenticate_fields_empty_list(client):
     payload = {
         "username": "username",
         "password": "password",
@@ -303,7 +313,7 @@ def test_integration_fields_empty_list(client):
     assert data["details"] == "body.fields: Value error, Fields must be a non-empty list or None."
 
 
-def test_integration_fields_invalid_field(client):
+def test_integration_authenticate_fields_invalid_field(client):
     payload = {
         "username": "username",
         "password": "password",
@@ -319,7 +329,29 @@ def test_integration_fields_invalid_field(client):
     assert data["details"].startswith("body.fields.0")
 
 
-def test_integration_readme_route(client):
+def test_integration_readme(client):
     response = client.get("/readme")
     assert response.status_code == 200
     assert "html" in response.headers["content-type"]
+
+
+def test_integration_health_check(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+
+
+def test_integration_not_found(client):
+    response = client.get("/nonexistent")
+    assert response.status_code == 404
+    data = response.json()
+    assert data["detail"] == "Not Found"
+
+
+def test_unhandled_exception_handler(client):
+    response = client.get("/raiseUnhandled")
+    assert response.status_code == 500
+    data = response.json()
+    assert data["status"] is False
+    assert data["message"] == "Internal Server Error. Please try again later."

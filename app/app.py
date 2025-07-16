@@ -144,7 +144,10 @@ async def authenticate(payload: RequestModel):
         )
 
 
-if __name__ == "__main__":
+def main():
+    """
+    Main function to run the FastAPI application with command line arguments.
+    """
     # Set up argument parser for command line arguments
     parser = argparse.ArgumentParser(
         description="PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy."
@@ -178,3 +181,7 @@ if __name__ == "__main__":
 
     # Run the app
     uvicorn.run("app.app:app", host=args.host, port=args.port, reload=args.debug)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()  # pragma: no cover
