@@ -213,4 +213,5 @@ curl -X POST http://localhost:5000/authenticate \
 
 ## Contributing to PESUAuth
 
-If you want to contribute to the project, please follow the [contribution guidelines](CONTRIBUTING.md).
+If you want to contribute to the project, please follow
+the [contribution guidelines](https://github.com/pesu-dev/auth/blob/main/CONTRIBUTING.md).
