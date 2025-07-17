@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytz
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import ValidationError
@@ -16,11 +17,31 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
 
 IST = pytz.timezone("Asia/Kolkata")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan event handler for startup and shutdown events.
+    """
+    # Startup
+    try:
+        logging.info("Application startup: Regenerating README.html...")
+        util.convert_readme_to_html()
+        logging.info("README.html regenerated successfully on startup.")
+    except Exception:
+        logging.exception("Failed to regenerate README.html on startup.")
+    yield
+    # Shutdown
+    logging.info("Application shutdown.")
+
+
 app = FastAPI(
     title="PESUAuth API",
     description="A simple API to authenticate PESU credentials using PESU Academy",
     version="2.0.0",
     docs_url="/",
+    lifespan=lifespan,
     openapi_tags=[
         {
             "name": "Authentication",
