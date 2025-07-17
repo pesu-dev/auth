@@ -1,4 +1,4 @@
-name: Enforce PR Source Policy
+name: Enforce PR Origin Policy
 
 on:
   pull_request:
@@ -18,13 +18,12 @@ jobs:
       - name: Print PR source info
         run: |
           echo "PR source information:"
-          echo "  - GITHUB_TOKEN: (hidden for security)"
           echo "  - PR Number: $PR_NUMBER"
           echo "  - Source repo: $SOURCE_REPO"
           echo "  - Target repo: $TARGET_REPO"
           echo "  - Branch: $BRANCH"
 
-      - name: ❌ Fail if PR is not from a feature branch on a fork
+      - name: Fail if PR is not from a feature branch on a fork
         run: |
           if [ "$SOURCE_REPO" = "$TARGET_REPO" ] || { [ "$SOURCE_REPO" != "$TARGET_REPO" ] && [ "$BRANCH" = "main" ]; }; then
             echo "❌ PRs must come from a fork and from a non-main branch. Closing PR #$PR_NUMBER."
