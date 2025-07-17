@@ -1,0 +1,39 @@
+name: Enforce PR Source Policy
+
+on:
+  pull_request:
+    types: [ opened, reopened, synchronize ]
+
+jobs:
+  validate-pr-origin:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      SOURCE_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      TARGET_REPO: ${{ github.repository }}
+      BRANCH: ${{ github.event.pull_request.head.ref }}
+
+    steps:
+      - name: Print PR source info
+        run: |
+          echo "PR source information:"
+          echo "  - GITHUB_TOKEN: (hidden for security)"
+          echo "  - PR Number: $PR_NUMBER"
+          echo "  - Source repo: $SOURCE_REPO"
+          echo "  - Target repo: $TARGET_REPO"
+          echo "  - Branch: $BRANCH"
+
+      - name: ❌ Fail if PR is not from a feature branch on a fork
+        run: |
+          if [ "$SOURCE_REPO" = "$TARGET_REPO" ] || { [ "$SOURCE_REPO" != "$TARGET_REPO" ] && [ "$BRANCH" = "main" ]; }; then
+            echo "❌ PRs must come from a fork and from a non-main branch. Closing PR #$PR_NUMBER."
+            curl -X PATCH \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/$TARGET_REPO/pulls/$PR_NUMBER \
+              -d '{"state":"closed"}'
+            exit 1
+          else
+            echo "✅ PR passed origin checks."
+          fi
