@@ -8,8 +8,6 @@ jobs:
   validate-pr-origin:
     runs-on: ubuntu-latest
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      REPOSITORY_WRITE_ACCESS_TOKEN: ${{ secrets.REPOSITORY_WRITE_ACCESS_TOKEN }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       SOURCE_REPO: ${{ github.event.pull_request.head.repo.full_name }}
       TARGET_REPO: ${{ github.repository }}
