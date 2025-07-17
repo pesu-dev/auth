@@ -20,4 +20,3 @@ def convert_readme_to_html():
     with open("README.html", "w") as f:
         f.write(html)
     logging.info("README.md converted to HTML successfully.")
-    # test
