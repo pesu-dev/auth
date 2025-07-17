@@ -28,23 +28,6 @@ jobs:
         run: |
           if [ "$SOURCE_REPO" = "$TARGET_REPO" ] || { [ "$SOURCE_REPO" != "$TARGET_REPO" ] && [ "$BRANCH" = "main" ]; }; then
             echo "❌ PRs must come from a fork and from a non-main branch. Closing PR #$PR_NUMBER."
-
-            # Post a comment explaining the reason
-            curl -X POST \
-              -H "Authorization: Bearer $REPOSITORY_WRITE_ACCESS_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/$TARGET_REPO/issues/$PR_NUMBER/comments \
-              -d "{\"body\": \"🚫 This PR has been **automatically closed** because it does not follow the contribution guidelines.\\n\\nPRs must:\\n- Be created from a **fork** of the repository\\n- Use a **non-main** branch (e.g., \`feature-xyz\`)\\n\\n🛠️ Please fork the repository, create a new branch, push your changes there, and open a new pull request.\"}"
-
-            # Close the pull request
-            curl -X PATCH \
-              -H "Authorization: Bearer $REPOSITORY_WRITE_ACCESS_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/$TARGET_REPO/pulls/$PR_NUMBER \
-              -d '{"state":"closed"}'
-
             exit 1
           else
             echo "✅ PR passed origin checks."
