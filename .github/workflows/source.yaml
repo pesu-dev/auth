@@ -25,7 +25,7 @@ jobs:
       - name: Fail if PR is not from a feature branch on a fork
         run: |
           if [ "$SOURCE_REPO" = "$TARGET_REPO" ] || { [ "$SOURCE_REPO" != "$TARGET_REPO" ] && [ "$BRANCH" = "main" ]; }; then
-            echo "❌ PRs must come from a fork and from a non-main branch. Closing PR #$PR_NUMBER."
+            echo "❌ PRs must come from a fork and from a non-main branch. Failing workflow for PR #$PR_NUMBER."
             exit 1
           else
             echo "✅ PR passed origin checks."
