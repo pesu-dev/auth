@@ -19,7 +19,7 @@ We will acknowledge your report within 48 hours and keep you updated on the prog
 
 ## Important Disclaimer
 
-PESUAuth API acts solely as an API gateway for authenticating PESU credentials via the PESU Academy service. 
+PESUAuth API acts solely as an API gateway for authenticating PESU credentials via the PESU Academy service.
 
 - We **do not control or take responsibility** for any third-party applications or services that use this API.
 - Users and developers should exercise caution when using or integrating with applications built on top of this API.
