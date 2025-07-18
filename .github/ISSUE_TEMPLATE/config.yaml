@@ -1,0 +1,9 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🗨️ GitHub Discussions
+    url: https://github.com/orgs/pesu-dev/discussions
+    about: Use GitHub Discussions for general Q&A and brainstorming.
+
+  - name: 💬 Join the PESU Developer Group Discord Server
+    url: https://discord.gg/eZ3uFs2
+    about: Join our Discord for help with PESUAuth integration, support, or bot development.

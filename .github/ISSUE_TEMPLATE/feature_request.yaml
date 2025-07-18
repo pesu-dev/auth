@@ -1,0 +1,67 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement
+labels: ["enhancement", "discussion-needed"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ✨ Feature Request
+
+        Suggest a new idea, functionality, or improvement to the API.
+    validations:
+      required: true
+
+  - type: input
+    id: summary
+    attributes:
+      label: 📌 Feature Summary
+      placeholder: e.g. "Add support for fetching date of birth from PESU Academy"
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 💡 Motivation
+      description: Explain *why* this feature is needed. What problem does it solve or what value does it add?
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: 🧩 Suggested Implementation
+      description: (Optional) Share any ideas for how this could be implemented.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: 🧠 Estimated Complexity
+      options:
+        - Low (Simple addition, e.g., new route or doc update)
+        - Medium (Changes multiple files, some model updates)
+        - High (Refactor, scraping updates, or major design change)
+      multiple: false
+    validations:
+      required: false
+
+  - type: textarea
+    id: related
+    attributes:
+      label: 🔗 Related Issues / PRs
+      description: Reference related discussions, if any.
+      placeholder: |
+        - Related to #42
+        - Follow-up to PR #101
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 🧠 Additional Notes
+      placeholder: Edge cases, affected user groups, breaking potential or potential blockers
+    validations:
+      required: false
