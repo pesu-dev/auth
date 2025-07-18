@@ -56,7 +56,7 @@ Please provide a concise summary of the changes:
 
 > *Please indicate the work items you have carried out. Completing all the relevant items on this list is mandatory. Anything left unchecked will be assumed to be non-relevant*
 
-- [ ] My code follows the [CONTRIBUTING.md](../CONTRIBUTING.md) guidelines
+- [ ] My code follows the [CONTRIBUTING.md](https://github.com/pesu-dev/auth/blob/main/.github/CONTRIBUTING.md) guidelines
 - [ ] I've performed a self-review of my changes
 - [ ] I've added/updated necessary comments and docstrings
 - [ ] I've updated relevant docs (README or endpoint docs)
