@@ -8,6 +8,8 @@ body:
         ## 🐛 Bug Report
 
         Thank you for taking the time to report an issue. Please help us diagnose the problem by filling out the following information.
+    validations:
+      required: true
 
   - type: input
     id: title
@@ -35,12 +37,16 @@ body:
     attributes:
       label: ✅ Expected Behavior
       placeholder: e.g. "Should return 200 OK with a valid `ResponseModel` payload"
+    validations:
+      required: true
 
   - type: textarea
     id: actual
     attributes:
       label: ❌ Actual Behavior
       placeholder: e.g. "Returns 500 with 'Internal Server Error'"
+    validations:
+      required: true
 
   - type: input
     id: version
@@ -51,11 +57,22 @@ body:
       required: false
 
   - type: input
+    id: commit
+    attributes:
+      label: Commit SHA or name
+      description: Paste the commit hash or branch name you were using when the bug occurred (e.g. `abc1234`, `main@HEAD`, or `feature/xyz`).
+      placeholder: e.g. abc1234 or feature/auth-refactor
+    validations:
+      required: true
+
+  - type: input
     id: environment
     attributes:
       label: 🧪 Runtime Environment
       description: OS, Python version, Docker/uv, etc.
       placeholder: e.g. "PopOS 24.04, Python 3.12, uv, Docker 26.1"
+    validations:
+      required: true
 
   - type: textarea
     id: logs
@@ -63,6 +80,8 @@ body:
       label: 📜 Logs / Traceback
       description: Paste any relevant terminal logs, exceptions, or `pre-commit` failures.
       render: shell
+    validations:
+      required: true
 
   - type: dropdown
     id: area
@@ -79,10 +98,12 @@ body:
         - CI / pre-commit
         - Other
     validations:
-      required: false
+      required: true
 
   - type: textarea
     id: notes
     attributes:
       label: 🧠 Additional Notes
       description: Add any other context that might help diagnose or prioritize the issue.
+    validations:
+      required: false
