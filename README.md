@@ -211,6 +211,10 @@ curl -X POST http://localhost:5000/authenticate \
 }
 ```
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=pesu-dev/auth&type=Date)](https://www.star-history.com/#pesu-dev/auth&Date)
+
 ## Contributing to PESUAuth
 
 Made with ❤️ by
