@@ -1,0 +1,32 @@
+name: Enforce PR Origin Policy
+
+on:
+  pull_request:
+    types: [ opened, reopened, synchronize ]
+
+jobs:
+  validate-pr-origin:
+    runs-on: ubuntu-latest
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      SOURCE_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      TARGET_REPO: ${{ github.repository }}
+      BRANCH: ${{ github.event.pull_request.head.ref }}
+
+    steps:
+      - name: Print PR source info
+        run: |
+          echo "PR source information:"
+          echo "  - PR Number: $PR_NUMBER"
+          echo "  - Source repo: $SOURCE_REPO"
+          echo "  - Target repo: $TARGET_REPO"
+          echo "  - Branch: $BRANCH"
+
+      - name: Fail if PR is not from a feature branch on a fork
+        run: |
+          if [ "$SOURCE_REPO" = "$TARGET_REPO" ] || { [ "$SOURCE_REPO" != "$TARGET_REPO" ] && [ "$BRANCH" = "main" ]; }; then
+            echo "❌ PRs must come from a fork and from a non-main branch. Failing workflow for PR #$PR_NUMBER."
+            exit 1
+          else
+            echo "✅ PR passed origin checks."
+          fi
