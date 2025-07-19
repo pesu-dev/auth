@@ -201,7 +201,7 @@ class PESUAcademy:
             client.close()
             return {
                 "status": False,
-                "message": str(AuthenticationError()),
+                "message": "Unable to authenticate: " + str(AuthenticationError()),
             }
 
         # If class login-form is present, login failed
