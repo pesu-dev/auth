@@ -8,6 +8,8 @@ import httpx
 from selectolax.parser import HTMLParser
 from app.constants import PESUAcademyConstants
 
+from app.exceptions.exceptions import ProfileFetchError, CSRFTokenError, AuthenticationError
+
 
 class PESUAcademy:
     """
@@ -59,17 +61,32 @@ class PESUAcademy:
             response = client.get(profile_url, params=query)
             # If the status code is not 200, raise an exception because the profile page is not accessible
             if response.status_code != 200:
-                raise Exception("Unable to fetch profile data. Profile page not accessible.")
+                raise ProfileFetchError()
             logging.debug("Profile data fetched successfully.")
             # Parse the response text
             soup = HTMLParser(response.text)
 
-        except Exception:
+        except ProfileFetchError:
             logging.exception("Unable to fetch profile data.")
             return {"error": f"Unable to fetch profile data: {traceback.format_exc()}"}
+        except Exception:
+            # Catch exceptions caused by profile parsing errors
+            logging.exception("Error parsing profile from PESUAcademy response.")
+            return {"error": f"Unable to parse profile data: {traceback.format_exc()}"}
 
         profile = dict()
-        for div in soup.css("div.form-group")[:7]:
+
+        try:
+            selectors = ("div.form-group",)
+            if not soup.any_css_matches(selectors):
+                raise ProfileFetchError()
+            if len(form_group_elems := soup.css("div.form-group")) < 7:
+                raise ProfileFetchError()
+        except ProfileFetchError:
+            logging.exception("Error parsing profile from PESUAcademy response.")
+            return {"error": f"Unable to parse profile data: {traceback.format_exc()}"}
+
+        for div in form_group_elems[:7]:
             text = div.text().strip()
             logging.debug(f"Processing profile element: {text}")
             if text.startswith("PESU Id"):
@@ -154,15 +171,14 @@ class PESUAcademy:
                 csrf_token = csrf_node.attributes.get("content")
                 logging.debug(f"CSRF token fetched: {csrf_token}")
             else:
-                raise ValueError("CSRF token not found in the response.")
-        except Exception as e:
+                raise CSRFTokenError("CSRF token not found in the response.")
+        except CSRFTokenError as err:
             # Log the error and return the error message
             logging.exception("Unable to fetch csrf token.")
             client.close()
             return {
                 "status": False,
-                "message": "Unable to fetch csrf token.",
-                "error": str(e),
+                "message": f"Unable to fetch csrf token. {str(err)}",
             }
 
         # Prepare the login data for auth call
@@ -179,14 +195,13 @@ class PESUAcademy:
             response = client.post(auth_url, data=data)
             soup = HTMLParser(response.text)
             logging.debug("Authentication response received.")
-        except Exception as e:
+        except Exception:
             # Log the error and return the error message
             logging.exception("Unable to authenticate.")
             client.close()
             return {
                 "status": False,
-                "message": "Unable to authenticate.",
-                "error": str(e),
+                "message": "Unable to authenticate: " + str(AuthenticationError()),
             }
 
         # If class login-form is present, login failed
@@ -194,10 +209,7 @@ class PESUAcademy:
             # Log the error and return the error message
             logging.error("Login unsuccessful. Invalid username or password.")
             client.close()
-            return {
-                "status": False,
-                "message": "Invalid username or password, or the user does not exist.",
-            }
+            return {"status": False, "message": str(AuthenticationError())}
 
         # If the user is successfully authenticated
         logging.info(f"Login successful for user={username}.")

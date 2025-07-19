@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.pesu import PESUAcademy
+from app.exceptions.exceptions import CSRFTokenError
 
 
 @pytest.fixture
@@ -61,7 +62,7 @@ def test_authenticate_success_with_profile(mock_get_profile, mock_post, mock_get
 
 @patch("app.pesu.httpx.Client.get")
 def test_authenticate_csrf_fetch_failure(mock_get, pesu):
-    mock_get.side_effect = Exception("CSRF fetch failed")
+    mock_get.side_effect = CSRFTokenError("CSRF fetch failed")
 
     result = pesu.authenticate("user", "pass")
 

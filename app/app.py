@@ -15,6 +15,7 @@ import app.util as util
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
+from app.exceptions.exceptions import PESUAuthError
 
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -71,6 +72,17 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "status": False,
             "message": "Could not validate request data.",
             "details": message,
+        },
+    )
+
+
+@app.exception_handler(PESUAuthError)
+async def pesu_exception_handler(request: Request, exc: PESUAuthError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "status": False,
+            "message": exc.message,
         },
     )
 
