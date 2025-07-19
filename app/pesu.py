@@ -75,7 +75,18 @@ class PESUAcademy:
             return {"error": f"Unable to parse profile data: {traceback.format_exc()}"}
 
         profile = dict()
-        for div in soup.css("div.form-group")[:7]:
+
+        try:
+            selectors = ("div.form-group",)
+            if not soup.any_css_matches(selectors):
+                raise ProfileFetchError()
+            if len(form_group_elems := soup.css("div.form-group")) < 7:
+                raise ProfileFetchError()
+        except ProfileFetchError:
+            logging.exception("Error parsing profile from PESUAcademy response.")
+            return {"error": f"Unable to parse profile data: {traceback.format_exc()}"}
+
+        for div in form_group_elems[:7]:
             text = div.text().strip()
             logging.debug(f"Processing profile element: {text}")
             if text.startswith("PESU Id"):
