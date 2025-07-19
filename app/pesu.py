@@ -6,13 +6,26 @@ from typing import Any
 
 import httpx
 from selectolax.parser import HTMLParser
-from app.constants import PESUAcademyConstants
 
 
 class PESUAcademy:
     """
     Class to interact with the PESU Academy website.
     """
+
+    DEFAULT_FIELDS: list[str] = [
+        "name",
+        "prn",
+        "srn",
+        "program",
+        "branch",
+        "semester",
+        "section",
+        "email",
+        "phone",
+        "campus_code",
+        "campus",
+    ]
 
     def get_profile_information(self, client: httpx.Client, username: str) -> dict[str, Any]:
         """
@@ -118,9 +131,9 @@ class PESUAcademy:
         # Create a new client session
         client = httpx.Client(follow_redirects=True, timeout=httpx.Timeout(10.0))
         # Default fields to fetch if fields is not provided
-        fields = PESUAcademyConstants.DEFAULT_FIELDS if fields is None else fields
+        fields = self.DEFAULT_FIELDS if fields is None else fields
         # check if fields is not the default fields and enable field filtering
-        field_filtering = fields != PESUAcademyConstants.DEFAULT_FIELDS
+        field_filtering = fields != self.DEFAULT_FIELDS
 
         logging.info(
             f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ..."

@@ -6,6 +6,10 @@ from app.app import app, main
 from unittest.mock import MagicMock
 
 
+import logging
+import app.util as util
+
+
 @pytest.fixture
 def client():
     return TestClient(app)
@@ -67,3 +71,17 @@ def test_main_function_debug_mode(mock_run, mock_logging, mock_parse_args):
 
     mock_logging.assert_called_once()
     mock_run.assert_called_once_with("app.app:app", host="127.0.0.1", port=8000, reload=True)
+
+
+@pytest.mark.asyncio
+async def test_lifespan_startup_exception(monkeypatch, caplog):
+    def failing_convert():
+        raise Exception("Simulated failure")
+
+    monkeypatch.setattr(util, "convert_readme_to_html", failing_convert)
+    caplog.set_level(logging.ERROR)
+
+    async with app.router.lifespan_context(app):
+        pass
+
+    assert any("Failed to regenerate README.html on startup." in r.message for r in caplog.records)
