@@ -64,12 +64,6 @@ class RequestModel(BaseModel):
         """
         Validate that fields is either None or a non-empty list containing only allowed field names.
         """
-        if v is not None:
-            if not v:
-                raise ValueError("Fields must be a non-empty list or None.")
-            invalid = [f for f in v if f not in PESUAcademyConstants.DEFAULT_FIELDS]
-            if invalid:
-                raise ValueError(
-                    f"Invalid fields: {', '.join(invalid)}. Valid fields are: {', '.join(PESUAcademyConstants.DEFAULT_FIELDS)}"
-                )
+        if v is not None and not v:
+            raise ValueError("Fields must be a non-empty list or None.")
         return v

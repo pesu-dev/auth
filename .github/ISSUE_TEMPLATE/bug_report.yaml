@@ -1,0 +1,109 @@
+name: 🐛 Bug Report
+description: Report an issue with the PESUAuth API
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🐛 Bug Report
+
+        Thank you for taking the time to report an issue. Please help us diagnose the problem by filling out the following information.
+    validations:
+      required: true
+
+  - type: input
+    id: title
+    attributes:
+      label: 🧵 Bug Summary
+      description: Concisely describe the issue you're experiencing.
+      placeholder: "e.g. /authenticate throws 500 for valid credentials"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 📋 Steps to Reproduce
+      description: Provide a clear set of steps to reproduce the issue.
+      placeholder: |
+        1. Start the API with `scripts/run_tests.py`
+        2. Make a POST request to `/authenticate` with `username=X` and `password=Y`
+        3. Observe the 500 error and traceback
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: ✅ Expected Behavior
+      placeholder: e.g. "Should return 200 OK with a valid `ResponseModel` payload"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: ❌ Actual Behavior
+      placeholder: e.g. "Returns 500 with 'Internal Server Error'"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 📦 API Version
+      placeholder: e.g. 2.0.0
+    validations:
+      required: false
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA or name
+      description: Paste the commit hash or branch name you were using when the bug occurred (e.g. `abc1234`, `main@HEAD`, or `feature/xyz`).
+      placeholder: e.g. abc1234 or feature/auth-refactor
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: 🧪 Runtime Environment
+      description: OS, Python version, Docker/uv, etc.
+      placeholder: e.g. "PopOS 24.04, Python 3.12, uv, Docker 26.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 📜 Logs / Traceback
+      description: Paste any relevant terminal logs, exceptions, or `pre-commit` failures.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 📁 Area Affected
+      multiple: true
+      options:
+        - /authenticate
+        - /readme
+        - /health
+        - RequestModel or ResponseModel
+        - Profile scraping (`app/pesu.py`)
+        - HTML rendering (`app/util.py`)
+        - CI / pre-commit
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 🧠 Additional Notes
+      description: Add any other context that might help diagnose or prioritize the issue.
+    validations:
+      required: false

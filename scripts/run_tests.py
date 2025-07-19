@@ -29,7 +29,7 @@ def run_tests():
             "pytest",
             "--cov=app",
             "--cov-report=term-missing",
-            "--cov-fail-under=80",
+            "--cov-fail-under=95",
             "--disable-warnings",
             "-v",
             "-s",
