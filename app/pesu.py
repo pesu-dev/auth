@@ -6,7 +6,6 @@ from typing import Any
 
 import httpx
 from selectolax.parser import HTMLParser
-from app.constants import PESUAcademyConstants
 
 
 class PESUAcademy:
@@ -14,21 +13,19 @@ class PESUAcademy:
     Class to interact with the PESU Academy website.
     """
 
-    @staticmethod
-    def map_branch_to_short_code(branch: str) -> str | None:
-        """
-        Map the branch name to its short code.
-
-        Args:
-            branch (str): The full name of the branch.
-
-        Returns:
-            Optional[str]: The short code for the branch if it exists, otherwise None.
-        """
-        logging.warning(
-            "Branch short code mapping will be deprecated in future versions. If you require acronyms, please do it application-side."
-        )
-        return PESUAcademyConstants.BRANCH_SHORT_CODES.get(branch)
+    DEFAULT_FIELDS: list[str] = [
+        "name",
+        "prn",
+        "srn",
+        "program",
+        "branch",
+        "semester",
+        "section",
+        "email",
+        "phone",
+        "campus_code",
+        "campus",
+    ]
 
     def get_profile_information(self, client: httpx.Client, username: str) -> dict[str, Any]:
         """
@@ -89,8 +86,6 @@ class PESUAcademy:
                 "semester",
                 "section",
             ]:
-                if key == "branch" and (branch_short_code := self.map_branch_to_short_code(value)):
-                    profile["branch_short_code"] = branch_short_code
                 key = "prn" if key == "pesu_id" else key
                 logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
                 profile[key] = value
@@ -136,9 +131,9 @@ class PESUAcademy:
         # Create a new client session
         client = httpx.Client(follow_redirects=True, timeout=httpx.Timeout(10.0))
         # Default fields to fetch if fields is not provided
-        fields = PESUAcademyConstants.DEFAULT_FIELDS if fields is None else fields
+        fields = self.DEFAULT_FIELDS if fields is None else fields
         # check if fields is not the default fields and enable field filtering
-        field_filtering = fields != PESUAcademyConstants.DEFAULT_FIELDS
+        field_filtering = fields != self.DEFAULT_FIELDS
 
         logging.info(
             f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ..."

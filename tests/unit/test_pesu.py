@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-import app.pesu
 from app.pesu import PESUAcademy
 
 
@@ -102,11 +101,9 @@ def test_authenticate_with_profile_no_field_filtering(mock_get_profile, mock_pos
     mock_post_response = MagicMock()
     mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
     mock_post.return_value = mock_post_response
-    mock_get_profile.return_value = {
-        k: "test_value" for k in app.pesu.PESUAcademyConstants.DEFAULT_FIELDS
-    }
+    mock_get_profile.return_value = {k: "test_value" for k in PESUAcademy.DEFAULT_FIELDS}
     result = pesu.authenticate("testuser", "testpass", profile=True, fields=None)
     assert result["status"] is True
-    for field in app.pesu.PESUAcademyConstants.DEFAULT_FIELDS:
+    for field in PESUAcademy.DEFAULT_FIELDS:
         assert field in result["profile"]
         assert result["profile"][field] == "test_value"
