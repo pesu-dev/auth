@@ -75,8 +75,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status_code=400,
         content={
             "status": False,
-            "message": "Could not validate request data.",
-            "details": message,
+            "message": f"Could not validate request data. : {message}",
         },
     )
 

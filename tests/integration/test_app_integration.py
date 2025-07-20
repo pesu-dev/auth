@@ -218,8 +218,8 @@ def test_integration_authenticate_missing_username(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] is False
-    assert data["message"] == "Could not validate request data."
-    assert data["details"] == "body.username: Field required"
+    assert "Could not validate request data." in data["message"]
+    assert "body.username: Field required" in data["message"]
 
 
 def test_integration_authenticate_missing_password(client):
@@ -232,8 +232,8 @@ def test_integration_authenticate_missing_password(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] is False
-    assert data["message"] == "Could not validate request data."
-    assert data["details"] == "body.password: Field required"
+    assert "Could not validate request data." in data["message"]
+    assert "body.password: Field required" in data["message"]
 
 
 def test_integration_authenticate_username_wrong_type(client):
@@ -247,8 +247,8 @@ def test_integration_authenticate_username_wrong_type(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] is False
-    assert data["message"] == "Could not validate request data."
-    assert data["details"] == "body.username: Input should be a valid string"
+    assert "Could not validate request data." in data["message"]
+    assert "body.username: Input should be a valid string" in data["message"]
 
 
 def test_integration_authenticate_password_wrong_type(client):
@@ -262,8 +262,8 @@ def test_integration_authenticate_password_wrong_type(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] is False
-    assert data["message"] == "Could not validate request data."
-    assert data["details"] == "body.password: Input should be a valid string"
+    assert "Could not validate request data." in data["message"]
+    assert "body.password: Input should be a valid string" in data["message"]
 
 
 def test_integration_authenticate_profile_wrong_type(client):
@@ -277,8 +277,8 @@ def test_integration_authenticate_profile_wrong_type(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] is False
-    assert data["message"] == "Could not validate request data."
-    assert data["details"] == "body.profile: Input should be a valid boolean"
+    assert "Could not validate request data." in data["message"]
+    assert "body.profile: Input should be a valid boolean" in data["message"]
 
 
 def test_integration_authenticate_fields_wrong_type(client):
@@ -293,8 +293,8 @@ def test_integration_authenticate_fields_wrong_type(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] is False
-    assert data["message"] == "Could not validate request data."
-    assert data["details"] == "body.fields: Input should be a valid list"
+    assert "Could not validate request data." in data["message"]
+    assert "body.fields: Input should be a valid list" in data["message"]
 
 
 def test_integration_authenticate_fields_empty_list(client):
@@ -309,8 +309,8 @@ def test_integration_authenticate_fields_empty_list(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] is False
-    assert data["message"] == "Could not validate request data."
-    assert data["details"] == "body.fields: Value error, Fields must be a non-empty list or None."
+    assert "Could not validate request data." in data["message"]
+    assert "body.fields: Value error, Fields must be a non-empty list or None." in data["message"]
 
 
 def test_integration_authenticate_fields_invalid_field(client):
@@ -325,8 +325,8 @@ def test_integration_authenticate_fields_invalid_field(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] is False
-    assert data["message"] == "Could not validate request data."
-    assert data["details"].startswith("body.fields.0")
+    assert "Could not validate request data." in data["message"]
+    assert "body.fields.0" in data["message"]
 
 
 def test_integration_readme(client):
