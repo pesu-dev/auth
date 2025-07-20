@@ -202,7 +202,7 @@ def test_integration_authenticate_invalid_password(client):
     }
 
     response = client.post("/authenticate", json=payload)
-    assert response.status_code in (200, 500)
+    assert response.status_code in (200, 401, 500)
     data = response.json()
     assert data["status"] is False
     assert "Invalid" in data["message"] or "error" in data["message"].lower()

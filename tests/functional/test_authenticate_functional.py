@@ -3,6 +3,7 @@ import os
 import pytest
 
 from app.pesu import PESUAcademy
+from app.exceptions.exceptions import AuthenticationError
 
 
 @pytest.fixture
@@ -153,7 +154,8 @@ def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy):
 
 
 def test_authenticate_invalid_credentials(pesu_academy: PESUAcademy):
-    result = pesu_academy.authenticate("INVALID_USER", "wrongpass", profile=True, fields=None)
-    assert result["status"] is False
-    assert "Invalid username or password" in result["message"]
-    assert "profile" not in result
+    with pytest.raises(AuthenticationError):
+        result = pesu_academy.authenticate("INVALID_USER", "wrongpass", profile=True, fields=None)
+        assert result["status"] is False
+        assert "Invalid username or password" in result["message"]
+        assert "profile" not in result

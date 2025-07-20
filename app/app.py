@@ -15,7 +15,12 @@ import app.util as util
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
-from app.exceptions.exceptions import PESUAuthError
+from app.exceptions.exceptions import (
+    PESUAuthError,
+    CSRFTokenError,
+    AuthenticationError,
+    ProfileFetchError,
+)
 
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -170,6 +175,15 @@ async def authenticate(payload: RequestModel):
             raise HTTPException(
                 status_code=500, detail="Internal Server Error. Please try again later."
             )
+    except CSRFTokenError as e:
+        logging.exception(f"CSRF token error for user={username}: {str(e)}")
+        raise CSRFTokenError(message="CSRF token not found. Please try again.")
+    except AuthenticationError as e:
+        logging.exception(f"Authentication error for user={username}: {str(e)}")
+        raise AuthenticationError(message="Invalid username or password. Please try again.")
+    except ProfileFetchError as e:
+        logging.exception(f"Profile fetch error for user={username}: {str(e)}")
+        raise ProfileFetchError(message="Failed to fetch profile data. Please try again.")
     except Exception:
         logging.exception(f"Error authenticating user={username}.")
         raise HTTPException(

@@ -1,6 +1,5 @@
 import logging
 import re
-import traceback
 from datetime import datetime
 from typing import Any
 
@@ -8,7 +7,11 @@ import httpx
 from selectolax.parser import HTMLParser
 from app.constants import PESUAcademyConstants
 
-from app.exceptions.exceptions import ProfileFetchError, CSRFTokenError, AuthenticationError
+from app.exceptions.exceptions import (
+    ProfileFetchError,
+    CSRFTokenError,
+    AuthenticationError,
+)
 
 
 class PESUAcademy:
@@ -43,48 +46,33 @@ class PESUAcademy:
         Returns:
             dict[str, Any]: A dictionary containing the user's profile information.
         """
-        try:
-            # Fetch the profile data from the student profile page
-            logging.info(
-                f"Fetching profile data for user={username} from the student profile page..."
-            )
-            profile_url = "https://www.pesuacademy.com/Academy/s/studentProfilePESUAdmin"
-            query = {
-                "menuId": "670",
-                "url": "studentProfilePESUAdmin",
-                "controllerMode": "6414",
-                "actionType": "5",
-                "id": "0",
-                "selectedData": "0",
-                "_": str(int(datetime.now().timestamp() * 1000)),
-            }
-            response = client.get(profile_url, params=query)
-            # If the status code is not 200, raise an exception because the profile page is not accessible
-            if response.status_code != 200:
-                raise ProfileFetchError()
-            logging.debug("Profile data fetched successfully.")
-            # Parse the response text
-            soup = HTMLParser(response.text)
-
-        except ProfileFetchError:
-            logging.exception("Unable to fetch profile data.")
-            return {"error": f"Unable to fetch profile data: {traceback.format_exc()}"}
-        except Exception:
-            # Catch exceptions caused by profile parsing errors
-            logging.exception("Error parsing profile from PESUAcademy response.")
-            return {"error": f"Unable to parse profile data: {traceback.format_exc()}"}
+        # Fetch the profile data from the student profile page
+        logging.info(f"Fetching profile data for user={username} from the student profile page...")
+        profile_url = "https://www.pesuacademy.com/Academy/s/studentProfilePESUAdmin"
+        query = {
+            "menuId": "670",
+            "url": "studentProfilePESUAdmin",
+            "controllerMode": "6414",
+            "actionType": "5",
+            "id": "0",
+            "selectedData": "0",
+            "_": str(int(datetime.now().timestamp() * 1000)),
+        }
+        response = client.get(profile_url, params=query)
+        # If the status code is not 200, raise an exception because the profile page is not accessible
+        if response.status_code != 200:
+            raise ProfileFetchError()
+        logging.debug("Profile data fetched successfully.")
+        # Parse the response text
+        soup = HTMLParser(response.text)
 
         profile = dict()
 
-        try:
-            selectors = ("div.form-group",)
-            if not soup.any_css_matches(selectors):
-                raise ProfileFetchError()
-            if len(form_group_elems := soup.css("div.form-group")) < 7:
-                raise ProfileFetchError()
-        except ProfileFetchError:
-            logging.exception("Error parsing profile from PESUAcademy response.")
-            return {"error": f"Unable to parse profile data: {traceback.format_exc()}"}
+        selectors = ("div.form-group",)
+        if not soup.any_css_matches(selectors):
+            raise ProfileFetchError()
+        if len(form_group_elems := soup.css("div.form-group")) < 7:
+            raise ProfileFetchError()
 
         for div in form_group_elems[:7]:
             text = div.text().strip()
@@ -160,26 +148,17 @@ class PESUAcademy:
         logging.info(
             f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ..."
         )
-        try:
-            # Get the initial csrf token assigned to the user session when the home page is loaded
-            logging.debug("Fetching CSRF token from the home page...")
-            home_url = "https://www.pesuacademy.com/Academy/"
-            response = client.get(home_url)
-            soup = HTMLParser(response.text)
-            # extract the csrf token from the meta tag
-            if csrf_node := soup.css_first("meta[name='csrf-token']"):
-                csrf_token = csrf_node.attributes.get("content")
-                logging.debug(f"CSRF token fetched: {csrf_token}")
-            else:
-                raise CSRFTokenError("CSRF token not found in the response.")
-        except CSRFTokenError as err:
-            # Log the error and return the error message
-            logging.exception("Unable to fetch csrf token.")
-            client.close()
-            return {
-                "status": False,
-                "message": f"Unable to fetch csrf token. {str(err)}",
-            }
+        # Get the initial csrf token assigned to the user session when the home page is loaded
+        logging.debug("Fetching CSRF token from the home page...")
+        home_url = "https://www.pesuacademy.com/Academy/"
+        response = client.get(home_url)
+        soup = HTMLParser(response.text)
+        # extract the csrf token from the meta tag
+        if csrf_node := soup.css_first("meta[name='csrf-token']"):
+            csrf_token = csrf_node.attributes.get("content")
+            logging.debug(f"CSRF token fetched: {csrf_token}")
+        else:
+            raise CSRFTokenError("CSRF token not found in the response.")
 
         # Prepare the login data for auth call
         data = {
@@ -188,28 +167,19 @@ class PESUAcademy:
             "j_password": password,
         }
 
-        try:
-            logging.debug("Attempting to authenticate user...")
-            # Make a post request to authenticate the user
-            auth_url = "https://www.pesuacademy.com/Academy/j_spring_security_check"
-            response = client.post(auth_url, data=data)
-            soup = HTMLParser(response.text)
-            logging.debug("Authentication response received.")
-        except Exception:
-            # Log the error and return the error message
-            logging.exception("Unable to authenticate.")
-            client.close()
-            return {
-                "status": False,
-                "message": "Unable to authenticate: " + str(AuthenticationError()),
-            }
+        logging.debug("Attempting to authenticate user...")
+        # Make a post request to authenticate the user
+        auth_url = "https://www.pesuacademy.com/Academy/j_spring_security_check"
+        response = client.post(auth_url, data=data)
+        soup = HTMLParser(response.text)
+        logging.debug("Authentication response received.")
 
         # If class login-form is present, login failed
         if soup.css_first("div.login-form"):
             # Log the error and return the error message
-            logging.error("Login unsuccessful. Invalid username or password.")
             client.close()
-            return {"status": False, "message": str(AuthenticationError())}
+            # return {"status": False, "message": str(AuthenticationError())}
+            raise AuthenticationError()
 
         # If the user is successfully authenticated
         logging.info(f"Login successful for user={username}.")
@@ -219,7 +189,7 @@ class PESUAcademy:
             csrf_token = csrf_node.attributes.get("content")
             logging.debug(f"Authenticated CSRF token: {csrf_token}")
         else:
-            logging.exception("CSRF token not found in the authenticated response.")
+            raise CSRFTokenError("CSRF token not found in the authenticated response.")
 
         result = {"status": status, "message": "Login successful."}
 
