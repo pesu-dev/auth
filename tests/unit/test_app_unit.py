@@ -1,9 +1,8 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 
 from app.app import app, main
-from unittest.mock import MagicMock
 
 
 @pytest.fixture
@@ -12,7 +11,8 @@ def client():
 
 
 @patch("app.app.pesu_academy.authenticate")
-def test_authenticate_validation_error(mock_authenticate, client, caplog):
+@pytest.mark.asyncio
+async def test_authenticate_validation_error(mock_authenticate, client, caplog):
     mock_authenticate.return_value = {
         "status": True,
         "message": "Login successful",
@@ -28,7 +28,8 @@ def test_authenticate_validation_error(mock_authenticate, client, caplog):
 
 
 @patch("app.app.pesu_academy.authenticate")
-def test_authenticate_general_exception(mock_authenticate, client):
+@pytest.mark.asyncio
+async def test_authenticate_general_exception(mock_authenticate, client):
     mock_authenticate.side_effect = Exception("Test exception")
     payload = {"username": "testuser", "password": "testpass", "profile": False}
     response = client.post("/authenticate", json=payload)

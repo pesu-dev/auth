@@ -153,7 +153,7 @@ async def authenticate(payload: RequestModel):
     authentication_result = {"timestamp": current_time}
     logging.info(f"Authenticating user={username} with PESU Academy...")
     authentication_result.update(
-        pesu_academy.authenticate(
+        await pesu_academy.authenticate(
             username=username, password=password, profile=profile, fields=fields
         )
     )
