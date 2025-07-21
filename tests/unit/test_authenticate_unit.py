@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.pesu import PESUAcademy
+from app.exceptions.authentication import CSRFTokenError, AuthenticationError
 
 
 @pytest.fixture
@@ -61,12 +62,13 @@ def test_authenticate_success_with_profile(mock_get_profile, mock_post, mock_get
 
 @patch("app.pesu.httpx.Client.get")
 def test_authenticate_csrf_fetch_failure(mock_get, pesu):
-    mock_get.side_effect = Exception("CSRF fetch failed")
+    mock_get.side_effect = CSRFTokenError("CSRF fetch failed")
 
-    result = pesu.authenticate("user", "pass")
-
-    assert result["status"] is False
-    assert "Unable to fetch csrf token" in result["message"]
+    with pytest.raises(CSRFTokenError):
+        result = pesu.authenticate("user", "pass")
+        # result = pesu.authenticate("user", "pass")
+        assert result["status"] is False
+        assert "Unable to fetch csrf token" in result["message"]
 
 
 @patch("app.pesu.httpx.Client.get")
@@ -81,7 +83,8 @@ def test_authenticate_login_failure(mock_post, mock_get, pesu):
     mock_post_response.text = '<div class="login-form">Login error</div>'
     mock_post.return_value = mock_post_response
 
-    result = pesu.authenticate("user", "pass")
+    with pytest.raises(AuthenticationError):
+        result = pesu.authenticate("user", "pass")
 
-    assert result["status"] is False
-    assert "Invalid username or password" in result["message"]
+        assert result["status"] is False
+        assert "Invalid username or password" in result["message"]
