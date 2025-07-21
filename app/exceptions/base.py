@@ -1,4 +1,4 @@
-class PESUAuthError(Exception):
+class PESUAcademyError(Exception):
     """
     Base class for all PESU Academy-related errors.
     """

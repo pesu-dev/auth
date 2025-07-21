@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 @patch("app.app.pesu_academy.authenticate")
@@ -34,7 +34,7 @@ def test_authenticate_general_exception(mock_authenticate, client):
     response = client.post("/authenticate", json=payload)
     assert response.status_code == 500
     data = response.json()
-    assert "Internal Server Error" in data["detail"]
+    assert "Internal Server Error" in data["message"]
 
 
 @patch("app.app.argparse.ArgumentParser.parse_args")

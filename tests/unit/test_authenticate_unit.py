@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.pesu import PESUAcademy
-from app.exceptions.exceptions import CSRFTokenError, AuthenticationError
+from app.exceptions.authentication import CSRFTokenError, AuthenticationError
 
 
 @pytest.fixture

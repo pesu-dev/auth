@@ -3,7 +3,7 @@ import os
 import pytest
 
 from app.pesu import PESUAcademy
-from app.exceptions.exceptions import AuthenticationError
+from app.exceptions.authentication import AuthenticationError
 
 
 @pytest.fixture

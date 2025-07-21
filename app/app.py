@@ -15,12 +15,7 @@ import app.util as util
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
-from app.exceptions.exceptions import (
-    PESUAuthError,
-    CSRFTokenError,
-    AuthenticationError,
-    ProfileFetchError,
-)
+from app.exceptions.base import PESUAcademyError
 
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -32,14 +27,17 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     try:
-        logging.info("Application startup: Regenerating README.html...")
+        logging.info("PESUAuth API startup: Regenerating README.html...")
         util.convert_readme_to_html()
         logging.info("README.html regenerated successfully on startup.")
+        # TODO: Cache the README.html file and serve it from the cache if it exists.
     except Exception:
-        logging.exception("Failed to regenerate README.html on startup.")
+        logging.exception(
+            "Failed to regenerate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
+        )
     yield
     # Shutdown
-    logging.info("Application shutdown.")
+    logging.info("PESUAuth API shutdown.")
 
 
 app = FastAPI(
@@ -75,13 +73,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status_code=400,
         content={
             "status": False,
-            "message": f"Could not validate request data. : {message}",
+            "message": f"Could not validate request data - {message}",
         },
     )
 
 
-@app.exception_handler(PESUAuthError)
-async def pesu_exception_handler(request: Request, exc: PESUAuthError):
+@app.exception_handler(PESUAcademyError)
+async def pesu_exception_handler(request: Request, exc: PESUAcademyError):
+    logging.exception(f"PESUAcademyError: {exc.message}")
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -117,9 +116,10 @@ async def readme():
     """Serve the rendered README.md as HTML."""
     try:
         if not Path("README.html").exists():
-            logging.info("README.html does not exist. Beginning conversion...")
+            logging.warning("README.html does not exist. Regenerating...")
             util.convert_readme_to_html()
-        logging.info("Rendering README.html...")
+        logging.info("Serving README.html...")
+        # TODO: We should cache the README.html file and serve it from the cache if it exists.
         output = Path("README.html").read_text(encoding="utf-8")
         return HTMLResponse(
             status_code=200,
@@ -127,7 +127,7 @@ async def readme():
             headers={"Cache-Control": "public, max-age=86400"},
         )
     except Exception:
-        logging.exception("Error rendering home page.")
+        logging.exception("Could not render README.html. Returning an Internal Server Error.")
         raise HTTPException(
             status_code=500, detail="Internal Server Error. Please try again later."
         )
@@ -152,39 +152,27 @@ async def authenticate(payload: RequestModel):
     fields = payload.fields
 
     # Authenticate the user
-    try:
-        authentication_result = {"timestamp": current_time}
-        logging.info(f"Authenticating user={username} with PESU Academy...")
-        authentication_result.update(
-            pesu_academy.authenticate(
-                username=username, password=password, profile=profile, fields=fields
-            )
+    authentication_result = {"timestamp": current_time}
+    logging.info(f"Authenticating user={username} with PESU Academy...")
+    authentication_result.update(
+        pesu_academy.authenticate(
+            username=username, password=password, profile=profile, fields=fields
         )
-        try:
-            authentication_result = ResponseModel.model_validate(authentication_result)
-            logging.info(f"Returning auth result for user={username}: {authentication_result}")
-            authentication_result = authentication_result.model_dump(exclude_none=True)
-            authentication_result["timestamp"] = current_time.isoformat()
-            return JSONResponse(
-                status_code=200,
-                content=authentication_result,
-            )
-        except ValidationError:
-            logging.exception(f"Validation error on ResponseModel for user={username}.")
-            raise HTTPException(
-                status_code=500, detail="Internal Server Error. Please try again later."
-            )
-    except CSRFTokenError as e:
-        logging.exception(f"CSRF token error for user={username}: {str(e)}")
-        raise CSRFTokenError(message="CSRF token not found. Please try again.")
-    except AuthenticationError as e:
-        logging.exception(f"Authentication error for user={username}: {str(e)}")
-        raise AuthenticationError(message="Invalid username or password. Please try again.")
-    except ProfileFetchError as e:
-        logging.exception(f"Profile fetch error for user={username}: {str(e)}")
-        raise ProfileFetchError(message="Failed to fetch profile data. Please try again.")
-    except Exception:
-        logging.exception(f"Error authenticating user={username}.")
+    )
+
+    # Validate the response
+    try:
+        authentication_result = ResponseModel.model_validate(authentication_result)
+        logging.info(f"Returning auth result for user={username}: {authentication_result}")
+        authentication_result = authentication_result.model_dump(exclude_none=True)
+        authentication_result["timestamp"] = current_time.isoformat()
+        return JSONResponse(
+            status_code=200,
+            content=authentication_result,
+        )
+    except ValidationError:
+        logging.exception(f"Validation error on ResponseModel for user={username}.")
+        # TODO: This will NOT be handled by the exception handler. It will return a "detail" field which we do not want. Same in /readme (and other endpoints)
         raise HTTPException(
             status_code=500, detail="Internal Server Error. Please try again later."
         )
