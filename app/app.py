@@ -128,9 +128,7 @@ async def readme():
         )
     except Exception:
         logging.exception("Could not render README.html. Returning an Internal Server Error.")
-        raise PESUAcademyError(
-            status_code=500, message="Internal Server Error. Please try again later."
-        )
+        raise Exception("Internal Server Error. Please try again later.")
 
 
 @app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
@@ -172,7 +170,9 @@ async def authenticate(payload: RequestModel):
         )
     except ValidationError:
         logging.exception(f"Validation error on ResponseModel for user={username}.")
-        raise Exception("Internal Server Error. Please try again later.")
+        raise PESUAcademyError(
+            status_code=500, message="Internal Server Error. Please try again later."
+        )
 
 
 def main():

@@ -32,9 +32,10 @@ def test_readme_raises_exception(monkeypatch, client):
     monkeypatch.setattr("pathlib.Path.exists", lambda self: False)
     monkeypatch.setattr(app_module.util, "convert_readme_to_html", raise_exception)
 
-    response = client.get("/readme")
-    assert response.status_code == 500
-    assert "Internal Server Error" in response.text
+    with pytest.raises(Exception):
+        response = client.get("/readme")
+        assert response.status_code == 500
+        assert "Internal Server Error" in response.text
 
 
 def test_readme_success(client):
