@@ -32,10 +32,10 @@ async def lifespan(app: FastAPI):
     try:
         logging.info("PESUAuth API startup: Generating README HTML cache...")
         enabled_readme_cache = util.convert_readme_to_html()
-        logging.info("✅ README HTML cached in memory.")
+        logging.info("README HTML cached in memory.")
     except Exception:
         logging.exception(
-            "❌ Failed to generate README HTML at startup; /readme will attempt on-demand conversion."
+            "Failed to generate README HTML at startup; /readme will attempt on-demand conversion."
         )
         enabled_readme_cache = None
     yield
@@ -153,11 +153,14 @@ async def authenticate(payload: RequestModel):
     - fields (List[str], optional): Specific profile fields to include in the response.
     """
     current_time = datetime.datetime.now(IST)
+    # Input has already been validated by the RequestModel
     username = payload.username
     password = payload.password
     profile = payload.profile
     fields = payload.fields
 
+
+    # Authenticate the user
     authentication_result = {"timestamp": current_time}
     logging.info(f"Authenticating user={username} with PESU Academy...")
     authentication_result.update(
@@ -166,6 +169,7 @@ async def authenticate(payload: RequestModel):
         )
     )
 
+    # Validate the response
     try:
         authentication_result = ResponseModel.model_validate(authentication_result)
         logging.info(f"Returning auth result for user={username}: {authentication_result}")
@@ -186,6 +190,7 @@ def main():
     """
     Main function to run the FastAPI application with command line arguments.
     """
+    # Set up argument parser for command line arguments
     parser = argparse.ArgumentParser(
         description="PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy."
     )
@@ -208,13 +213,14 @@ def main():
     )
     args = parser.parse_args()
 
+    # Set up logging configuration
     logging_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(
         level=logging_level,
         format="%(asctime)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s",
         filemode="w",
     )
-
+    # Run the app
     uvicorn.run("app.app:app", host=args.host, port=args.port, reload=args.debug)
 
 
