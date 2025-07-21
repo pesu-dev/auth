@@ -1,5 +1,4 @@
 from app.exceptions.base import PESUAcademyError
-# TODO: See if we can rename this file
 
 
 class AuthenticationError(PESUAcademyError):

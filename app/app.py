@@ -16,6 +16,7 @@ import app.util as util
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
 from app.exceptions.base import PESUAcademyError
+from app.exceptions.authentication import ProfileFetchError
 
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -128,8 +129,8 @@ async def readme():
         )
     except Exception:
         logging.exception("Could not render README.html. Returning an Internal Server Error.")
-        raise HTTPException(
-            status_code=500, detail="Internal Server Error. Please try again later."
+        raise PESUAcademyError(
+            status_code=500, message="Internal Server Error. Please try again later."
         )
 
 
@@ -172,9 +173,8 @@ async def authenticate(payload: RequestModel):
         )
     except ValidationError:
         logging.exception(f"Validation error on ResponseModel for user={username}.")
-        # TODO: This will NOT be handled by the exception handler. It will return a "detail" field which we do not want. Same in /readme (and other endpoints)
-        raise HTTPException(
-            status_code=500, detail="Internal Server Error. Please try again later."
+        raise Exception(
+            "Internal Server Error. Please try again later."
         )
 
 
