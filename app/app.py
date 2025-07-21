@@ -6,19 +6,21 @@ from pathlib import Path
 import pytz
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Header
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.requests import Request
+from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
+
+import app.util as util
 from app.pesu import PESUAcademy
 from app.models import ResponseModel, RequestModel
-import app.util as util
-
-from fastapi.exceptions import RequestValidationError
-from fastapi.requests import Request
 from app.exceptions.base import PESUAcademyError
 
 IST = pytz.timezone("Asia/Kolkata")
 
+# Module-level cache for README HTML
+enabled_readme_cache: str | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,19 +28,19 @@ async def lifespan(app: FastAPI):
     Lifespan event handler for startup and shutdown events.
     """
     # Startup
+    global enabled_readme_cache
     try:
-        logging.info("PESUAuth API startup: Regenerating README.html...")
-        util.convert_readme_to_html()
-        logging.info("README.html regenerated successfully on startup.")
-        # TODO: Cache the README.html file and serve it from the cache if it exists.
+        logging.info("PESUAuth API startup: Generating README HTML cache...")
+        enabled_readme_cache = util.convert_readme_to_html()
+        logging.info("✅ README HTML cached in memory.")
     except Exception:
         logging.exception(
-            "Failed to regenerate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
+            "❌ Failed to generate README HTML at startup; /readme will attempt on-demand conversion."
         )
+        enabled_readme_cache = None
     yield
     # Shutdown
     logging.info("PESUAuth API shutdown.")
-
 
 app = FastAPI(
     title="PESUAuth API",
@@ -61,6 +63,7 @@ app = FastAPI(
         },
     ],
 )
+
 pesu_academy = PESUAcademy()
 
 
@@ -113,22 +116,29 @@ async def health_check():
 
 @app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
 async def readme():
-    """Serve the rendered README.md as HTML."""
-    try:
-        if not Path("README.html").exists():
-            logging.warning("README.html does not exist. Regenerating...")
-            util.convert_readme_to_html()
-        logging.info("Serving README.html...")
-        # TODO: We should cache the README.html file and serve it from the cache if it exists.
-        output = Path("README.html").read_text(encoding="utf-8")
-        return HTMLResponse(
-            status_code=200,
-            content=output,
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
-    except Exception:
-        logging.exception("Could not render README.html. Returning an Internal Server Error.")
-        raise Exception("Internal Server Error. Please try again later.")
+    """
+    Serve the rendered README.md as HTML from in-memory cache.
+    """
+    global enabled_readme_cache
+    content: str
+    if enabled_readme_cache is None:
+        logging.warning("README cache empty; regenerating on-demand...")
+        try:
+            content = util.convert_readme_to_html()
+        except Exception:
+            logging.exception("Could not render README.md on request.")
+            return HTMLResponse(
+                status_code=500,
+                content="<h1>Internal Server Error</h1><p>Unable to load documentation.</p>",
+            )
+    else:
+        content = enabled_readme_cache
+
+    return HTMLResponse(
+        content=content,
+        status_code=200,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
@@ -143,13 +153,11 @@ async def authenticate(payload: RequestModel):
     - fields (List[str], optional): Specific profile fields to include in the response.
     """
     current_time = datetime.datetime.now(IST)
-    # Input has already been validated by the RequestModel
     username = payload.username
     password = payload.password
     profile = payload.profile
     fields = payload.fields
 
-    # Authenticate the user
     authentication_result = {"timestamp": current_time}
     logging.info(f"Authenticating user={username} with PESU Academy...")
     authentication_result.update(
@@ -158,7 +166,6 @@ async def authenticate(payload: RequestModel):
         )
     )
 
-    # Validate the response
     try:
         authentication_result = ResponseModel.model_validate(authentication_result)
         logging.info(f"Returning auth result for user={username}: {authentication_result}")
@@ -179,7 +186,6 @@ def main():
     """
     Main function to run the FastAPI application with command line arguments.
     """
-    # Set up argument parser for command line arguments
     parser = argparse.ArgumentParser(
         description="PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy."
     )
@@ -202,7 +208,6 @@ def main():
     )
     args = parser.parse_args()
 
-    # Set up logging configuration
     logging_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(
         level=logging_level,
@@ -210,7 +215,6 @@ def main():
         filemode="w",
     )
 
-    # Run the app
     uvicorn.run("app.app:app", host=args.host, port=args.port, reload=args.debug)
 
 
