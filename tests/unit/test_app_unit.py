@@ -23,7 +23,7 @@ def test_authenticate_validation_error(mock_authenticate, client, caplog):
         response = client.post("/authenticate", json=payload)
     assert response.status_code == 500
     data = response.json()
-    assert "Internal Server Error" in data["detail"]
+    assert "Internal Server Error" in data["message"]
     assert "Validation error on ResponseModel" in caplog.text
 
 

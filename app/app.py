@@ -6,7 +6,7 @@ from pathlib import Path
 import pytz
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import ValidationError
 from app.pesu import PESUAcademy
@@ -16,7 +16,6 @@ import app.util as util
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
 from app.exceptions.base import PESUAcademyError
-from app.exceptions.authentication import ProfileFetchError
 
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -173,9 +172,7 @@ async def authenticate(payload: RequestModel):
         )
     except ValidationError:
         logging.exception(f"Validation error on ResponseModel for user={username}.")
-        raise Exception(
-            "Internal Server Error. Please try again later."
-        )
+        raise Exception("Internal Server Error. Please try again later.")
 
 
 def main():
