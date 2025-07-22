@@ -27,19 +27,8 @@ async def lifespan(app: FastAPI):
     Lifespan event handler for startup and shutdown events.
     """
     # Startup
-    asyncio.create_task(initialize_startup_cache())
-    yield
-    # Shutdown
-    if pesu_academy._client:
-        await pesu_academy._client.aclose()
-    logging.info("PESUAuth API shutdown.")
-
-async def initialize_startup_cache():
-    """
-    Initialize the startup cache for the README.html file and prefetch the PESUAcademy client and CSRF token.
-    """
-    global README_HTML_CACHE
     # Cache the README.html file
+    global README_HTML_CACHE
     try:
         logging.info("PESUAuth API startup")
         logging.debug("Regenerating README.html...")
@@ -52,11 +41,18 @@ async def initialize_startup_cache():
     # Prefetch PESUAcademy client for first request
     await pesu_academy._prefetch_client_with_csrf_token()
     logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
+    yield
+
+    # Shutdown
+    if pesu_academy._client:
+        await pesu_academy._client.aclose()
+    logging.info("PESUAuth API shutdown.")
+
 
 app = FastAPI(
     title="PESUAuth API",
     description="A simple API to authenticate PESU credentials using PESU Academy",
-    version="2.0.0",
+    version="2.1.0",
     docs_url="/",
     lifespan=lifespan,
     openapi_tags=[

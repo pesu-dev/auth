@@ -12,7 +12,9 @@ async def convert_readme_to_html() -> str:
     logging.info("Beginning conversion of README.md to HTML via GitHub API...")
     async with aiofiles.open("README.md", mode="r", encoding="utf-8") as f:
         readme_content = await f.read()
-    readme_content = await asyncio.to_thread(emoji.emojize, readme_content.strip(), language="alias")
+    readme_content = await asyncio.to_thread(
+        emoji.emojize, readme_content.strip(), language="alias"
+    )
     async with httpx.AsyncClient() as client:
         response = await client.post(
             "https://api.github.com/markdown",

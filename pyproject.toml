@@ -1,6 +1,6 @@
 [project]
 name = "pesu-auth"
-version = "2.0.0"
+version = "2.1.0"
 description = "A simple API to authenticate PESU credentials using PESU Academy."
 readme = "README.md"
 requires-python = ">=3.11"
