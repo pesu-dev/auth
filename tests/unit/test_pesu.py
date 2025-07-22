@@ -80,7 +80,9 @@ async def test_authenticate_csrf_token_missing_after_login(mock_post, mock_get, 
 @patch("app.pesu.httpx.AsyncClient.post")
 @patch("app.pesu.PESUAcademy.get_profile_information")
 @pytest.mark.asyncio
-async def test_authenticate_with_profile_field_filtering(mock_get_profile, mock_post, mock_get, pesu):
+async def test_authenticate_with_profile_field_filtering(
+    mock_get_profile, mock_post, mock_get, pesu
+):
     mock_get_response = AsyncMock()
     mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
     mock_get.return_value = mock_get_response
@@ -108,7 +110,9 @@ async def test_authenticate_with_profile_field_filtering(mock_get_profile, mock_
 @patch("app.pesu.httpx.AsyncClient.post")
 @patch("app.pesu.PESUAcademy.get_profile_information")
 @pytest.mark.asyncio
-async def test_authenticate_with_profile_no_field_filtering(mock_get_profile, mock_post, mock_get, pesu):
+async def test_authenticate_with_profile_no_field_filtering(
+    mock_get_profile, mock_post, mock_get, pesu
+):
     mock_get_response = AsyncMock()
     mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
     mock_get.return_value = mock_get_response
