@@ -1,7 +1,6 @@
 import argparse
 import datetime
 import logging
-import asyncio
 
 import pytz
 import uvicorn
