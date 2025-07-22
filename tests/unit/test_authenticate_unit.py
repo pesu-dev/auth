@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -11,36 +11,38 @@ def pesu():
     return PESUAcademy()
 
 
-@patch("app.pesu.httpx.Client.get")
-@patch("app.pesu.httpx.Client.post")
-def test_authenticate_success_no_profile(mock_post, mock_get, pesu):
+@patch("app.pesu.httpx.AsyncClient.get")
+@patch("app.pesu.httpx.AsyncClient.post")
+@pytest.mark.asyncio
+async def test_authenticate_success_no_profile(mock_post, mock_get, pesu):
     # Mock GET home page response with csrf token meta
-    mock_get_response = MagicMock()
+    mock_get_response = AsyncMock()
     mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
     mock_get_response.status_code = 200
     mock_get.return_value = mock_get_response
 
     # Mock POST login success response with csrf token meta
-    mock_post_response = MagicMock()
+    mock_post_response = AsyncMock()
     mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
     mock_post.return_value = mock_post_response
 
-    result = pesu.authenticate("user", "pass", profile=False)
+    result = await pesu.authenticate("user", "pass", profile=False)
 
     assert result["status"] is True
     assert result["message"] == "Login successful."
     assert "profile" not in result
 
 
-@patch("app.pesu.httpx.Client.get")
-@patch("app.pesu.httpx.Client.post")
+@patch("app.pesu.httpx.AsyncClient.get")
+@patch("app.pesu.httpx.AsyncClient.post")
 @patch("app.pesu.PESUAcademy.get_profile_information")
-def test_authenticate_success_with_profile(mock_get_profile, mock_post, mock_get, pesu):
-    mock_get_response = MagicMock()
+@pytest.mark.asyncio
+async def test_authenticate_success_with_profile(mock_get_profile, mock_post, mock_get, pesu):
+    mock_get_response = AsyncMock()
     mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
     mock_get.return_value = mock_get_response
 
-    mock_post_response = MagicMock()
+    mock_post_response = AsyncMock()
     mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
     mock_post.return_value = mock_post_response
 
@@ -50,7 +52,7 @@ def test_authenticate_success_with_profile(mock_get_profile, mock_post, mock_get
         "branch": "Computer Science and Engineering",
     }
 
-    result = pesu.authenticate("user", "pass", profile=True, fields=["prn", "name"])
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["prn", "name"])
 
     assert result["status"] is True
     assert "profile" in result
@@ -60,31 +62,32 @@ def test_authenticate_success_with_profile(mock_get_profile, mock_post, mock_get
     assert "branch" not in result["profile"]
 
 
-@patch("app.pesu.httpx.Client.get")
-def test_authenticate_csrf_fetch_failure(mock_get, pesu):
+@patch("app.pesu.httpx.AsyncClient.get")
+@pytest.mark.asyncio
+async def test_authenticate_csrf_fetch_failure(mock_get, pesu):
     mock_get.side_effect = CSRFTokenError("CSRF fetch failed")
 
     with pytest.raises(CSRFTokenError):
-        result = pesu.authenticate("user", "pass")
-        # result = pesu.authenticate("user", "pass")
+        result = await pesu.authenticate("user", "pass")
         assert result["status"] is False
         assert "Unable to fetch csrf token" in result["message"]
 
 
-@patch("app.pesu.httpx.Client.get")
-@patch("app.pesu.httpx.Client.post")
-def test_authenticate_login_failure(mock_post, mock_get, pesu):
-    mock_get_response = MagicMock()
+@patch("app.pesu.httpx.AsyncClient.get")
+@patch("app.pesu.httpx.AsyncClient.post")
+@pytest.mark.asyncio
+async def test_authenticate_login_failure(mock_post, mock_get, pesu):
+    mock_get_response = AsyncMock()
     mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
     mock_get.return_value = mock_get_response
 
     # Simulate login failure: login form div present
-    mock_post_response = MagicMock()
+    mock_post_response = AsyncMock()
     mock_post_response.text = '<div class="login-form">Login error</div>'
     mock_post.return_value = mock_post_response
 
     with pytest.raises(AuthenticationError):
-        result = pesu.authenticate("user", "pass")
+        result = await pesu.authenticate("user", "pass")
 
         assert result["status"] is False
         assert "Invalid username or password" in result["message"]
