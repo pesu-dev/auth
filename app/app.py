@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import logging
+import asyncio
 
 import pytz
 import uvicorn
@@ -26,8 +27,19 @@ async def lifespan(app: FastAPI):
     Lifespan event handler for startup and shutdown events.
     """
     # Startup
-    # Cache the README.html file
+    asyncio.create_task(initialize_startup_cache())
+    yield
+    # Shutdown
+    if pesu_academy._client:
+        await pesu_academy._client.aclose()
+    logging.info("PESUAuth API shutdown.")
+
+async def initialize_startup_cache():
+    """
+    Initialize the startup cache for the README.html file and prefetch the PESUAcademy client and CSRF token.
+    """
     global README_HTML_CACHE
+    # Cache the README.html file
     try:
         logging.info("PESUAuth API startup")
         logging.debug("Regenerating README.html...")
@@ -40,12 +52,6 @@ async def lifespan(app: FastAPI):
     # Prefetch PESUAcademy client for first request
     await pesu_academy._prefetch_client_with_csrf_token()
     logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
-    yield
-    # Shutdown
-    if pesu_academy._client:
-        await pesu_academy._client.aclose()
-    logging.info("PESUAuth API shutdown.")
-
 
 app = FastAPI(
     title="PESUAuth API",
