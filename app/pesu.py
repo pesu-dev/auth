@@ -136,6 +136,7 @@ class PESUAcademy:
     async def get_profile_information(
         self, client: httpx.AsyncClient, username: str
     ) -> dict[str, Any]:
+
         """
         Get the profile information of the user.
 
@@ -176,7 +177,7 @@ class PESUAcademy:
             raise ProfileParseError(f"Failed to parse student profile page from PESU Academy for user={username}.")
         
         profile: dict[str, Any] = {}
-        
+
         # {`html value`:`reference value`}
         key_map = {
             "Name": "name",
