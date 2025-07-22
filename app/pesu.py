@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 import httpx
-from selectolax.parser import HTMLParser
+from selectolax.parser import HTMLParser, Node
 from app.constants import PESUAcademyConstants
 
 from app.exceptions.authentication import (
@@ -16,6 +16,42 @@ from app.exceptions.authentication import (
 )
 
 
+def get_profile_by_idx(details_cont: Node, idx: int) -> tuple[str, str]:
+    """
+    Extracts a single profile field (key and value) by its index.
+    
+    This helper function navigates a pre-parsed HTML container to find a
+    specific field based on its position.
+
+    Args:
+        details_cont (Node): Pre-parsed parent node containing all profile fields
+        idx (int): Index of the required field: 0 - name, 1 - srn, 2 - prn, 3 - program, 4 - branch, 5 - semester, 6 - section
+    Returns:
+        Tuple(key, value): A tuple containing key and value of a particular field
+
+    Raises:
+        IndexError: If the provided index is greater than the number of fields
+        ValueError: If the key or value is not found
+    """
+
+    fields = details_cont.css("div.form-group")
+    if idx >= len(fields):
+        raise IndexError(f'Index {idx} out of bounds')
+    
+    
+    target_field = fields[idx]
+    key = target_field.css_first("label.lbl-title-light").text(strip=True)
+
+    # Use the adjacent sibbling selector `+` to find value label 
+    value = target_field.css_first("label.lbl-title-light + label").text(strip=True)
+
+    if not key or not value:
+        raise ValueError(f"Could not parse key/value for field at index {idx}.")
+    else:
+        logging.info(f"Extracted key: '{key}' with value: '{value}'")
+
+    return key, value
+    
 class PESUAcademy:
     """
     Class to interact with the PESU Academy website.
@@ -130,44 +166,37 @@ class PESUAcademy:
             )
 
         logging.debug("Profile data fetched successfully.")
+
         # Parse the response text
+
         soup = await asyncio.to_thread(HTMLParser, response.text)
-        profile = dict()
+        details_container = soup.css_first("div.elem-info-wrapper")
 
-        if (
-            not soup.any_css_matches(("div.form-group",))
-            or len(form_group_elems := soup.css("div.form-group")) < 7
-        ):
-            raise ProfileParseError(
-                f"Failed to parse student profile page from PESU Academy for user={username}."
-            )
+        if not details_container:
+            raise ProfileParseError(f"Failed to parse student profile page from PESU Academy for user={username}.")
+        
+        profile: dict[str, Any] = {}
+        
+        # {`html value`:`reference value`}
+        key_map = {
+            "Name": "name",
+            "PESU Id": "prn",
+            "SRN": "srn",
+            "Program": "program",
+            "Branch": "branch",
+            "Semester": "semester",
+            "Section": "section"
+        }
 
-        # TODO: Should we parse it more deterministically?
-        for div in form_group_elems[:7]:
-            text = div.text().strip()
-            logging.debug(f"Processing profile element: {text}")
-            if text.startswith("PESU Id"):
-                key = "pesu_id"
-                value = text.split()[-1]
-            else:
-                key, value = text.split(" ", 1)
-                key = "_".join(key.split()).lower()
-            value = value.strip()
-            logging.debug(f"Extracted key: '{key}' with value: '{value}'")
-            if key in [
-                "name",
-                "srn",
-                "pesu_id",
-                "program",
-                "branch",
-                "semester",
-                "section",
-            ]:
-                if key == "branch" and (branch_short_code := self.map_branch_to_short_code(value)):
-                    profile["branch_short_code"] = branch_short_code
-                key = "prn" if key == "pesu_id" else key
-                logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
-                profile[key] = value
+        for i in range(7):
+            try:
+                key, value = get_profile_by_idx(details_container, i)
+
+                if key in key_map and value.upper() != 'NA':
+                    logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
+                    profile[key_map[key]] = value
+            except (ValueError, IndexError) as e:
+                logging.warning(f"Could not parse value at {i}: {e}")
 
         # Get the email and phone number from the profile page
         if (
@@ -286,7 +315,7 @@ class PESUAcademy:
                 )
 
         logging.info(f"Authentication process for user={username} completed successfully.")
-
+        
         # Close the client and return the result
         await client.aclose()
         return result
