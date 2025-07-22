@@ -22,6 +22,11 @@ def make_request(profile: bool = True) -> tuple[dict, float]:
         "password": os.getenv("TEST_PASSWORD"),
         "profile": profile,
     }
+    data2 = {
+        "username": "PES1201800303",
+        "password": "fandomlover123",
+        "profile": profile,
+    }
     with httpx.Client(follow_redirects=True, timeout=httpx.Timeout(10.0)) as client:
         start_time = time.time()
         response = client.post(
@@ -29,6 +34,13 @@ def make_request(profile: bool = True) -> tuple[dict, float]:
             json=data,
             follow_redirects=True,
         )
+
+        # response = client.post(
+        #     "http://localhost:5000/authenticate",
+        #     json=data2,
+        #     follow_redirects=True,
+        # )
+
     elapsed_time = time.time() - start_time
     return response.json(), elapsed_time
 

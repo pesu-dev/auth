@@ -43,24 +43,33 @@ class PESUAcademy:
 
     async def _prefetch_client_with_csrf_token(self):
         """Prefetch a new client with an unauthenticated CSRF token."""
-        try:
-            logging.info("Prefetching a new client with an unauthenticated CSRF token...")
-            client, token = await self._fetch_new_client_with_csrf_token()
-            async with self._csrf_lock:
-                if self._client is not None:
-                    await self._client.aclose()  # Close old client if exists to avoid leaks
-                self._client = client
-                self._csrf_token = token
-            logging.info("Successfully prefetched client and CSRF token.")
-        except Exception:
-            logging.exception("Failed to prefetch client and CSRF token")
+        logging.info("Prefetching a new client with an unauthenticated CSRF token...")
+        client, token = await self._fetch_new_client_with_csrf_token()
+        async with self._csrf_lock:
+            # Close old cached client (if any) to avoid leaks
+            if self._client is not None:
+                await self._client.aclose()
+            # Store the new cached client/token
+            self._client = client
+            self._csrf_token = token
+        logging.info("Cache refreshed with new unauthenticated CSRF token.")
 
     async def _get_client_with_csrf_token(self) -> tuple[httpx.AsyncClient, str]:
         """Get the client with the cached CSRF token."""
         async with self._csrf_lock:
+            # If cache is empty (first call), populate it
             if not (self._client and self._csrf_token):
                 self._client, self._csrf_token = await self._fetch_new_client_with_csrf_token()
-            return self._client, self._csrf_token
+            # Hand out the cached client/token for *this* request
+            client_to_use, token_to_use = self._client, self._csrf_token
+            # Immediately clear the cache so the next caller doesn't reuse this client/token
+            self._client = None
+            self._csrf_token = None
+
+        # Kick off async prefetch for the *next* request (non-blocking)
+        asyncio.create_task(self._prefetch_client_with_csrf_token())
+        # Return a dedicated client/token for this request
+        return client_to_use, token_to_use
 
     @staticmethod
     def map_branch_to_short_code(branch: str) -> str | None:
@@ -269,6 +278,7 @@ class PESUAcademy:
         logging.info(f"Authentication process for user={username} completed successfully.")
 
         # Reset the client and CSRF token and prefetch a new one for the next request
+        await client.aclose()
         asyncio.create_task(self._prefetch_client_with_csrf_token())
 
         # Return the result
