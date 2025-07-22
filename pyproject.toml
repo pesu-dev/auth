@@ -11,12 +11,11 @@ authors = [
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn>=0.27.0",
-    "gh-md-to-html>=1.21.3",
     "httpx>=0.28.1",
-    "lxml-html-clean>=0.4.2",
     "pydantic>=2.6.0",
     "pytz>=2025.2",
     "selectolax>=0.3.30",
+    "aiofiles>=24.1.0",
 ]
 
 [project.optional-dependencies]

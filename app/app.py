@@ -1,7 +1,6 @@
 import argparse
 import datetime
 import logging
-from pathlib import Path
 
 import pytz
 import uvicorn
@@ -18,6 +17,7 @@ from fastapi.requests import Request
 from app.exceptions.base import PESUAcademyError
 
 IST = pytz.timezone("Asia/Kolkata")
+README_HTML_CACHE: str | None = None
 
 
 @asynccontextmanager
@@ -28,9 +28,9 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         logging.info("PESUAuth API startup: Regenerating README.html...")
-        util.convert_readme_to_html()
+        global README_HTML_CACHE
+        README_HTML_CACHE = await util.convert_readme_to_html()
         logging.info("README.html regenerated successfully on startup.")
-        # TODO: Cache the README.html file and serve it from the cache if it exists.
         await pesu_academy._prefetch_client_with_csrf_token()
     except Exception:
         logging.exception(
@@ -118,15 +118,14 @@ async def health_check():
 async def readme():
     """Serve the rendered README.md as HTML."""
     try:
-        if not Path("README.html").exists():
+        global README_HTML_CACHE
+        if not README_HTML_CACHE:
             logging.warning("README.html does not exist. Regenerating...")
-            util.convert_readme_to_html()
+            README_HTML_CACHE = await util.convert_readme_to_html()
         logging.info("Serving README.html...")
-        # TODO: We should cache the README.html file and serve it from the cache if it exists.
-        output = Path("README.html").read_text(encoding="utf-8")
         return HTMLResponse(
             status_code=200,
-            content=output,
+            content=README_HTML_CACHE,
             headers={"Cache-Control": "public, max-age=86400"},
         )
     except Exception:

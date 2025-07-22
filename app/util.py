@@ -1,22 +1,27 @@
-import re
 import logging
-import gh_md_to_html
+import aiofiles
+import emoji
+import httpx
 
 
-def convert_readme_to_html():
+async def convert_readme_to_html() -> str:
     """
-    Convert the README.md file to HTML and save it as README.html so that it can be rendered on the home page.
+    Convert the README.md file to HTML using GitHub's Markdown API and return it. Also saves the HTML to README.html.
     """
-    logging.info("Beginning conversion of README.md to HTML...")
-    readme_content = open("README.md").read().strip()
-    readme_content = re.sub(r":\w+: ", "", readme_content)
-    with open("README_tmp.md", "w") as f:
-        f.write(readme_content)
-    html = gh_md_to_html.main(
-        "README_tmp.md",
-        enable_image_downloading=False,
-        image_paths=None,
-    ).strip()
-    with open("README.html", "w") as f:
-        f.write(html)
-    logging.info("README.md converted to HTML successfully.")
+    logging.info("Beginning conversion of README.md to HTML via GitHub API...")
+    async with aiofiles.open("README.md", mode="r", encoding="utf-8") as f:
+        readme_content = await f.read()
+    readme_content = emoji.emojize(readme_content.strip(), language="alias")
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://api.github.com/markdown",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            json={"text": readme_content},
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        html = response.text.strip()
+    return html
