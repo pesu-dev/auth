@@ -159,7 +159,6 @@ async def authenticate(payload: RequestModel):
     profile = payload.profile
     fields = payload.fields
 
-
     # Authenticate the user
     authentication_result = {"timestamp": current_time}
     logging.info(f"Authenticating user={username} with PESU Academy...")
