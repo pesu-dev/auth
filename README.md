@@ -16,8 +16,8 @@ returns the user's profile information. No personal data is stored.
 
 ## PESUAuth LIVE Deployment
 
-* You can access the PESUAuth API endpoints [here](https://pesu-auth.onrender.com/).
-* You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
+- You can access the PESUAuth API endpoints [here](https://pesu-auth.onrender.com/).
+- You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
 
 > :warning: **Warning:** The live version is hosted on a free tier server, so you might experience some latency on the
 > first request since the server might not be awake. Subsequent requests will be faster.
@@ -33,16 +33,16 @@ following commands to start the API.
 
 1. Build the Docker image either from the source code or pull the pre-built image from Docker Hub.
 
-    1. You can build the Docker image from the source code by running the following command in the root directory of
-       the repository.
+   1. You can build the Docker image from the source code by running the following command in the root directory of
+      the repository.
 
    ```bash
    docker build . --tag pesu-auth
    ```
 
-    2. You can also pull the pre-built Docker image
-       from [Docker Hub](https://hub.docker.com/repository/docker/aditeyabaral/pesu-auth/general) by running the
-       following command:
+   2. You can also pull the pre-built Docker image
+      from [Docker Hub](https://hub.docker.com/repository/docker/aditeyabaral/pesu-auth/general) by running the
+      following command:
 
    ```bash
    docker pull aditeyabaral/pesu-auth:latest
@@ -103,7 +103,7 @@ with the user's profile information if requested.
 ### Request Parameters
 
 | **Parameter** | **Optional** | **Type**    | **Default** | **Description**                                                                                 |
-|---------------|--------------|-------------|-------------|-------------------------------------------------------------------------------------------------|
+| ------------- | ------------ | ----------- | ----------- | ----------------------------------------------------------------------------------------------- |
 | `username`    | No           | `str`       |             | The user's SRN or PRN                                                                           |
 | `password`    | No           | `str`       |             | The user's password                                                                             |
 | `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information                                                            |
@@ -116,12 +116,11 @@ profile data was requested, the response's `profile` key will store a dictionary
 **On an unsuccessful sign-in, this field will not exist**.
 
 | **Field**   | **Type**        | **Description**                                                          |
-|-------------|-----------------|--------------------------------------------------------------------------|
+| ----------- | --------------- | ------------------------------------------------------------------------ |
 | `status`    | `boolean`       | A flag indicating whether the overall request was successful             |
 | `profile`   | `ProfileObject` | A nested map storing the profile information, returned only if requested |
 | `message`   | `str`           | A message that provides information corresponding to the status          |
 | `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
-| `details`   | `str`           | Information about the error, if an error occurs.                         |
 
 #### `ProfileObject`
 
@@ -129,7 +128,7 @@ This object contains the user's profile information, which is returned only if t
 If the authentication fails, this field will not be present in the response.
 
 | **Field**           | **Description**                                        |
-|---------------------|--------------------------------------------------------|
+| ------------------- | ------------------------------------------------------ |
 | `name`              | Name of the user                                       |
 | `prn`               | PRN of the user                                        |
 | `srn`               | SRN of the user                                        |
@@ -217,6 +216,6 @@ Made with ❤️ by
 
 [![Contributors](https://contrib.rocks/image?repo=pesu-dev/auth)](https://github.com/pesu-dev/auth/graphs/contributors)
 
-*Powered by [contrib.rocks](https://contrib.rocks)*
+_Powered by [contrib.rocks](https://contrib.rocks)_
 
 If you'd like to contribute, please follow our [contribution guidelines](https://github.com/pesu-dev/auth/blob/main/.github/CONTRIBUTING.md).
