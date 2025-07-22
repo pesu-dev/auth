@@ -19,7 +19,7 @@ from app.exceptions.authentication import (
 def get_profile_by_idx(details_cont: Node, idx: int) -> tuple[str, str]:
     """
     Extracts a single profile field (key and value) by its index.
-    
+
     This helper function navigates a pre-parsed HTML container to find a
     specific field based on its position.
 
@@ -36,13 +36,12 @@ def get_profile_by_idx(details_cont: Node, idx: int) -> tuple[str, str]:
 
     fields = details_cont.css("div.form-group")
     if idx >= len(fields):
-        raise IndexError(f'Index {idx} out of bounds')
-    
-    
+        raise IndexError(f"Index {idx} out of bounds")
+
     target_field = fields[idx]
     key = target_field.css_first("label.lbl-title-light").text(strip=True)
 
-    # Use the adjacent sibbling selector `+` to find value label 
+    # Use the adjacent sibbling selector `+` to find value label
     value = target_field.css_first("label.lbl-title-light + label").text(strip=True)
 
     if not key or not value:
@@ -51,7 +50,8 @@ def get_profile_by_idx(details_cont: Node, idx: int) -> tuple[str, str]:
         logging.info(f"Extracted key: '{key}' with value: '{value}'")
 
     return key, value
-    
+
+
 class PESUAcademy:
     """
     Class to interact with the PESU Academy website.
@@ -174,8 +174,10 @@ class PESUAcademy:
         details_container = soup.css_first("div.elem-info-wrapper")
 
         if not details_container:
-            raise ProfileParseError(f"Failed to parse student profile page from PESU Academy for user={username}.")
-        
+            raise ProfileParseError(
+                f"Failed to parse student profile page from PESU Academy for user={username}."
+            )
+
         profile: dict[str, Any] = {}
 
         # {`html value`:`reference value`}
@@ -186,16 +188,25 @@ class PESUAcademy:
             "Program": "program",
             "Branch": "branch",
             "Semester": "semester",
-            "Section": "section"
+            "Section": "section",
         }
 
         for i in range(7):
             try:
                 key, value = get_profile_by_idx(details_container, i)
 
-                if key in key_map and value.upper() != 'NA':
+                if key in key_map and value.upper() != "NA":
+                    mapped_key = key_map[key]
                     logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
-                    profile[key_map[key]] = value
+                    profile[mapped_key] = value
+
+                    if mapped_key == "branch":
+                        if branch_short_code := self.map_branch_to_short_code(value):
+                            profile["branch_short_code"] = branch_short_code
+                            logging.debug(
+                                f"Adding key: 'branch_short_code', value: '{branch_short_code}' to profile..."
+                            )
+
             except (ValueError, IndexError) as e:
                 logging.warning(f"Could not parse value at {i}: {e}")
 
@@ -305,7 +316,9 @@ class PESUAcademy:
         if profile:
             logging.info(f"Profile data requested for user={username}. Fetching profile data...")
             # Fetch the profile information
+
             result["profile"] = await self.get_profile_information(client, username)
+
             # Filter the fields if field filtering is enabled
             if field_filtering:
                 result["profile"] = {
@@ -316,7 +329,7 @@ class PESUAcademy:
                 )
 
         logging.info(f"Authentication process for user={username} completed successfully.")
-        
+
         # Close the client and return the result
         await client.aclose()
         return result
