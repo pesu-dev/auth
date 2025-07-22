@@ -277,9 +277,6 @@ class PESUAcademy:
 
         logging.info(f"Authentication process for user={username} completed successfully.")
 
-        # Reset the client and CSRF token and prefetch a new one for the next request
+        # Close the client and return the result
         await client.aclose()
-        asyncio.create_task(self._prefetch_client_with_csrf_token())
-
-        # Return the result
         return result

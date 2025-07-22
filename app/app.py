@@ -6,7 +6,7 @@ from pathlib import Path
 import pytz
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import ValidationError
 from app.pesu import PESUAcademy
@@ -135,7 +135,7 @@ async def readme():
 
 
 @app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
-async def authenticate(payload: RequestModel):
+async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks):
     """
     Authenticate a user using their PESU credentials via the PESU Academy service.
 
@@ -160,6 +160,8 @@ async def authenticate(payload: RequestModel):
             username=username, password=password, profile=profile, fields=fields
         )
     )
+    # Prefetch a new client with an unauthenticated CSRF token for the next request
+    background_tasks.add_task(pesu_academy._prefetch_client_with_csrf_token)
 
     # Validate the response
     try:
