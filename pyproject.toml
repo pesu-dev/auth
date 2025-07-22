@@ -16,6 +16,7 @@ dependencies = [
     "pytz>=2025.2",
     "selectolax>=0.3.30",
     "aiofiles>=24.1.0",
+    "emoji>=2.14.1",
 ]
 
 [project.optional-dependencies]
