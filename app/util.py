@@ -4,8 +4,11 @@ from pathlib import Path
 import gh_md_to_html
 
 def convert_readme_to_html() -> str:
-    
-    #Read README.md, convert to HTML, and return the HTML string.
+     
+    """
+    Convert the README.md file to HTML and save it as README.html so that it can be rendered on the home page.
+    Read README.md, convert to HTML, and return the HTML string.
+    """
     
     logging.info("Converting README.md to HTML...")
 
