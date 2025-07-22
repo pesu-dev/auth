@@ -31,7 +31,6 @@ def make_request(profile: bool = True) -> tuple[dict, float]:
             follow_redirects=True,
         )
 
-
     elapsed_time = time.time() - start_time
     return response.json(), elapsed_time
 
