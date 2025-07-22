@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from datetime import datetime
@@ -20,6 +21,45 @@ class PESUAcademy:
     Class to interact with the PESU Academy website.
     """
 
+    def __init__(self):
+        self._csrf_token: str | None = None
+        self._csrf_lock = asyncio.Lock()
+
+    async def _fetch_new_csrf_token(self) -> str:
+        """Fetch a fresh unauthenticated CSRF token from PESU Academy."""
+        logging.info("Fetching a new CSRF token...")
+        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
+            resp = await client.get("https://www.pesuacademy.com/Academy/")
+            soup = HTMLParser(resp.text)
+            if node := soup.css_first("meta[name='csrf-token']"):
+                self._csrf_token = node.attributes["content"]
+                logging.info(f"Fetched CSRF token: {self._csrf_token}")
+                return self._csrf_token
+            else:
+                raise RuntimeError("Could not find CSRF token in PESU Academy homepage")
+
+    async def get_csrf_token_and_prefetch(self) -> str:
+        """
+        Consume the cached token (or fetch if none exists).
+        Then start a background task to fetch a fresh one for the next request.
+        """
+        async with self._csrf_lock:
+            csrf_token_to_use = self._csrf_token or await self._fetch_new_csrf_token()
+            self._csrf_token = None  # Consume token
+        # Start background task to prefetch the next token
+        # asyncio.create_task(self._prefetch_csrf_token())
+        return csrf_token_to_use
+
+    async def _prefetch_csrf_token(self):
+        """Fetch and cache a new CSRF token for future requests."""
+        try:
+            token = await self._fetch_new_csrf_token()
+            async with self._csrf_lock:
+                self._csrf_token = token
+            logging.info("Pre-fetched new CSRF token for next login request.")
+        except Exception:
+            logging.exception("Failed to prefetch CSRF token.")
+
     @staticmethod
     def map_branch_to_short_code(branch: str) -> str | None:
         """
@@ -36,7 +76,7 @@ class PESUAcademy:
         )
         return PESUAcademyConstants.BRANCH_SHORT_CODES.get(branch)
 
-    def get_profile_information(self, client: httpx.Client, username: str) -> dict[str, Any]:
+    async def get_profile_information(self, client: httpx.AsyncClient, username: str) -> dict[str, Any]:
         """
         Get the profile information of the user.
 
@@ -59,7 +99,7 @@ class PESUAcademy:
             "selectedData": "0",
             "_": str(int(datetime.now().timestamp() * 1000)),
         }
-        response = client.get(profile_url, params=query)
+        response = await client.get(profile_url, params=query)
         # If the status code is not 200, raise an exception because the profile page is not accessible
         if response.status_code != 200:
             raise ProfileFetchError(
@@ -142,7 +182,7 @@ class PESUAcademy:
 
         return profile
 
-    def authenticate(
+    async def authenticate(
         self,
         username: str,
         password: str,
@@ -162,81 +202,83 @@ class PESUAcademy:
             dict[str, Any]: A dictionary containing the authentication status, message, and optionally the profile information.
         """
         # Create a new client session
-        client = httpx.Client(follow_redirects=True, timeout=httpx.Timeout(10.0))
-        # Default fields to fetch if fields is not provided
-        fields = PESUAcademyConstants.DEFAULT_FIELDS if fields is None else fields
+        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
+            # Default fields to fetch if fields is not provided
+            fields = PESUAcademyConstants.DEFAULT_FIELDS if fields is None else fields
         # Check if fields is not the default fields and enable field filtering
-        field_filtering = fields != PESUAcademyConstants.DEFAULT_FIELDS
+            field_filtering = fields != PESUAcademyConstants.DEFAULT_FIELDS
 
-        logging.info(
-            f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ..."
-        )
-        # Get the initial csrf token assigned to the user session when the home page is loaded
-        logging.debug("Fetching CSRF token from the home page...")
-        home_url = "https://www.pesuacademy.com/Academy/"
-        response = client.get(home_url)
-        soup = HTMLParser(response.text)
-        # Extract the csrf token from the meta tag
-        if csrf_node := soup.css_first("meta[name='csrf-token']"):
-            csrf_token = csrf_node.attributes.get("content")
-            logging.debug(f"CSRF token fetched: {csrf_token}")
-        else:
-            client.close()
-            raise CSRFTokenError(
-                f"CSRF token not found in the pre-authentication response for user={username}."
+            logging.info(
+                f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ..."
             )
-
-        # Prepare the login data for auth call
-        data = {
-            "_csrf": csrf_token,
-            "j_username": username,
-            "j_password": password,
-        }
-
-        logging.debug("Attempting to authenticate user...")
-        # Make a post request to authenticate the user
-        auth_url = "https://www.pesuacademy.com/Academy/j_spring_security_check"
-        response = client.post(auth_url, data=data)
-        soup = HTMLParser(response.text)
-        logging.debug("Authentication response received.")
-
-        # If class login-form is present, login failed
-        if soup.css_first("div.login-form"):
-            # Log the error and return the error message
-            client.close()
-            raise AuthenticationError(
-                f"Invalid username or password, or user does not exist for user={username}."
-            )
-
-        # If the user is successfully authenticated
-        logging.info(f"Login successful for user={username}.")
-        status = True
-        # Get the newly authenticated csrf token
-        if csrf_node := soup.css_first("meta[name='csrf-token']"):
-            csrf_token = csrf_node.attributes.get("content")
-            logging.debug(f"Authenticated CSRF token: {csrf_token}")
-        else:
-            client.close()
-            raise CSRFTokenError(
-                f"CSRF token not found in the post-authentication response for user={username}."
-            )
-
-        result = {"status": status, "message": "Login successful."}
-
-        if profile:
-            logging.info(f"Profile data requested for user={username}. Fetching profile data...")
-            # Fetch the profile information
-            result["profile"] = self.get_profile_information(client, username)
-            # Filter the fields if field filtering is enabled
-            if field_filtering:
-                result["profile"] = {
-                    key: value for key, value in result["profile"].items() if key in fields
-                }
-                logging.info(
-                    f"Field filtering enabled. Filtered profile data for user={username}: {result['profile']}"
+            # Get the initial csrf token assigned to the user session when the home page is loaded
+            logging.debug("Fetching CSRF token from the home page...")
+            home_url = "https://www.pesuacademy.com/Academy/"
+            response = await client.get(home_url)
+            soup = HTMLParser(response.text)
+            # Extract the csrf token from the meta tag
+            if csrf_node := soup.css_first("meta[name='csrf-token']"):
+                csrf_token = csrf_node.attributes.get("content")
+                logging.debug(f"CSRF token fetched: {csrf_token}")
+            else:
+                # client.close()
+                raise CSRFTokenError(
+                    f"CSRF token not found in the pre-authentication response for user={username}."
                 )
 
-        logging.info(f"Authentication process for user={username} completed successfully.")
-        # Close the client session and return the result
-        client.close()
-        return result
+            # Get a pre-fetched token (consumes it and triggers a new fetch in background)
+            # csrf_token = await self.get_csrf_token_and_prefetch()
+            # logging.debug(f"Using cached CSRF token for user={username}.")
+
+            # Prepare the login data for auth call
+            data = {
+                "_csrf": csrf_token,
+                "j_username": username,
+                "j_password": password,
+            }
+
+            logging.debug("Attempting to authenticate user...")
+            # Make a post request to authenticate the user
+            auth_url = "https://www.pesuacademy.com/Academy/j_spring_security_check"
+            response = await client.post(auth_url, data=data)
+            soup = HTMLParser(response.text)
+            logging.debug("Authentication response received.")
+
+            # If class login-form is present, login failed
+            if soup.css_first("div.login-form"):
+                # Log the error and return the error message
+                raise AuthenticationError(
+                    f"Invalid username or password, or user does not exist for user={username}."
+                )
+
+            # If the user is successfully authenticated
+            logging.info(f"Login successful for user={username}.")
+            status = True
+            # Get the newly authenticated csrf token
+            if csrf_node := soup.css_first("meta[name='csrf-token']"):
+                csrf_token = csrf_node.attributes.get("content")
+                logging.debug(f"Authenticated CSRF token: {csrf_token}")
+            else:
+                raise CSRFTokenError(
+                    f"CSRF token not found in the post-authentication response for user={username}."
+                )
+
+            result = {"status": status, "message": "Login successful."}
+
+            if profile:
+                logging.info(f"Profile data requested for user={username}. Fetching profile data...")
+                # Fetch the profile information
+                result["profile"] = await self.get_profile_information(client, username)
+                # Filter the fields if field filtering is enabled
+                if field_filtering:
+                    result["profile"] = {
+                        key: value for key, value in result["profile"].items() if key in fields
+                    }
+                    logging.info(
+                        f"Field filtering enabled. Filtered profile data for user={username}: {result['profile']}"
+                    )
+
+            logging.info(f"Authentication process for user={username} completed successfully.")
+            asyncio.create_task(self._prefetch_csrf_token())
+            # Close the client session and return the result
+            return result

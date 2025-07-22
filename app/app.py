@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
         util.convert_readme_to_html()
         logging.info("README.html regenerated successfully on startup.")
         # TODO: Cache the README.html file and serve it from the cache if it exists.
+        await pesu_academy._prefetch_csrf_token()
     except Exception:
         logging.exception(
             "Failed to regenerate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
@@ -153,7 +154,7 @@ async def authenticate(payload: RequestModel):
     authentication_result = {"timestamp": current_time}
     logging.info(f"Authenticating user={username} with PESU Academy...")
     authentication_result.update(
-        pesu_academy.authenticate(
+        await pesu_academy.authenticate(
             username=username, password=password, profile=profile, fields=fields
         )
     )
