@@ -26,16 +26,20 @@ async def lifespan(app: FastAPI):
     Lifespan event handler for startup and shutdown events.
     """
     # Startup
+    # Cache the README.html file
+    global README_HTML_CACHE
     try:
-        logging.info("PESUAuth API startup: Regenerating README.html...")
-        global README_HTML_CACHE
+        logging.info("PESUAuth API startup")
+        logging.debug("Regenerating README.html...")
         README_HTML_CACHE = await util.convert_readme_to_html()
-        logging.info("README.html regenerated successfully on startup.")
-        await pesu_academy._prefetch_client_with_csrf_token()
+        logging.debug("README.html generated successfully on startup.")
     except Exception:
         logging.exception(
-            "Failed to regenerate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
+            "Failed to generate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
         )
+    # Prefetch PESUAcademy client for first request
+    await pesu_academy._prefetch_client_with_csrf_token()
+    logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
     yield
     # Shutdown
     if pesu_academy._client:
@@ -110,7 +114,7 @@ async def health_check():
     """
     Health check endpoint to verify if the API is running.
     """
-    logging.info("Health check requested.")
+    logging.debug("Health check requested.")
     return {"status": "ok"}
 
 
@@ -122,7 +126,7 @@ async def readme():
         if not README_HTML_CACHE:
             logging.warning("README.html does not exist. Regenerating...")
             README_HTML_CACHE = await util.convert_readme_to_html()
-        logging.info("Serving README.html...")
+        logging.debug("Serving README.html from cache.")
         return HTMLResponse(
             status_code=200,
             content=README_HTML_CACHE,
