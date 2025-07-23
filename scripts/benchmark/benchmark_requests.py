@@ -109,12 +109,12 @@ if __name__ == "__main__":
             else:
                 success.append(0)
 
-    if output:
-        outfile = (
-            output
-            if output
-            else f"benchmark_[num_requests={num_requests}]_[max_workers={max_workers}]_[parallel={parallel}]_[route={route}]_[host={host}]_[timeout={timeout}].csv"
-        )
+    outfile = (
+        output
+        if output
+        else f"benchmark_[num_requests={num_requests}]_[max_workers={max_workers}]_[parallel={parallel}]_[route={route}]_[host={host}]_[timeout={timeout}].csv"
+    )
+
     with open(
         outfile,
         "w",
