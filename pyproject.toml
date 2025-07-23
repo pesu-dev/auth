@@ -21,12 +21,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "matplotlib>=3.10.3",
+    "numpy>=2.3.1",
+    "pandas>=2.3.1",
     "pre-commit>=4.2.0",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.0.0",
     "pytest-cov>=6.2.1",
     "python-dotenv>=1.1.0",
     "ruff>=0.12.2",
+    "seaborn>=0.13.2",
     "tqdm>=4.67.1",
 ]
 
