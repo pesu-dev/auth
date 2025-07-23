@@ -1,64 +1,84 @@
-from unittest.mock import mock_open, patch
 import pytest
-
-import app.app as app_module
-
+from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 from app.app import app
+import app.util as util
+import app.app as app_module
+from fastapi import FastAPI
 
 
 @pytest.fixture
 def client():
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 
 
-def test_convert_readme_to_html_writes_html():
-    m_open = mock_open(read_data="# Title\nSome content")
-    with patch("builtins.open", m_open):
-        with patch("gh_md_to_html.main") as mock_gh_md_to_html:
-            mock_gh_md_to_html.return_value = "<h1>Title</h1>"
-            app_module.util.convert_readme_to_html()
-    m_open.assert_any_call("README_tmp.md", "w")
-    m_open.assert_any_call("README.html", "w")
-    handle = m_open()
-    handle.write.assert_any_call("<h1>Title</h1>")
+@pytest.mark.asyncio
+async def test_convert_readme_to_html_returns_html():
+    mock_file = AsyncMock()
+    mock_file.__aenter__.return_value.read.return_value = "# Title\nSome content"
+    with patch("emoji.emojize", return_value="# Title\nSome content"):
+        mock_response = MagicMock()
+        mock_response.text = "<h1>Mock HTML</h1>"
+        mock_response.raise_for_status = lambda: None  # avoid exception
+        mock_client_instance = AsyncMock()
+        mock_client_instance.post.return_value = mock_response
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client_instance
+        with (
+            patch("aiofiles.open", return_value=mock_file),
+            patch("httpx.AsyncClient", return_value=mock_client),
+        ):
+            html = await util.convert_readme_to_html()
+            assert html == "<h1>Mock HTML</h1>"
+            mock_file.__aenter__.return_value.read.assert_awaited_once()
+            mock_client_instance.post.assert_awaited_once()
 
 
 def test_readme_raises_exception(monkeypatch, client):
-    def raise_exception():
+    async def raise_exception():
         raise Exception("fail")
 
-    monkeypatch.setattr("pathlib.Path.exists", lambda self: False)
-    monkeypatch.setattr(app_module.util, "convert_readme_to_html", raise_exception)
-
-    with pytest.raises(Exception):
-        response = client.get("/readme")
-        assert response.status_code == 500
-        assert "Internal Server Error" in response.text
+    monkeypatch.setattr(util, "convert_readme_to_html", raise_exception)
+    app_module.README_HTML_CACHE = None
+    response = client.get("/readme")
+    assert response.status_code == 500
+    assert "Internal Server Error" in response.text
 
 
 def test_readme_success(client):
-    with (
-        patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.read_text", return_value="<html><body>Test README</body></html>"),
-    ):
-        response = client.get("/readme")
-        assert response.status_code == 200
-        assert "html" in response.headers["content-type"]
-        assert "Test README" in response.text
+    cached_html = '<div class="markdown-heading"><h1 class="heading-element">pesu-auth</h1></div>'
+    app_module.README_HTML_CACHE = cached_html
+    response = client.get("/readme")
+    assert response.status_code == 200
+    assert "html" in response.headers["content-type"]
+    assert "pesu-auth" in response.text
 
 
 def test_readme_generates_html_when_missing(client):
-    m_open = mock_open(read_data="# Title\nSome content")
-
-    with (
-        patch("pathlib.Path.exists", side_effect=[False, True]),
-        patch("builtins.open", m_open),
-        patch("app.util.gh_md_to_html.main", return_value="<h1>Generated Title</h1>"),
-        patch("pathlib.Path.read_text", return_value="<h1>Generated Title</h1>"),
-    ):
+    app_module.README_HTML_CACHE = None
+    generated_html = (
+        '<div class="markdown-heading"><h1 class="heading-element">Generated Title</h1></div>'
+    )
+    with patch("app.util.convert_readme_to_html", new_callable=AsyncMock) as mock_convert:
+        mock_convert.return_value = generated_html
         response = client.get("/readme")
-        assert response.status_code == 200
-        assert "html" in response.headers["content-type"]
-        assert "Generated Title" in response.text
+    assert response.status_code == 200
+    assert "html" in response.headers["content-type"]
+    assert "Generated Title" in response.text
+
+
+@patch("app.app.util.convert_readme_to_html", side_effect=Exception("README generation failed"))
+@patch("app.app.pesu_academy.prefetch_client_with_csrf_token", new_callable=AsyncMock)
+@patch("app.app.pesu_academy.close_client", new_callable=AsyncMock)
+@pytest.mark.asyncio
+async def test_lifespan_readme_generation_exception(
+    mock_close_client, mock_prefetch_client, mock_convert_readme, caplog
+):
+    from app.app import lifespan
+
+    app = FastAPI(lifespan=lifespan)
+    with caplog.at_level("ERROR"):
+        async with lifespan(app):
+            pass
+    assert "Failed to generate README.html on startup" in caplog.text

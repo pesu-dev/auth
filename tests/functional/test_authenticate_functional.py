@@ -12,46 +12,50 @@ def pesu_academy():
 
 
 @pytest.mark.secret_required
-def test_authenticate_success_username_email(pesu_academy: PESUAcademy):
+@pytest.mark.asyncio
+async def test_authenticate_success_username_email(pesu_academy: PESUAcademy):
     email = os.getenv("TEST_EMAIL")
     password = os.getenv("TEST_PASSWORD")
     assert email is not None, "TEST_EMAIL environment variable not set"
     assert password is not None, "TEST_PASSWORD environment variable not set"
 
-    result = pesu_academy.authenticate(email, password, profile=False, fields=None)
+    result = await pesu_academy.authenticate(email, password, profile=False, fields=None)
     assert result["status"] is True
     assert "Login successful" in result["message"]
     assert "profile" not in result
 
 
 @pytest.mark.secret_required
-def test_authenticate_success_username_prn(pesu_academy: PESUAcademy):
+@pytest.mark.asyncio
+async def test_authenticate_success_username_prn(pesu_academy: PESUAcademy):
     prn = os.getenv("TEST_PRN")
     password = os.getenv("TEST_PASSWORD")
     assert prn is not None, "TEST_PRN environment variable not set"
     assert password is not None, "TEST_PASSWORD environment variable not set"
 
-    result = pesu_academy.authenticate(prn, password, profile=False, fields=None)
+    result = await pesu_academy.authenticate(prn, password, profile=False, fields=None)
     assert result["status"] is True
     assert "Login successful" in result["message"]
     assert "profile" not in result
 
 
 @pytest.mark.secret_required
-def test_authenticate_success_username_phone(pesu_academy: PESUAcademy):
+@pytest.mark.asyncio
+async def test_authenticate_success_username_phone(pesu_academy: PESUAcademy):
     phone = os.getenv("TEST_PHONE")
     password = os.getenv("TEST_PASSWORD")
     assert phone is not None, "TEST_PHONE environment variable not set"
     assert password is not None, "TEST_PASSWORD environment variable not set"
 
-    result = pesu_academy.authenticate(phone, password, profile=False, fields=None)
+    result = await pesu_academy.authenticate(phone, password, profile=False, fields=None)
     assert result["status"] is True
     assert "Login successful" in result["message"]
     assert "profile" not in result
 
 
 @pytest.mark.secret_required
-def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcademy):
+@pytest.mark.asyncio
+async def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcademy):
     email = os.getenv("TEST_EMAIL")
     password = os.getenv("TEST_PASSWORD")
     prn = os.getenv("TEST_PRN")
@@ -66,7 +70,7 @@ def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcademy):
     assert campus is not None, "TEST_CAMPUS environment variable not set"
 
     fields = ["prn", "branch", "branch_short_code", "campus"]
-    result = pesu_academy.authenticate(email, password, profile=True, fields=fields)
+    result = await pesu_academy.authenticate(email, password, profile=True, fields=fields)
 
     assert result["status"] is True
     assert "profile" in result
@@ -84,7 +88,8 @@ def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcademy):
 
 
 @pytest.mark.secret_required
-def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy):
+@pytest.mark.asyncio
+async def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy):
     name = os.getenv("TEST_NAME")
     email = os.getenv("TEST_EMAIL")
     password = os.getenv("TEST_PASSWORD")
@@ -129,7 +134,7 @@ def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy):
         "campus",
     ]
 
-    result = pesu_academy.authenticate(email, password, profile=True, fields=None)
+    result = await pesu_academy.authenticate(email, password, profile=True, fields=None)
 
     assert result["status"] is True
     assert "profile" in result
@@ -153,9 +158,12 @@ def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy):
     assert profile["campus"] == campus
 
 
-def test_authenticate_invalid_credentials(pesu_academy: PESUAcademy):
+@pytest.mark.asyncio
+async def test_authenticate_invalid_credentials(pesu_academy: PESUAcademy):
     with pytest.raises(AuthenticationError):
-        result = pesu_academy.authenticate("INVALID_USER", "wrongpass", profile=True, fields=None)
+        result = await pesu_academy.authenticate(
+            "INVALID_USER", "wrongpass", profile=True, fields=None
+        )
         assert result["status"] is False
         assert "Invalid username or password" in result["message"]
         assert "profile" not in result

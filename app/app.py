@@ -1,12 +1,11 @@
 import argparse
 import datetime
 import logging
-from pathlib import Path
 
 import pytz
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import ValidationError
 from app.pesu import PESUAcademy
@@ -18,6 +17,7 @@ from fastapi.requests import Request
 from app.exceptions.base import PESUAcademyError
 
 IST = pytz.timezone("Asia/Kolkata")
+README_HTML_CACHE: str | None = None
 
 
 @asynccontextmanager
@@ -26,24 +26,31 @@ async def lifespan(app: FastAPI):
     Lifespan event handler for startup and shutdown events.
     """
     # Startup
+    # Cache the README.html file
+    global README_HTML_CACHE
     try:
-        logging.info("PESUAuth API startup: Regenerating README.html...")
-        util.convert_readme_to_html()
-        logging.info("README.html regenerated successfully on startup.")
-        # TODO: Cache the README.html file and serve it from the cache if it exists.
+        logging.info("PESUAuth API startup")
+        logging.debug("Regenerating README.html...")
+        README_HTML_CACHE = await util.convert_readme_to_html()
+        logging.debug("README.html generated successfully on startup.")
     except Exception:
         logging.exception(
-            "Failed to regenerate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
+            "Failed to generate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
         )
+    # Prefetch PESUAcademy client for first request
+    await pesu_academy.prefetch_client_with_csrf_token()
+    logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
     yield
+
     # Shutdown
+    await pesu_academy.close_client()
     logging.info("PESUAuth API shutdown.")
 
 
 app = FastAPI(
     title="PESUAuth API",
     description="A simple API to authenticate PESU credentials using PESU Academy",
-    version="2.0.0",
+    version="2.1.0",
     docs_url="/",
     lifespan=lifespan,
     openapi_tags=[
@@ -107,7 +114,7 @@ async def health_check():
     """
     Health check endpoint to verify if the API is running.
     """
-    logging.info("Health check requested.")
+    logging.debug("Health check requested.")
     return {"status": "ok"}
 
 
@@ -115,15 +122,14 @@ async def health_check():
 async def readme():
     """Serve the rendered README.md as HTML."""
     try:
-        if not Path("README.html").exists():
+        global README_HTML_CACHE
+        if not README_HTML_CACHE:
             logging.warning("README.html does not exist. Regenerating...")
-            util.convert_readme_to_html()
-        logging.info("Serving README.html...")
-        # TODO: We should cache the README.html file and serve it from the cache if it exists.
-        output = Path("README.html").read_text(encoding="utf-8")
+            README_HTML_CACHE = await util.convert_readme_to_html()
+        logging.debug("Serving README.html from cache.")
         return HTMLResponse(
             status_code=200,
-            content=output,
+            content=README_HTML_CACHE,
             headers={"Cache-Control": "public, max-age=86400"},
         )
     except Exception:
@@ -132,7 +138,7 @@ async def readme():
 
 
 @app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
-async def authenticate(payload: RequestModel):
+async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks):
     """
     Authenticate a user using their PESU credentials via the PESU Academy service.
 
@@ -153,10 +159,12 @@ async def authenticate(payload: RequestModel):
     authentication_result = {"timestamp": current_time}
     logging.info(f"Authenticating user={username} with PESU Academy...")
     authentication_result.update(
-        pesu_academy.authenticate(
+        await pesu_academy.authenticate(
             username=username, password=password, profile=profile, fields=fields
         )
     )
+    # Prefetch a new client with an unauthenticated CSRF token for the next request
+    background_tasks.add_task(pesu_academy.prefetch_client_with_csrf_token)
 
     # Validate the response
     try:
