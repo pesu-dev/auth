@@ -208,3 +208,127 @@ async def test_authenticate_csrf_token_missing_after_login_strict(
     mock_html_parser.return_value = mock_soup
     with pytest.raises(CSRFTokenError):
         await pesu.authenticate("testuser", "testpass")
+
+
+@patch("app.pesu.HTMLParser")
+@patch("app.pesu.httpx.AsyncClient.get")
+@pytest.mark.asyncio
+async def test_get_profile_information_unknown_campus_code(
+    mock_get, mock_html_parser, pesu, caplog
+):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = "<html></html>"
+    mock_get.return_value = mock_response
+
+    def make_div(text):
+        div = MagicMock()
+        div.text.return_value = text
+        return div
+
+    form_group_elems = [
+        make_div("Name Test User"),
+        make_div("SRN PES1234567"),
+        make_div("PESU Id PES3XXXXX"),
+        make_div("Program BTech"),
+        make_div("Branch Computer Science and Engineering"),
+        make_div("Semester 6"),
+        make_div("Section A"),
+    ]
+
+    mock_soup = MagicMock()
+    mock_soup.any_css_matches.return_value = True
+    mock_soup.css.return_value = form_group_elems
+
+    email_node = MagicMock()
+    email_node.attributes = {"value": "test@example.com"}
+    phone_node = MagicMock()
+    phone_node.attributes = {"value": "1234567890"}
+
+    def css_first(selector):
+        if selector == "#updateMail":
+            return email_node
+        if selector == "#updateContact":
+            return phone_node
+        return None
+
+    mock_soup.css_first.side_effect = css_first
+    mock_html_parser.return_value = mock_soup
+
+    client = AsyncMock()
+    client.get.return_value = mock_response
+
+    with caplog.at_level("INFO"):
+        profile = await pesu.get_profile_information(client, "testuser")
+        assert profile["prn"] == "PES3XXXXX"
+        assert profile["name"] == "Test User"
+        assert profile["branch"] == "Computer Science and Engineering"
+        assert profile["email"] == "test@example.com"
+        assert profile["phone"] == "1234567890"
+        assert any(
+            "Unknown campus code: 3 parsed from PRN=PES3XXXXX for user=testuser" in record.message
+            for record in caplog.records
+        )
+        assert any(
+            "Complete profile information retrieved for user=testuser" in record.message
+            for record in caplog.records
+        )
+
+
+@patch("app.pesu.HTMLParser")
+@patch("app.pesu.httpx.AsyncClient.get")
+@pytest.mark.asyncio
+async def test_get_profile_information_campus_code_rr_ec(mock_get, mock_html_parser, pesu):
+    """Test that PRNs with PES1 and PES2 set the correct campus and campus_code."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = "<html></html>"
+    mock_get.return_value = mock_response
+
+    def make_div(text):
+        div = MagicMock()
+        div.text.return_value = text
+        return div
+
+    # Subcase 1: PES1... (RR campus)
+    form_group_elems_rr = [
+        make_div("Name Test User"),
+        make_div("SRN PES1234567"),
+        make_div("PESU Id PES1XXXXX"),
+        make_div("Program BTech"),
+        make_div("Branch Computer Science and Engineering"),
+        make_div("Semester 6"),
+        make_div("Section A"),
+    ]
+    mock_soup_rr = MagicMock()
+    mock_soup_rr.any_css_matches.return_value = True
+    mock_soup_rr.css.return_value = form_group_elems_rr
+    mock_soup_rr.css_first.side_effect = lambda selector: None
+    mock_html_parser.return_value = mock_soup_rr
+
+    client = AsyncMock()
+    client.get.return_value = mock_response
+
+    profile_rr = await pesu.get_profile_information(client, "testuser")
+    assert profile_rr["campus_code"] == 1
+    assert profile_rr["campus"] == "RR"
+
+    # Subcase 2: PES2... (EC campus)
+    form_group_elems_ec = [
+        make_div("Name Test User"),
+        make_div("SRN PES2234567"),
+        make_div("PESU Id PES2YYYYY"),
+        make_div("Program BTech"),
+        make_div("Branch Computer Science and Engineering"),
+        make_div("Semester 6"),
+        make_div("Section A"),
+    ]
+    mock_soup_ec = MagicMock()
+    mock_soup_ec.any_css_matches.return_value = True
+    mock_soup_ec.css.return_value = form_group_elems_ec
+    mock_soup_ec.css_first.side_effect = lambda selector: None
+    mock_html_parser.return_value = mock_soup_ec
+
+    profile_ec = await pesu.get_profile_information(client, "testuser")
+    assert profile_ec["campus_code"] == 2
+    assert profile_ec["campus"] == "EC"
