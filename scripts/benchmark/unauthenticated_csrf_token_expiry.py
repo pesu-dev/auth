@@ -49,7 +49,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    request_count, success, times = 0, list(), list()
+    request_count, success, times, waiting_times = 0, list(), list(), [0]
     while True:
         request_count += 1
         response, elapsed = make_request(
@@ -71,8 +71,9 @@ if __name__ == "__main__":
             unit="s",
         ):
             time.sleep(1)
+        waiting_times.append(next_interval)
 
     with open(args.output, "w") as f:
-        f.write("status,time\n")
-        for s, t in zip(success, times):
-            f.write(f"{s},{t}\n")
+        f.write("status,time,waiting_time\n")
+        for s, t, w in zip(success, times, waiting_times):
+            f.write(f"{s},{t},{w}\n")
