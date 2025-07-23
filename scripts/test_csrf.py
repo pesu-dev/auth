@@ -3,7 +3,6 @@ import logging
 import time
 import os
 from datetime import datetime
-from typing import Optional
 import httpx
 from dotenv import load_dotenv
 
