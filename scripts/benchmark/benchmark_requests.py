@@ -1,42 +1,12 @@
-import os
-import time
-
-import httpx
 import argparse
-import logging
 from tqdm.auto import tqdm
-from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-load_dotenv()
-
-
-def make_request(profile: bool = True) -> tuple[dict, float]:
-    """
-    Make a request to the authentication endpoint and return the response and elapsed time.
-    :param profile: Whether to fetch the profile information or not
-    :return: Tuple of response JSON and elapsed time in seconds
-    """
-    data = {
-        "username": os.getenv("TEST_PRN"),
-        "password": os.getenv("TEST_PASSWORD"),
-        "profile": profile,
-    }
-
-    with httpx.Client(follow_redirects=True, timeout=httpx.Timeout(10.0)) as client:
-        start_time = time.time()
-        response = client.post(
-            "http://localhost:5000/authenticate",
-            json=data,
-            follow_redirects=True,
-        )
-
-    elapsed_time = time.time() - start_time
-    return response.json(), elapsed_time
+from util import make_request
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Benchmark the authentication endpoint.")
+    parser = argparse.ArgumentParser(description="Benchmark PESUAuth API.")
     parser.add_argument(
         "--max-workers",
         type=int,
@@ -52,12 +22,41 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-profile",
         action="store_true",
-        help="Run the benchmark without fetching profile information (default: fetch profile info)",
+        help="Run the authenticate endpoint benchmark without fetching profile information (default: fetch profile info)",
     )
     parser.add_argument(
         "--parallel",
         action="store_true",
         help="Run the benchmark in parallel using threads",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="http://localhost:5000",
+        help="The host to make the request to (default: http://localhost:5000)",
+    )
+    parser.add_argument(
+        "--route",
+        type=str,
+        choices=["authenticate", "health", "readme"],
+        default="authenticate",
+        help="The route to make the request to (default: authenticate)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=10.0,
+        help="The timeout for the request (default: 10.0)",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Verbose output (default: False)",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        help="The output file to save the benchmark results to",
     )
     args = parser.parse_args()
 
@@ -65,39 +64,59 @@ if __name__ == "__main__":
     num_requests = args.num_requests
     profile = not args.no_profile
     parallel = args.parallel
+    host = args.host
+    route = args.route
+    timeout = args.timeout
+    verbose = args.verbose
+    output = args.output
 
     success = []
     times = []
     if parallel:
-        logging.info(
+        print(
             f"Running benchmark with max {max_workers} workers and {num_requests} requests in parallel..."
         )
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(make_request, profile=profile) for _ in range(num_requests)]
+            futures = [
+                executor.submit(
+                    make_request, profile=profile, host=host, route=route, timeout=timeout
+                )
+                for _ in range(num_requests)
+            ]
             for future in as_completed(futures):
                 try:
                     response, elapsed = future.result()
                     times.append(elapsed)
-                    logging.debug(response)
+                    if verbose:
+                        print(f"Response: {response}")
                     if response.get("status"):
                         success.append(1)
                     else:
                         success.append(0)
                 except Exception as e:
-                    logging.error(f"Request failed: {e}")
+                    print(f"Request failed: {e}")
     else:
-        logging.info(f"Running benchmark with {num_requests} requests sequentially...")
+        print(f"Running benchmark with {num_requests} requests sequentially...")
         for _ in tqdm(range(num_requests), desc="Processing requests"):
-            response, elapsed = make_request(profile=profile)
+            response, elapsed = make_request(
+                profile=profile, host=host, route=route, timeout=timeout
+            )
             times.append(elapsed)
-            logging.debug(response)
+            if verbose:
+                print(f"Response: {response}")
             if response.get("status"):
                 success.append(1)
             else:
                 success.append(0)
 
+    outfile = (
+        output
+        if output
+        else f"benchmark_[num_requests={num_requests}]_[max_workers={max_workers}]_[parallel={parallel}]_[route={route}]_[timeout={timeout}].csv"
+    )
+
     with open(
-        f"benchmark_[num_requests={num_requests}]_[max_workers={max_workers}]_[parallel={parallel}].csv",
+        outfile,
         "w",
     ) as f:
         f.write("status,time\n")
