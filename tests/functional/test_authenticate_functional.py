@@ -69,7 +69,7 @@ async def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcade
     assert campus is not None, "TEST_CAMPUS environment variable not set"
     assert name is not None, "TEST_NAME environment variable not set"
 
-    fields = ["prn", "branch", "branch_short_code", "campus"]
+    fields = ["prn", "branch", "campus"]
     result = await pesu_academy.authenticate(email, password, profile=True, fields=fields)
 
     assert result["status"] is True
@@ -83,7 +83,7 @@ async def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcade
     assert profile["prn"] == prn
     assert profile["branch"] == branch
     assert profile["campus"] == campus
-    assert profile["name"] == name
+    assert "name" not in profile
     assert "email" not in profile
 
 
