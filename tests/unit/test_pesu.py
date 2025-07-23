@@ -332,3 +332,27 @@ async def test_get_profile_information_campus_code_rr_ec(mock_get, mock_html_par
     profile_ec = await pesu.get_profile_information(client, "testuser")
     assert profile_ec["campus_code"] == 2
     assert profile_ec["campus"] == "EC"
+
+
+@patch("app.pesu.HTMLParser")
+@patch("app.pesu.httpx.AsyncClient.get")
+@pytest.mark.asyncio
+async def test_get_profile_information_no_profile_data(mock_get, mock_html_parser, pesu):
+    """Test that ProfileParseError is raised when no profile data is parsed (parsing loop runs but nothing added)."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = "<html></html>"
+    mock_get.return_value = mock_response
+    mock_soup = MagicMock()
+    mock_soup.any_css_matches.return_value = True
+    mock_soup.css.return_value = [
+        MagicMock(text=MagicMock(return_value="foo bar")) for _ in range(7)
+    ]
+    mock_soup.css_first.return_value = None
+    mock_html_parser.return_value = mock_soup
+
+    client = AsyncMock()
+    client.get.return_value = mock_response
+    with pytest.raises(ProfileParseError) as exc_info:
+        await pesu.get_profile_information(client, "testuser")
+    assert "No profile data could be extracted for user=testuser" in str(exc_info.value)
