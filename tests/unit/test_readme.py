@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from app.app import app
 import app.util as util
 import app.app as app_module
+from fastapi import FastAPI
 
 
 @pytest.fixture
@@ -65,3 +66,19 @@ def test_readme_generates_html_when_missing(client):
     assert response.status_code == 200
     assert "html" in response.headers["content-type"]
     assert "Generated Title" in response.text
+
+
+@patch("app.app.util.convert_readme_to_html", side_effect=Exception("README generation failed"))
+@patch("app.app.pesu_academy.prefetch_client_with_csrf_token", new_callable=AsyncMock)
+@patch("app.app.pesu_academy.close_client", new_callable=AsyncMock)
+@pytest.mark.asyncio
+async def test_lifespan_readme_generation_exception(
+    mock_close_client, mock_prefetch_client, mock_convert_readme, caplog
+):
+    from app.app import lifespan
+
+    app = FastAPI(lifespan=lifespan)
+    with caplog.at_level("ERROR"):
+        async with lifespan(app):
+            pass
+    assert "Failed to generate README.html on startup" in caplog.text

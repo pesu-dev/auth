@@ -1,9 +1,14 @@
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 
 import app.pesu
 from app.pesu import PESUAcademy
-from app.exceptions.authentication import ProfileFetchError, CSRFTokenError
+from app.exceptions.authentication import (
+    ProfileFetchError,
+    CSRFTokenError,
+    AuthenticationError,
+    ProfileParseError,
+)
 
 
 @pytest.fixture
@@ -127,3 +132,79 @@ async def test_authenticate_with_profile_no_field_filtering(
     for field in app.pesu.PESUAcademyConstants.DEFAULT_FIELDS:
         assert field in result["profile"]
         assert result["profile"][field] == "test_value"
+
+
+@patch("app.pesu.HTMLParser")
+@patch("app.pesu.httpx.AsyncClient.get")
+@pytest.mark.asyncio
+async def test_get_profile_information_profile_parse_error(mock_get, mock_html_parser, pesu):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = "<html></html>"
+    mock_get.return_value = mock_response
+    mock_soup = MagicMock()
+    mock_soup.any_css_matches.return_value = True
+    mock_soup.css.return_value = [MagicMock()] * 3
+    mock_html_parser.return_value = mock_soup
+
+    client = AsyncMock()
+    client.get.return_value = mock_response
+
+    with pytest.raises(ProfileParseError):
+        await pesu.get_profile_information(client, "testuser")
+
+
+@patch("app.pesu.HTMLParser")
+@patch("app.pesu.httpx.AsyncClient.post")
+@patch("app.pesu.httpx.AsyncClient.get")
+@pytest.mark.asyncio
+async def test_authenticate_login_form_present(mock_get, mock_post, mock_html_parser, pesu):
+    mock_get_response = MagicMock()
+    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
+    mock_get_response.status_code = 200
+    mock_get.return_value = mock_get_response
+    mock_soup_csrf = MagicMock()
+    mock_soup_csrf.css_first.side_effect = lambda selector: (
+        MagicMock(attributes={"content": "fake-csrf-token"})
+        if selector == "meta[name='csrf-token']"
+        else None
+    )
+    mock_soup_login = MagicMock()
+    mock_soup_login.css_first.side_effect = lambda selector: (
+        MagicMock() if selector == "div.login-form" else None
+    )
+    mock_html_parser.side_effect = [mock_soup_csrf, mock_soup_login]
+    mock_post_response = MagicMock()
+    mock_post_response.text = "<html><body><div class='login-form'></div></body></html>"
+    mock_post_response.status_code = 200
+    mock_post.return_value = mock_post_response
+    with pytest.raises(AuthenticationError):
+        await pesu.authenticate("testuser", "testpass")
+
+
+@patch("app.pesu.HTMLParser")
+@patch("app.pesu.httpx.AsyncClient.post")
+@patch("app.pesu.httpx.AsyncClient.get")
+@pytest.mark.asyncio
+async def test_authenticate_csrf_token_missing_after_login_strict(
+    mock_get, mock_post, mock_html_parser, pesu
+):
+    mock_get_response = AsyncMock()
+    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
+    mock_get.return_value = mock_get_response
+    mock_post_response = AsyncMock()
+    mock_post_response.text = "<html><body>Login successful but no CSRF token</body></html>"
+    mock_post.return_value = mock_post_response
+    mock_soup = MagicMock()
+
+    def css_first(selector):
+        if selector == "div.login-form":
+            return None
+        if selector == "meta[name='csrf-token']":
+            return None
+        return None
+
+    mock_soup.css_first.side_effect = css_first
+    mock_html_parser.return_value = mock_soup
+    with pytest.raises(CSRFTokenError):
+        await pesu.authenticate("testuser", "testpass")
