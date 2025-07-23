@@ -38,13 +38,12 @@ async def lifespan(app: FastAPI):
             "Failed to generate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
         )
     # Prefetch PESUAcademy client for first request
-    await pesu_academy._prefetch_client_with_csrf_token()
+    await pesu_academy.prefetch_client_with_csrf_token()
     logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
     yield
 
     # Shutdown
-    if pesu_academy._client:
-        await pesu_academy._client.aclose()
+    await pesu_academy.close_client()
     logging.info("PESUAuth API shutdown.")
 
 
@@ -165,7 +164,7 @@ async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks)
         )
     )
     # Prefetch a new client with an unauthenticated CSRF token for the next request
-    background_tasks.add_task(pesu_academy._prefetch_client_with_csrf_token)
+    background_tasks.add_task(pesu_academy.prefetch_client_with_csrf_token)
 
     # Validate the response
     try:

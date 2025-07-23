@@ -41,6 +41,10 @@ class PESUAcademy:
         else:
             raise CSRFTokenError("CSRF token not found in the pre-authentication response.")
 
+    async def prefetch_client_with_csrf_token(self):
+        """Public method to prefetch a new client with an unauthenticated CSRF token."""
+        await self._prefetch_client_with_csrf_token()
+
     async def _prefetch_client_with_csrf_token(self):
         """Prefetch a new client with an unauthenticated CSRF token."""
         logging.info("Prefetching a new client with an unauthenticated CSRF token...")
@@ -70,6 +74,12 @@ class PESUAcademy:
         asyncio.create_task(self._prefetch_client_with_csrf_token())
         # Return a dedicated client/token for this request
         return client_to_use, token_to_use
+
+    async def close_client(self):
+        """Public method to close the internal client if it exists."""
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
 
     @staticmethod
     def map_branch_to_short_code(branch: str) -> str | None:

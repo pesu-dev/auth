@@ -13,7 +13,6 @@ def client():
 
 
 @pytest.mark.asyncio
-@pytest.mark.asyncio
 async def test_convert_readme_to_html_returns_html():
     mock_file = AsyncMock()
     mock_file.__aenter__.return_value.read.return_value = "# Title\nSome content"
