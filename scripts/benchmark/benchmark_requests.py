@@ -112,7 +112,7 @@ if __name__ == "__main__":
     outfile = (
         output
         if output
-        else f"benchmark_[num_requests={num_requests}]_[max_workers={max_workers}]_[parallel={parallel}]_[route={route}]_[host={host}]_[timeout={timeout}].csv"
+        else f"benchmark_[num_requests={num_requests}]_[max_workers={max_workers}]_[parallel={parallel}]_[route={route}]_[timeout={timeout}].csv"
     )
 
     with open(
