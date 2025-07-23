@@ -33,7 +33,7 @@ class PESUAcademy:
         client = httpx.AsyncClient(follow_redirects=True, timeout=10.0)
         # Fetch the CSRF token
         resp = await client.get("https://www.pesuacademy.com/Academy/")
-        soup = HTMLParser(resp.text)
+        soup = await asyncio.to_thread(HTMLParser, resp.text)
         if node := soup.css_first("meta[name='csrf-token']"):
             csrf_token = node.attributes["content"]
             logging.info(f"Fetched CSRF token: {csrf_token}")
@@ -131,7 +131,7 @@ class PESUAcademy:
 
         logging.debug("Profile data fetched successfully.")
         # Parse the response text
-        soup = HTMLParser(response.text)
+        soup = await asyncio.to_thread(HTMLParser, response.text)
         profile = dict()
 
         if (
@@ -248,7 +248,7 @@ class PESUAcademy:
         # Make a post request to authenticate the user
         auth_url = "https://www.pesuacademy.com/Academy/j_spring_security_check"
         response = await client.post(auth_url, data=data)
-        soup = HTMLParser(response.text)
+        soup = await asyncio.to_thread(HTMLParser, response.text)
         logging.debug("Authentication response received.")
 
         # If class login-form is present, login failed
