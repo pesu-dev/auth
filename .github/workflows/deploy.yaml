@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
 
-
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
@@ -52,46 +51,86 @@ jobs:
     permissions:
       contents: read
       packages: write
+
     steps:
       - uses: actions/checkout@v3
+
       - name: Get short commit hash
         id: vars
         run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and tag image for GHCR
         run: |
           docker build . --tag ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ steps.vars.outputs.tag }}
           docker tag ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ steps.vars.outputs.tag }} ghcr.io/${{ github.repository_owner }}/pesu-auth:latest
+
       - name: Push image to GitHub Container Registry
         run: |
           docker push ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ steps.vars.outputs.tag }}
           docker push ghcr.io/${{ github.repository_owner }}/pesu-auth:latest
 
-  deploy-to-render:
+  deploy-to-render-prod-and-staging:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
 
-
     env:
-      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      RENDER_DEPLOY_HOOK_URL_PROD: ${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }}
+      RENDER_DEPLOY_HOOK_URL_DEV: ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}
 
     steps:
-      - name: Check Deploy Hook URL
+      - name: Check Deploy Hook URLs
         run: |
-          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
-            echo "Render deploy hook URL is missing, skipping deployment"
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }}" ]; then
+            echo "Render PROD deploy hook URL is missing!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}" ]; then
+            echo "Render DEV (staging) deploy hook URL is missing!"
             exit 1
           fi
 
-      - name: Trigger Render deploy hook
+      - name: Trigger Render Staging Deploy (Mirror Prod)
         run: |
-          echo "🚀 Triggering Render deployment..."
-          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }} || {
-            echo "❌ Render deploy hook failed!"
+          echo "🚀 Deploying to Staging ..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }} || {
+            echo "❌ Render staging sync failed!"
+            exit 1
+          }
+
+      - name: Trigger Render Production Deploy
+        run: |
+          echo "🚀 Deploying to Production ..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }} || {
+            echo "❌ Render PROD deploy failed!"
+            exit 1
+          }
+
+  deploy-to-render-staging:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.head_branch == 'dev' && github.event.workflow_run.conclusion == 'success' }}
+
+    env:
+      RENDER_DEPLOY_HOOK_URL_DEV: ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}
+
+    steps:
+      - name: Check Staging Deploy Hook URL
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}" ]; then
+            echo "Render DEV (staging) deploy hook URL is missing!"
+            exit 1
+          fi
+
+      - name: Trigger Render Staging Deploy
+        run: |
+          echo "🚀 Deploying to Staging ..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }} || {
+            echo "❌ Render staging deploy failed!"
             exit 1
           }
