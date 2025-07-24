@@ -7,45 +7,39 @@ on:
       - completed
 
 jobs:
+  # Docker build and push (main only)
   push-to-dockerhub:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
-
-
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-
     steps:
       - uses: actions/checkout@v3
-
       - name: Check Docker credentials
         run: |
           if [ -z "${{ secrets.DOCKER_USERNAME }}" ] || [ -z "${{ secrets.DOCKER_PASSWORD }}" ]; then
             echo "Secrets missing, skipping push"
             exit 1
           fi
-
       - name: Get short commit hash
         id: vars
         run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Build and tag image
         run: |
           docker build . --tag ${{ secrets.DOCKER_USERNAME }}/pesu-auth:${{ steps.vars.outputs.tag }}
           docker tag ${{ secrets.DOCKER_USERNAME }}/pesu-auth:${{ steps.vars.outputs.tag }} ${{ secrets.DOCKER_USERNAME }}/pesu-auth:latest
-
       - name: Push image to Docker Hub
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/pesu-auth:${{ steps.vars.outputs.tag }}
           docker push ${{ secrets.DOCKER_USERNAME }}/pesu-auth:latest
 
+  # GHCR build and push (main only)
   push-to-ghcr:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
@@ -72,26 +66,56 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ steps.vars.outputs.tag }}
           docker push ghcr.io/${{ github.repository_owner }}/pesu-auth:latest
 
-  deploy-to-render:
+  # Deploy both environments on main
+  deploy-prod-and-staging:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
-
-
     env:
-      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-
+      RENDER_DEPLOY_HOOK_URL_PROD: ${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }}
+      RENDER_DEPLOY_HOOK_URL_DEV: ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}
     steps:
-      - name: Check Deploy Hook URL
+      - name: Check Deploy Hook URLs
         run: |
-          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
-            echo "Render deploy hook URL is missing, skipping deployment"
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }}" ]; then
+            echo "Production deploy hook missing!"
             exit 1
           fi
-
-      - name: Trigger Render deploy hook
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}" ]; then
+            echo "Staging deploy hook missing!"
+            exit 1
+          fi
+      - name: Deploy to Production
         run: |
-          echo "🚀 Triggering Render deployment..."
-          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }} || {
-            echo "❌ Render deploy hook failed!"
+          echo "🚀 Deploying to Production..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }} || {
+            echo "❌ Production deploy failed!"
+            exit 1
+          }
+      - name: Sync Staging with Production
+        run: |
+          echo "🚀 Deploying to Staging (mirror prod)..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }} || {
+            echo "❌ Staging deploy failed!"
+            exit 1
+          }
+
+  # Deploy only to staging on dev
+  deploy-staging-only:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.head_branch == 'dev' && github.event.workflow_run.conclusion == 'success' }}
+    env:
+      RENDER_DEPLOY_HOOK_URL_DEV: ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}
+    steps:
+      - name: Check Staging Deploy Hook URL
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}" ]; then
+            echo "Staging deploy hook missing!"
+            exit 1
+          fi
+      - name: Deploy to Staging (Dev branch)
+        run: |
+          echo "🚀 Deploying to Staging..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }} || {
+            echo "❌ Staging deploy failed!"
             exit 1
           }
