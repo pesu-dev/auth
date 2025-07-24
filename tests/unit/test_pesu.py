@@ -221,24 +221,36 @@ async def test_get_profile_information_unknown_campus_code(
     mock_response.text = "<html></html>"
     mock_get.return_value = mock_response
 
-    def make_div(text):
+    def make_div(key, value):
         div = MagicMock()
-        div.text.return_value = text
+        key_label = MagicMock()
+        key_label.text.return_value = key
+        value_label = MagicMock()
+        value_label.text.return_value = value
+
+        def css_first(selector):
+            if selector == "label.lbl-title-light":
+                return key_label
+            if selector == "label.lbl-title-light + label":
+                return value_label
+            return None
+
+        div.css_first.side_effect = css_first
         return div
 
     form_group_elems = [
-        make_div("Name Test User"),
-        make_div("SRN PES1234567"),
-        make_div("PESU Id PES3XXXXX"),
-        make_div("Program BTech"),
-        make_div("Branch Computer Science and Engineering"),
-        make_div("Semester 6"),
-        make_div("Section A"),
+        make_div("Name", "Test User"),
+        make_div("SRN", "PES1234567"),
+        make_div("PESU Id", "PES3XXXXX"),
+        make_div("Program", "BTech"),
+        make_div("Branch", "Computer Science and Engineering"),
+        make_div("Semester", "6"),
+        make_div("Section", "A"),
     ]
 
     mock_soup = MagicMock()
-    mock_soup.any_css_matches.return_value = True
-    mock_soup.css.return_value = form_group_elems
+    mock_container = MagicMock()
+    mock_container.css.return_value = form_group_elems
 
     email_node = MagicMock()
     email_node.attributes = {"value": "test@example.com"}
@@ -246,6 +258,8 @@ async def test_get_profile_information_unknown_campus_code(
     phone_node.attributes = {"value": "1234567890"}
 
     def css_first(selector):
+        if selector == "div.elem-info-wrapper":
+            return mock_container
         if selector == "#updateMail":
             return email_node
         if selector == "#updateContact":
@@ -285,25 +299,39 @@ async def test_get_profile_information_campus_code_rr_ec(mock_get, mock_html_par
     mock_response.text = "<html></html>"
     mock_get.return_value = mock_response
 
-    def make_div(text):
+    def make_div(key, value):
         div = MagicMock()
-        div.text.return_value = text
+        key_label = MagicMock()
+        key_label.text.return_value = key
+        value_label = MagicMock()
+        value_label.text.return_value = value
+
+        def css_first(selector):
+            if selector == "label.lbl-title-light":
+                return key_label
+            if selector == "label.lbl-title-light + label":
+                return value_label
+            return None
+
+        div.css_first.side_effect = css_first
         return div
 
     # Subcase 1: PES1... (RR campus)
     form_group_elems_rr = [
-        make_div("Name Test User"),
-        make_div("SRN PES1234567"),
-        make_div("PESU Id PES1XXXXX"),
-        make_div("Program BTech"),
-        make_div("Branch Computer Science and Engineering"),
-        make_div("Semester 6"),
-        make_div("Section A"),
+        make_div("Name", "Test User"),
+        make_div("SRN", "PES1234567"),
+        make_div("PESU Id", "PES1XXXXX"),
+        make_div("Program", "BTech"),
+        make_div("Branch", "Computer Science and Engineering"),
+        make_div("Semester", "6"),
+        make_div("Section", "A"),
     ]
     mock_soup_rr = MagicMock()
-    mock_soup_rr.any_css_matches.return_value = True
-    mock_soup_rr.css.return_value = form_group_elems_rr
-    mock_soup_rr.css_first.side_effect = lambda selector: None
+    mock_container_rr = MagicMock()
+    mock_container_rr.css.return_value = form_group_elems_rr
+    mock_soup_rr.css_first.side_effect = (
+        lambda selector: mock_container_rr if selector == "div.elem-info-wrapper" else None
+    )
     mock_html_parser.return_value = mock_soup_rr
 
     client = AsyncMock()
@@ -315,18 +343,20 @@ async def test_get_profile_information_campus_code_rr_ec(mock_get, mock_html_par
 
     # Subcase 2: PES2... (EC campus)
     form_group_elems_ec = [
-        make_div("Name Test User"),
-        make_div("SRN PES2234567"),
-        make_div("PESU Id PES2YYYYY"),
-        make_div("Program BTech"),
-        make_div("Branch Computer Science and Engineering"),
-        make_div("Semester 6"),
-        make_div("Section A"),
+        make_div("Name", "Test User"),
+        make_div("SRN", "PES2234567"),
+        make_div("PESU Id", "PES2YYYYY"),
+        make_div("Program", "BTech"),
+        make_div("Branch", "Computer Science and Engineering"),
+        make_div("Semester", "6"),
+        make_div("Section", "A"),
     ]
     mock_soup_ec = MagicMock()
-    mock_soup_ec.any_css_matches.return_value = True
-    mock_soup_ec.css.return_value = form_group_elems_ec
-    mock_soup_ec.css_first.side_effect = lambda selector: None
+    mock_container_ec = MagicMock()
+    mock_container_ec.css.return_value = form_group_elems_ec
+    mock_soup_ec.css_first.side_effect = (
+        lambda selector: mock_container_ec if selector == "div.elem-info-wrapper" else None
+    )
     mock_html_parser.return_value = mock_soup_ec
 
     profile_ec = await pesu.get_profile_information(client, "testuser")
@@ -355,4 +385,89 @@ async def test_get_profile_information_no_profile_data(mock_get, mock_html_parse
     client.get.return_value = mock_response
     with pytest.raises(ProfileParseError) as exc_info:
         await pesu.get_profile_information(client, "testuser")
+    assert (
+        "Failed to parse student profile page from PESU Academy for user=testuser. The webpage might have changed."
+        in str(exc_info.value)
+    )
+
+
+@patch("app.pesu.HTMLParser")
+@patch("app.pesu.httpx.AsyncClient.get")
+@patch("app.pesu.PESUAcademy._extract_and_update_profile", new_callable=AsyncMock)
+@pytest.mark.asyncio
+async def test_get_profile_information_empty_profile_triggers_final_parse_error(
+    mock_extract, mock_get, mock_html_parser, pesu
+):
+    mock_extract.return_value = None
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = "<html></html>"
+    mock_get.return_value = mock_response
+
+    mock_container = MagicMock()
+    mock_container.css.return_value = [MagicMock() for _ in range(7)]
+    mock_soup = MagicMock()
+    mock_soup.css_first.side_effect = (
+        lambda selector: mock_container if selector == "div.elem-info-wrapper" else None
+    )
+    mock_html_parser.return_value = mock_soup
+
+    client = AsyncMock()
+    client.get.return_value = mock_response
+
+    with pytest.raises(ProfileParseError) as exc_info:
+        await pesu.get_profile_information(client, "testuser")
     assert "No profile data could be extracted for user=testuser" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_extract_and_update_profile_key_label_missing(pesu):
+    node = MagicMock()
+    node.css_first.return_value = None  # key label missing
+    profile = {}
+    with pytest.raises(ProfileParseError) as exc_info:
+        await pesu._extract_and_update_profile(node, 0, profile)
+    assert "Could not parse key for field at index 0" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_extract_and_update_profile_value_label_missing(pesu):
+    node = MagicMock()
+    key_label = MagicMock()
+    key_label.text.return_value = "Name"
+
+    def css_first(selector):
+        if selector == "label.lbl-title-light":
+            return key_label
+        if selector == "label.lbl-title-light + label":
+            return None  # value label missing
+        return None
+
+    node.css_first.side_effect = css_first
+    profile = {}
+    with pytest.raises(ProfileParseError) as exc_info:
+        await pesu._extract_and_update_profile(node, 0, profile)
+    assert "Could not parse value for field at index 0" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_extract_and_update_profile_unknown_key(pesu):
+    node = MagicMock()
+    key_label = MagicMock()
+    key_label.text.return_value = "UnknownKey"
+    value_label = MagicMock()
+    value_label.text.return_value = "SomeValue"
+
+    def css_first(selector):
+        if selector == "label.lbl-title-light":
+            return key_label
+        if selector == "label.lbl-title-light + label":
+            return value_label
+        return None
+
+    node.css_first.side_effect = css_first
+    profile = {}
+    with pytest.raises(ProfileParseError) as exc_info:
+        await pesu._extract_and_update_profile(node, 0, profile)
+    assert "Unknown key: 'UnknownKey' in the profile page" in str(exc_info.value)
