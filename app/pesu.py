@@ -16,53 +16,28 @@ from app.exceptions.authentication import (
 )
 
 
-def get_profile_by_idx(details_cont: Node, idx: int) -> tuple[str, str]:
-    """
-    Extracts a single profile field (key and value) by its index.
-
-    This helper function navigates a pre-parsed HTML container to find a
-    specific field based on its position.
-
-    Args:
-        details_cont (Node): Pre-parsed parent node containing all profile fields
-        idx (int): Index of the required field: 0 - name, 1 - srn, 2 - prn, 3 - program, 4 - branch, 5 - semester, 6 - section
-    Returns:
-        Tuple(key, value): A tuple containing key and value of a particular field
-
-    Raises:
-        IndexError: If the provided index is greater than the number of fields
-        ValueError: If the key or value is not found
-    """
-
-    fields = details_cont.css("div.form-group")
-    if idx >= len(fields):
-        raise IndexError(f"Index {idx} out of bounds")
-
-    target_field = fields[idx]
-    key = target_field.css_first("label.lbl-title-light").text(strip=True)
-
-    # Use the adjacent sibbling selector `+` to find value label
-    value = target_field.css_first("label.lbl-title-light + label").text(strip=True)
-
-    if not key or not value:
-        raise ValueError(f"Could not parse key/value for field at index {idx}.")
-    else:
-        logging.info(f"Extracted key: '{key}' with value: '{value}'")
-
-    return key, value
-
-
 class PESUAcademy:
     """
     Class to interact with the PESU Academy website.
     """
+
+    PROFILE_PAGE_HEADER_TO_KEY_MAP = {
+        "Name": "name",
+        "PESU Id": "prn",
+        "SRN": "srn",
+        "Program": "program",
+        "Branch": "branch",
+        "Semester": "semester",
+        "Section": "section",
+    }
 
     def __init__(self):
         self._csrf_token: str | None = None
         self._client: httpx.AsyncClient | None = None
         self._csrf_lock = asyncio.Lock()
 
-    async def _fetch_new_client_with_csrf_token(self) -> tuple[httpx.AsyncClient, str]:
+    @staticmethod
+    async def _fetch_new_client_with_csrf_token() -> tuple[httpx.AsyncClient, str]:
         """Fetch a fresh client with an unauthenticated CSRF token from PESU Academy."""
         logging.info("Fetching a new client with an unauthenticated CSRF token...")
         # Create a new client
@@ -76,10 +51,6 @@ class PESUAcademy:
             return client, csrf_token
         else:
             raise CSRFTokenError("CSRF token not found in the pre-authentication response.")
-
-    async def prefetch_client_with_csrf_token(self):
-        """Public method to prefetch a new client with an unauthenticated CSRF token."""
-        await self._prefetch_client_with_csrf_token()
 
     async def _prefetch_client_with_csrf_token(self):
         """Prefetch a new client with an unauthenticated CSRF token."""
@@ -111,6 +82,48 @@ class PESUAcademy:
         # Return a dedicated client/token for this request
         return client_to_use, token_to_use
 
+    async def _extract_and_update_profile(self, node: Node, idx: int, profile: dict):
+        """
+        Extracts the profile data from a node and updates the profile dictionary.
+
+        Args:
+            node (Node): Pre-parsed node containing the profile information
+            idx (int): Index of the node
+            profile (dict): The profile dictionary to update in-place
+        """
+
+        def parse_and_update():
+            # Use the selector `label.lbl-title-light` to find the key label
+            if not (key_node := node.css_first("label.lbl-title-light")) or not (
+                key := key_node.text(strip=True)
+            ):
+                raise ProfileParseError(f"Could not parse key for field at index {idx}.")
+            # Use the adjacent sibling selector `+` to find value label
+            if not (value_node := node.css_first("label.lbl-title-light + label")) or not (
+                value := value_node.text(strip=True)
+            ):
+                raise ProfileParseError(f"Could not parse value for field at index {idx}.")
+            logging.debug(f"Extracted key: '{key}' with value: '{value}' at index {idx}.")
+            # If the key is in the map, add it to the profile
+            if key := self.PROFILE_PAGE_HEADER_TO_KEY_MAP.get(key):
+                logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
+                profile[key] = value
+                if key == "branch" and (branch_short_code := self.map_branch_to_short_code(value)):
+                    profile["branch_short_code"] = branch_short_code
+                    logging.debug(
+                        f"Adding key: 'branch_short_code', value: '{branch_short_code}' to profile..."
+                    )
+            else:
+                raise ProfileParseError(
+                    f"Unknown key: '{key}' in the profile page. The webpage might have changed."
+                )
+
+        await asyncio.to_thread(parse_and_update)
+
+    async def prefetch_client_with_csrf_token(self):
+        """Public method to prefetch a new client with an unauthenticated CSRF token."""
+        await self._prefetch_client_with_csrf_token()
+
     async def close_client(self):
         """Public method to close the internal client if it exists."""
         if self._client is not None:
@@ -136,7 +149,6 @@ class PESUAcademy:
     async def get_profile_information(
         self, client: httpx.AsyncClient, username: str
     ) -> dict[str, Any]:
-
         """
         Get the profile information of the user.
 
@@ -165,50 +177,24 @@ class PESUAcademy:
             raise ProfileFetchError(
                 f"Failed to fetch student profile page from PESU Academy for user={username}."
             )
-
-        logging.debug("Profile data fetched successfully.")
+        logging.debug("Student profile page fetched successfully.")
 
         # Parse the response text
-
         soup = await asyncio.to_thread(HTMLParser, response.text)
-        details_container = soup.css_first("div.elem-info-wrapper")
-
-        if not details_container:
+        # Get the details container and its nodes where the profile information is stored
+        if (
+            not (details_container := soup.css_first("div.elem-info-wrapper"))
+            or not (details_nodes := details_container.css("div.form-group"))
+            or len(details_nodes) < 7
+        ):
             raise ProfileParseError(
-                f"Failed to parse student profile page from PESU Academy for user={username}."
+                f"Failed to parse student profile page from PESU Academy for user={username}. The webpage might have changed."
             )
 
+        # Extract the profile information from the profile page
         profile: dict[str, Any] = {}
-
-        # {`html value`:`reference value`}
-        key_map = {
-            "Name": "name",
-            "PESU Id": "prn",
-            "SRN": "srn",
-            "Program": "program",
-            "Branch": "branch",
-            "Semester": "semester",
-            "Section": "section",
-        }
-
-        for i in range(7):
-            try:
-                key, value = get_profile_by_idx(details_container, i)
-
-                if key in key_map and value.upper() != "NA":
-                    mapped_key = key_map[key]
-                    logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
-                    profile[mapped_key] = value
-
-                    if mapped_key == "branch":
-                        if branch_short_code := self.map_branch_to_short_code(value):
-                            profile["branch_short_code"] = branch_short_code
-                            logging.debug(
-                                f"Adding key: 'branch_short_code', value: '{branch_short_code}' to profile..."
-                            )
-
-            except (ValueError, IndexError) as e:
-                logging.warning(f"Could not parse value at {i}: {e}")
+        tasks = [self._extract_and_update_profile(details_nodes[i], i, profile) for i in range(7)]
+        await asyncio.gather(*tasks)
 
         # Get the email and phone number from the profile page
         if (
@@ -316,9 +302,7 @@ class PESUAcademy:
         if profile:
             logging.info(f"Profile data requested for user={username}. Fetching profile data...")
             # Fetch the profile information
-
             result["profile"] = await self.get_profile_information(client, username)
-
             # Filter the fields if field filtering is enabled
             if field_filtering:
                 result["profile"] = {
