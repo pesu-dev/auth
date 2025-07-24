@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 import httpx
-from selectolax.parser import HTMLParser
+from selectolax.parser import HTMLParser, Node
 from app.constants import PESUAcademyConstants
 
 from app.exceptions.authentication import (
@@ -21,12 +21,23 @@ class PESUAcademy:
     Class to interact with the PESU Academy website.
     """
 
+    PROFILE_PAGE_HEADER_TO_KEY_MAP = {
+        "Name": "name",
+        "PESU Id": "prn",
+        "SRN": "srn",
+        "Program": "program",
+        "Branch": "branch",
+        "Semester": "semester",
+        "Section": "section",
+    }
+
     def __init__(self):
         self._csrf_token: str | None = None
         self._client: httpx.AsyncClient | None = None
         self._csrf_lock = asyncio.Lock()
 
-    async def _fetch_new_client_with_csrf_token(self) -> tuple[httpx.AsyncClient, str]:
+    @staticmethod
+    async def _fetch_new_client_with_csrf_token() -> tuple[httpx.AsyncClient, str]:
         """Fetch a fresh client with an unauthenticated CSRF token from PESU Academy."""
         logging.info("Fetching a new client with an unauthenticated CSRF token...")
         # Create a new client
@@ -40,10 +51,6 @@ class PESUAcademy:
             return client, csrf_token
         else:
             raise CSRFTokenError("CSRF token not found in the pre-authentication response.")
-
-    async def prefetch_client_with_csrf_token(self):
-        """Public method to prefetch a new client with an unauthenticated CSRF token."""
-        await self._prefetch_client_with_csrf_token()
 
     async def _prefetch_client_with_csrf_token(self):
         """Prefetch a new client with an unauthenticated CSRF token."""
@@ -74,6 +81,50 @@ class PESUAcademy:
         asyncio.create_task(self._prefetch_client_with_csrf_token())
         # Return a dedicated client/token for this request
         return client_to_use, token_to_use
+
+    async def _extract_and_update_profile(self, node: Node, idx: int, profile: dict):
+        """
+        Extracts the profile data from a node and updates the profile dictionary.
+
+        Args:
+            node (Node): Pre-parsed node containing the profile information
+            idx (int): Index of the node
+            profile (dict): The profile dictionary to update in-place
+        """
+
+        def parse_and_update():
+            # Use the selector `label.lbl-title-light` to find the key label
+            if not (key_node := node.css_first("label.lbl-title-light")) or not (
+                key := key_node.text(strip=True)
+            ):
+                raise ProfileParseError(f"Could not parse key for field at index {idx}.")
+            # Use the adjacent sibling selector `+` to find value label
+            if not (value_node := node.css_first("label.lbl-title-light + label")) or not (
+                value := value_node.text(strip=True)
+            ):
+                raise ProfileParseError(f"Could not parse value for field at index {idx}.")
+            logging.debug(f"Extracted key: '{key}' with value: '{value}' at index {idx}.")
+            # If the key is in the map, add it to the profile
+            if mapped_key := self.PROFILE_PAGE_HEADER_TO_KEY_MAP.get(key):
+                logging.debug(f"Adding key: '{mapped_key}', value: '{value}' to profile...")
+                profile[mapped_key] = value
+                if mapped_key == "branch" and (
+                    branch_short_code := self.map_branch_to_short_code(value)
+                ):
+                    profile["branch_short_code"] = branch_short_code
+                    logging.debug(
+                        f"Adding key: 'branch_short_code', value: '{branch_short_code}' to profile..."
+                    )
+            else:
+                raise ProfileParseError(
+                    f"Unknown key: '{key}' in the profile page. The webpage might have changed."
+                )
+
+        await asyncio.to_thread(parse_and_update)
+
+    async def prefetch_client_with_csrf_token(self):
+        """Public method to prefetch a new client with an unauthenticated CSRF token."""
+        await self._prefetch_client_with_csrf_token()
 
     async def close_client(self):
         """Public method to close the internal client if it exists."""
@@ -128,46 +179,24 @@ class PESUAcademy:
             raise ProfileFetchError(
                 f"Failed to fetch student profile page from PESU Academy for user={username}."
             )
+        logging.debug("Student profile page fetched successfully.")
 
-        logging.debug("Profile data fetched successfully.")
         # Parse the response text
         soup = await asyncio.to_thread(HTMLParser, response.text)
-        profile = dict()
-
+        # Get the details container and its nodes where the profile information is stored
         if (
-            not soup.any_css_matches(("div.form-group",))
-            or len(form_group_elems := soup.css("div.form-group")) < 7
+            not (details_container := soup.css_first("div.elem-info-wrapper"))
+            or not (details_nodes := details_container.css("div.form-group"))
+            or len(details_nodes) < 7
         ):
             raise ProfileParseError(
-                f"Failed to parse student profile page from PESU Academy for user={username}."
+                f"Failed to parse student profile page from PESU Academy for user={username}. The webpage might have changed."
             )
 
-        # TODO: Should we parse it more deterministically?
-        for div in form_group_elems[:7]:
-            text = div.text().strip()
-            logging.debug(f"Processing profile element: {text}")
-            if text.startswith("PESU Id"):
-                key = "pesu_id"
-                value = text.split()[-1]
-            else:
-                key, value = text.split(" ", 1)
-                key = "_".join(key.split()).lower()
-            value = value.strip()
-            logging.debug(f"Extracted key: '{key}' with value: '{value}'")
-            if key in [
-                "name",
-                "srn",
-                "pesu_id",
-                "program",
-                "branch",
-                "semester",
-                "section",
-            ]:
-                if key == "branch" and (branch_short_code := self.map_branch_to_short_code(value)):
-                    profile["branch_short_code"] = branch_short_code
-                key = "prn" if key == "pesu_id" else key
-                logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
-                profile[key] = value
+        # Extract the profile information from the profile page
+        profile: dict[str, Any] = {}
+        tasks = [self._extract_and_update_profile(details_nodes[i], i, profile) for i in range(7)]
+        await asyncio.gather(*tasks)
 
         # Get the email and phone number from the profile page
         if (
@@ -200,8 +229,7 @@ class PESUAcademy:
         # Check if we extracted any profile data
         if not profile:
             raise ProfileParseError(f"No profile data could be extracted for user={username}.")
-        else:
-            logging.info(f"Complete profile information retrieved for user={username}: {profile}.")
+        logging.info(f"Complete profile information retrieved for user={username}: {profile}.")
 
         return profile
 
