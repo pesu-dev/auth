@@ -389,3 +389,85 @@ async def test_get_profile_information_no_profile_data(mock_get, mock_html_parse
         "Failed to parse student profile page from PESU Academy for user=testuser. The webpage might have changed."
         in str(exc_info.value)
     )
+
+
+@patch("app.pesu.HTMLParser")
+@patch("app.pesu.httpx.AsyncClient.get")
+@patch("app.pesu.PESUAcademy._extract_and_update_profile", new_callable=AsyncMock)
+@pytest.mark.asyncio
+async def test_get_profile_information_empty_profile_triggers_final_parse_error(
+    mock_extract, mock_get, mock_html_parser, pesu
+):
+    mock_extract.return_value = None
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = "<html></html>"
+    mock_get.return_value = mock_response
+
+    mock_container = MagicMock()
+    mock_container.css.return_value = [MagicMock() for _ in range(7)]
+    mock_soup = MagicMock()
+    mock_soup.css_first.side_effect = (
+        lambda selector: mock_container if selector == "div.elem-info-wrapper" else None
+    )
+    mock_html_parser.return_value = mock_soup
+
+    client = AsyncMock()
+    client.get.return_value = mock_response
+
+    with pytest.raises(ProfileParseError) as exc_info:
+        await pesu.get_profile_information(client, "testuser")
+    assert "No profile data could be extracted for user=testuser" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_extract_and_update_profile_key_label_missing(pesu):
+    node = MagicMock()
+    node.css_first.return_value = None  # key label missing
+    profile = {}
+    with pytest.raises(ProfileParseError) as exc_info:
+        await pesu._extract_and_update_profile(node, 0, profile)
+    assert "Could not parse key for field at index 0" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_extract_and_update_profile_value_label_missing(pesu):
+    node = MagicMock()
+    key_label = MagicMock()
+    key_label.text.return_value = "Name"
+
+    def css_first(selector):
+        if selector == "label.lbl-title-light":
+            return key_label
+        if selector == "label.lbl-title-light + label":
+            return None  # value label missing
+        return None
+
+    node.css_first.side_effect = css_first
+    profile = {}
+    with pytest.raises(ProfileParseError) as exc_info:
+        await pesu._extract_and_update_profile(node, 0, profile)
+    assert "Could not parse value for field at index 0" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_extract_and_update_profile_unknown_key(pesu):
+    node = MagicMock()
+    key_label = MagicMock()
+    key_label.text.return_value = "UnknownKey"
+    value_label = MagicMock()
+    value_label.text.return_value = "SomeValue"
+
+    def css_first(selector):
+        if selector == "label.lbl-title-light":
+            return key_label
+        if selector == "label.lbl-title-light + label":
+            return value_label
+        return None
+
+    node.css_first.side_effect = css_first
+    profile = {}
+    with pytest.raises(ProfileParseError) as exc_info:
+        await pesu._extract_and_update_profile(node, 0, profile)
+    assert "Unknown key: 'UnknownKey' in the profile page" in str(exc_info.value)

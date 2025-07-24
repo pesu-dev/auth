@@ -105,10 +105,12 @@ class PESUAcademy:
                 raise ProfileParseError(f"Could not parse value for field at index {idx}.")
             logging.debug(f"Extracted key: '{key}' with value: '{value}' at index {idx}.")
             # If the key is in the map, add it to the profile
-            if key := self.PROFILE_PAGE_HEADER_TO_KEY_MAP.get(key):
-                logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
-                profile[key] = value
-                if key == "branch" and (branch_short_code := self.map_branch_to_short_code(value)):
+            if mapped_key := self.PROFILE_PAGE_HEADER_TO_KEY_MAP.get(key):
+                logging.debug(f"Adding key: '{mapped_key}', value: '{value}' to profile...")
+                profile[mapped_key] = value
+                if mapped_key == "branch" and (
+                    branch_short_code := self.map_branch_to_short_code(value)
+                ):
                     profile["branch_short_code"] = branch_short_code
                     logging.debug(
                         f"Adding key: 'branch_short_code', value: '{branch_short_code}' to profile..."
@@ -227,8 +229,7 @@ class PESUAcademy:
         # Check if we extracted any profile data
         if not profile:
             raise ProfileParseError(f"No profile data could be extracted for user={username}.")
-        else:
-            logging.info(f"Complete profile information retrieved for user={username}: {profile}.")
+        logging.info(f"Complete profile information retrieved for user={username}: {profile}.")
 
         return profile
 
