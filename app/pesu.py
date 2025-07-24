@@ -163,8 +163,6 @@ class PESUAcademy:
                 "semester",
                 "section",
             ]:
-                if key == "branch" and (branch_short_code := self.map_branch_to_short_code(value)):
-                    profile["branch_short_code"] = branch_short_code
                 key = "prn" if key == "pesu_id" else key
                 logging.debug(f"Adding key: '{key}', value: '{value}' to profile...")
                 profile[key] = value
