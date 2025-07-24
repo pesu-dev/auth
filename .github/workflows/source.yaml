@@ -26,8 +26,22 @@ jobs:
 
       - name: Validate PR origin and target branch
         run: |
-          if [ "$SOURCE_REPO" = "$TARGET_REPO" ] || { [ "$SOURCE_REPO" != "$TARGET_REPO" ] && [ "$SOURCE_BRANCH" = "main" ]; } || [ "$TARGET_BRANCH" != "dev" ]; then
-            echo "❌ PRs must come from a fork, from a non-main branch, and must target the dev branch. Failing workflow for PR #$PR_NUMBER."
+          # Fail if PR is from the same repo (must be a fork)
+          if [ "$SOURCE_REPO" = "$TARGET_REPO" ]; then
+            echo "❌ PR must come from a forked repository (not the main repo)."
             exit 1
           fi
+
+          # Fail if the source branch is 'main'
+          if [ "$SOURCE_BRANCH" = "main" ]; then
+            echo "❌ PR cannot come from the 'main' branch of a fork."
+            exit 1
+          fi
+
+          # Fail if the target branch is not 'dev'
+          if [ "$TARGET_BRANCH" != "dev" ]; then
+            echo "❌ PR must target the 'dev' branch (not $TARGET_BRANCH)."
+            exit 1
+          fi
+
           echo "✅ PR passed origin and target branch checks."
