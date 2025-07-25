@@ -48,8 +48,8 @@ We encourage developers to work on their own forks of the repository. This allow
 
 We maintain two deployment environments:
 
-- **Staging (dev branch)**: https://pesu-auth-dev.onrender.com/ - [Status Page](https://6ns95sgb.status.cron-job.org/)
-- **Production (main branch)**: https://pesu-auth.onrender.com/ - [Status Page](https://xzlk85cp.status.cron-job.org/)
+- **dev**: https://pesu-auth-dev.onrender.com/ - [Status Page](https://6ns95sgb.status.cron-job.org/)
+- **main**: https://pesu-auth.onrender.com/ - [Status Page](https://xzlk85cp.status.cron-job.org/)
 
 ### 🔄 Development Workflow
 
@@ -64,10 +64,10 @@ The standard workflow for contributing is as follows:
 7. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
 8. After successful testing in staging, changes are promoted from `dev` to `main` for production deployment.
 
-**Important:** All Pull Requests must target the `dev` branch. Direct PRs to `main` will be closed and redirected to `dev`.
+**Important:** All Pull Requests must target the `dev` branch. Direct PRs to `main` will be closed.
 
 Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository.
-All contributions **must** be through a pull request raised from a new branch (not `dev` or `main`) in your forked repository.
+All contributions **must** be through a pull request raised from a feature branch (not `dev` or `main`) in your forked repository.
 
 ---
 
@@ -243,7 +243,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
    git push origin your-feature-name
    ```
 
-2. Open a Pull Request (PR) on GitHub targeting the `dev` branch (not `main`).
+2. Open a Pull Request (PR) on GitHub targeting the `dev` branch.
 
 3. In your PR:
 
