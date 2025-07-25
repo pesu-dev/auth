@@ -48,8 +48,8 @@ We encourage developers to work on their own forks of the repository. This allow
 
 We maintain two deployment environments:
 
-- **dev**: https://pesu-auth-dev.onrender.com/ - [Status Page](https://6ns95sgb.status.cron-job.org/)
-- **main**: https://pesu-auth.onrender.com/ - [Status Page](https://xzlk85cp.status.cron-job.org/)
+- **Staging**: https://pesu-auth-dev.onrender.com/ - [Status Page](https://6ns95sgb.status.cron-job.org/)
+- **Production**: https://pesu-auth.onrender.com/ - [Status Page](https://xzlk85cp.status.cron-job.org/)
 
 ### 🔄 Development Workflow
 
@@ -59,15 +59,15 @@ The standard workflow for contributing is as follows:
 2. Create a new branch for your feature or bug fix.
 3. Make your changes and commit them with clear, descriptive messages.
 4. Push your branch to your fork on GitHub.
-5. **Create a Pull Request (PR) against the repository's `dev` branch** (not `main`).
+5. Create a Pull Request (PR) against the repository's `dev` branch (not `main`).
 6. Wait for review and feedback from the maintainers, address any comments or suggestions.
 7. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
 8. After successful testing in staging, changes are promoted from `dev` to `main` for production deployment.
 
 **Important:** All Pull Requests must target the `dev` branch. Direct PRs to `main` will be closed.
 
-Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository.
-All contributions **must** be through a pull request raised from a feature branch (not `dev` or `main`) in your forked repository.
+
+Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository. All PRs must be raised from a feature branch of your forked repository and target the `dev` branch. Direct PRs to `main` will be closed.
 
 ---
 
