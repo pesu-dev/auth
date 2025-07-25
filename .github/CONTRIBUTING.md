@@ -64,8 +64,6 @@ The standard workflow for contributing is as follows:
 7. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
 8. After successful testing in staging, changes are promoted from `dev` to `main` for production deployment.
 
-**Important:** All Pull Requests must target the `dev` branch. Direct PRs to `main` will be closed.
-
 
 Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository. All PRs must be raised from a feature branch of your forked repository and target the `dev` branch. Direct PRs to `main` will be closed.
 
