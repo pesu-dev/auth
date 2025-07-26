@@ -48,8 +48,8 @@ We encourage developers to work on their own forks of the repository. This allow
 
 We maintain two deployment environments:
 
-- **Staging**: https://pesu-auth-dev.onrender.com/ - [Status Page](https://6ns95sgb.status.cron-job.org/)
-- **Production**: https://pesu-auth.onrender.com/ - [Status Page](https://xzlk85cp.status.cron-job.org/)
+- **Staging**: https://pesu-auth-dev.onrender.com - [Status Page](https://6ns95sgb.status.cron-job.org/)
+- **Production**: https://pesu-auth.onrender.com - [Status Page](https://xzlk85cp.status.cron-job.org/)
 
 ### 🔄 Development Workflow
 
