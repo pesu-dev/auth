@@ -15,7 +15,6 @@ import app.util as util
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
-from fastapi_utils.tasks import repeat_every
 from app.exceptions.base import PESUAcademyError
 
 IST = pytz.timezone("Asia/Kolkata")
