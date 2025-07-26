@@ -16,6 +16,7 @@ jobs:
       SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
       TARGET_REPO: ${{ github.repository }}
       TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
+      PESU_DEV_SUPERUSER_TOKEN: ${{ secrets.PESU_DEV_SUPERUSER_TOKEN }}
 
     if: >
       github.event.pull_request.base.ref == 'main' &&
@@ -42,6 +43,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${PESU_DEV_SUPERUSER_TOKEN}@github.com/${{ github.repository }}.git
+
 
       - name: Sync dev with main
         run: |
