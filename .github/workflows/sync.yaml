@@ -41,8 +41,7 @@ jobs:
 
       - name: Set up Git
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "aditeyabaral"
           git remote set-url origin https://x-access-token:${PESU_DEV_SUPERUSER_TOKEN}@github.com/${{ github.repository }}.git
 
 
