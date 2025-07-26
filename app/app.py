@@ -21,6 +21,7 @@ IST = pytz.timezone("Asia/Kolkata")
 README_HTML_CACHE: str | None = None
 REFRESH_INTERVAL_SECONDS = 45 * 60  # 45 minutes
 
+
 async def csrf_token_refresh_loop(pesu_academy, shutdown_event: asyncio.Event):
     while not shutdown_event.is_set():
         try:
@@ -32,8 +33,9 @@ async def csrf_token_refresh_loop(pesu_academy, shutdown_event: asyncio.Event):
             # Wait for the shutdown event or timeout
             logging.debug(f"Waiting for {REFRESH_INTERVAL_SECONDS} seconds before next refresh...")
             await asyncio.wait_for(shutdown_event.wait(), timeout=REFRESH_INTERVAL_SECONDS)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -59,9 +61,7 @@ async def lifespan(app: FastAPI):
 
     # Start the periodic CSRF token refresh background task
     shutdown_event = asyncio.Event()
-    refresh_task = asyncio.create_task(
-        csrf_token_refresh_loop(pesu_academy, shutdown_event)
-    )
+    refresh_task = asyncio.create_task(csrf_token_refresh_loop(pesu_academy, shutdown_event))
 
     # Shutdown
     shutdown_event.set()
