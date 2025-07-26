@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import logging
+import asyncio
 
 import pytz
 import uvicorn
@@ -14,11 +15,26 @@ import app.util as util
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
+from fastapi_utils.tasks import repeat_every
 from app.exceptions.base import PESUAcademyError
 
 IST = pytz.timezone("Asia/Kolkata")
 README_HTML_CACHE: str | None = None
+REFRESH_INTERVAL_SECONDS = 45 * 60  # 45 minutes
 
+async def csrf_token_refresh_loop(pesu_academy, shutdown_event: asyncio.Event):
+    while not shutdown_event.is_set():
+        try:
+            await pesu_academy.prefetch_client_with_csrf_token()
+            logging.info("Periodic: Refreshed PESUAcademy unauthenticated CSRF token.")
+        except Exception:
+            logging.exception("Could not refresh CSRF token.")
+        try:
+            # Wait for the shutdown event or timeout
+            logging.debug(f"Waiting for {REFRESH_INTERVAL_SECONDS} seconds before next refresh...")
+            await asyncio.wait_for(shutdown_event.wait(), timeout=REFRESH_INTERVAL_SECONDS)
+        except asyncio.TimeoutError:
+            pass
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,7 +58,15 @@ async def lifespan(app: FastAPI):
     logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
     yield
 
+    # Start the periodic CSRF token refresh background task
+    shutdown_event = asyncio.Event()
+    refresh_task = asyncio.create_task(
+        csrf_token_refresh_loop(pesu_academy, shutdown_event)
+    )
+
     # Shutdown
+    shutdown_event.set()
+    await refresh_task
     await pesu_academy.close_client()
     logging.info("PESUAuth API shutdown.")
 
