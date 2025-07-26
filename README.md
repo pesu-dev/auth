@@ -215,7 +215,7 @@ curl -X POST http://localhost:5000/authenticate \
 
 Made with ❤️ by
 
-[![Contributors](https://contrib.rocks/image?repo=pesu-dev/auth)](https://github.com/pesu-dev/auth/graphs/contributors)
+[![Contributors](https://contrib.rocks/image?repo=pesu-dev/auth&nocache=1)](https://github.com/pesu-dev/auth/graphs/contributors)
 
 *Powered by [contrib.rocks](https://contrib.rocks)*
 
