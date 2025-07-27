@@ -19,22 +19,21 @@ from app.exceptions.base import PESUAcademyError
 
 IST = pytz.timezone("Asia/Kolkata")
 README_HTML_CACHE: str | None = None
-REFRESH_INTERVAL_SECONDS = 45 * 60  # 45 minutes
+REFRESH_INTERVAL_SECONDS = 45 * 60
 
 
-async def csrf_token_refresh_loop(pesu_academy, shutdown_event: asyncio.Event):
-    while not shutdown_event.is_set():
+async def _csrf_token_refresh_loop():
+    while True:
         try:
-            await pesu_academy.prefetch_client_with_csrf_token()
-            logging.info("Periodic: Refreshed PESUAcademy unauthenticated CSRF token.")
+            logging.debug("Refreshing unauthenticated CSRF token...")
+            if pesu_academy.is_client_idle:  # Only refresh when the client is idle
+                await pesu_academy.prefetch_client_with_csrf_token()
+                logging.info("Unauthenticated CSRF token refreshed successfully.")
+            else:
+                logging.debug("Skipping CSRF refresh; client is currently in use.")
         except Exception:
-            logging.exception("Could not refresh CSRF token.")
-        try:
-            # Wait for the shutdown event or timeout
-            logging.debug(f"Waiting for {REFRESH_INTERVAL_SECONDS} seconds before next refresh...")
-            await asyncio.wait_for(shutdown_event.wait(), timeout=REFRESH_INTERVAL_SECONDS)
-        except TimeoutError:
-            pass
+            logging.exception("Failed to refresh unauthenticated CSRF token in the background.")
+        await asyncio.sleep(REFRESH_INTERVAL_SECONDS)
 
 
 @asynccontextmanager
@@ -54,18 +53,26 @@ async def lifespan(app: FastAPI):
         logging.exception(
             "Failed to generate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
         )
+
     # Prefetch PESUAcademy client for first request
     await pesu_academy.prefetch_client_with_csrf_token()
     logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
-    yield
 
     # Start the periodic CSRF token refresh background task
-    shutdown_event = asyncio.Event()
-    refresh_task = asyncio.create_task(csrf_token_refresh_loop(pesu_academy, shutdown_event))
+    refresh_task = asyncio.create_task(_csrf_token_refresh_loop())
+    logging.info("Started the unauthenticated CSRF token refresh background task.")
+
+    yield
 
     # Shutdown
-    shutdown_event.set()
-    await refresh_task
+    refresh_task.cancel()
+    try:
+        await refresh_task
+    except asyncio.CancelledError:
+        logging.debug("Unauthenticated CSRF token refresh background task cancelled.")
+    except Exception:
+        logging.exception("Failed to cancel unauthenticated CSRF token refresh background task.")
+
     await pesu_academy.close_client()
     logging.info("PESUAuth API shutdown.")
 
