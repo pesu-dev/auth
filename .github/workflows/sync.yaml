@@ -1,0 +1,62 @@
+name: Sync staging to production
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  sync-staging-to-production:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      SOURCE_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
+      TARGET_REPO: ${{ github.repository }}
+      TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
+      PESU_DEV_SUPERUSER_TOKEN: ${{ secrets.PESU_DEV_SUPERUSER_TOKEN }}
+
+    if: >
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.ref == 'dev' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Print PR source info
+        run: |
+          echo "PR source information:"
+          echo "  - PR Number: $PR_NUMBER"
+          echo "  - Source repo: $SOURCE_REPO"
+          echo "  - Source branch: $SOURCE_BRANCH"
+          echo "  - Target repo: $TARGET_REPO"
+          echo "  - Target branch: $TARGET_BRANCH"
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Git
+        run: |
+          git config user.name "aditeyabaral"
+          git remote set-url origin https://x-access-token:${PESU_DEV_SUPERUSER_TOKEN}@github.com/${{ github.repository }}.git
+
+
+      - name: Sync dev with main
+        run: |
+          git fetch origin
+          git checkout dev
+
+          # Try fast-forward merge first
+          if git merge origin/main --ff-only; then
+            echo "✅ Fast-forwarded dev to match main."
+            git push origin dev
+          else
+            echo "⚠️ Could not fast-forward dev (diverged history)."
+            echo "Force resetting dev to match main..."
+            git reset --hard origin/main
+            git push origin dev --force
+          fi

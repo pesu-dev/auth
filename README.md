@@ -121,7 +121,6 @@ profile data was requested, the response's `profile` key will store a dictionary
 | `profile`   | `ProfileObject` | A nested map storing the profile information, returned only if requested |
 | `message`   | `str`           | A message that provides information corresponding to the status          |
 | `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
-| `details`   | `str`           | Information about the error, if an error occurs.                         |
 
 #### `ProfileObject`
 
