@@ -133,16 +133,6 @@ class PESUAcademy:
             self._client = None
 
     @property
-    def client(self) -> httpx.AsyncClient:
-        """Public property to get the internal client."""
-        return self._client
-
-    @property
-    def csrf_token(self) -> str:
-        """Public property to get the internal CSRF token."""
-        return self._csrf_token
-
-    @property
     def is_client_idle(self) -> bool:
         """Public property to check if the internal client is idle."""
         return self._client is None
