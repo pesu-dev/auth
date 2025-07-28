@@ -25,14 +25,12 @@ CSRF_TOKEN_REFRESH_LOCK = asyncio.Lock()
 
 async def _refresh_csrf_token_with_lock():
     """
-    Refresh the CSRF token with a lock. This is used to prevent race conditions when the client is not idle.
+    Refresh the CSRF token with a lock.
     """
+    logging.debug("Refreshing unauthenticated CSRF token...")
     async with CSRF_TOKEN_REFRESH_LOCK:
-        if pesu_academy.is_client_idle:  # Only refresh when the client is idle
-            await pesu_academy.prefetch_client_with_csrf_token()
-            logging.info("Unauthenticated CSRF token refreshed successfully.")
-        else:
-            logging.debug("Skipping CSRF refresh; client is currently in use.")
+        await pesu_academy.prefetch_client_with_csrf_token()
+        logging.info("Unauthenticated CSRF token refreshed successfully.")
 
 
 async def _csrf_token_refresh_loop():
