@@ -78,7 +78,7 @@ if __name__ == "__main__":
         if success[-1] == 0:
             break
 
-        next_interval = args.interval * request_count * 60
+        next_interval = (args.start_delay + (args.interval * request_count)) * 60
         for _ in tqdm(
             range(next_interval),
             desc=f"Waiting {next_interval / 60} minutes before next request",
