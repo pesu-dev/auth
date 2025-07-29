@@ -6,7 +6,6 @@ from typing import Any
 
 import httpx
 from selectolax.parser import HTMLParser, Node
-from app.constants import PESUAcademyConstants
 
 from app.exceptions.authentication import (
     ProfileFetchError,
@@ -20,6 +19,20 @@ class PESUAcademy:
     """
     Class to interact with the PESU Academy website.
     """
+
+    DEFAULT_FIELDS: list[str] = [
+        "name",
+        "prn",
+        "srn",
+        "program",
+        "branch",
+        "semester",
+        "section",
+        "email",
+        "phone",
+        "campus_code",
+        "campus",
+    ]
 
     PROFILE_PAGE_HEADER_TO_KEY_MAP = {
         "Name": "name",
@@ -108,13 +121,6 @@ class PESUAcademy:
             if mapped_key := self.PROFILE_PAGE_HEADER_TO_KEY_MAP.get(key):
                 logging.debug(f"Adding key: '{mapped_key}', value: '{value}' to profile...")
                 profile[mapped_key] = value
-                if mapped_key == "branch" and (
-                    branch_short_code := self.map_branch_to_short_code(value)
-                ):
-                    profile["branch_short_code"] = branch_short_code
-                    logging.debug(
-                        f"Adding key: 'branch_short_code', value: '{branch_short_code}' to profile..."
-                    )
             else:
                 raise ProfileParseError(
                     f"Unknown key: '{key}' in the profile page. The webpage might have changed."
@@ -131,22 +137,6 @@ class PESUAcademy:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
-
-    @staticmethod
-    def map_branch_to_short_code(branch: str) -> str | None:
-        """
-        Map the branch name to its short code.
-
-        Args:
-            branch (str): The full name of the branch.
-
-        Returns:
-            Optional[str]: The short code for the branch if it exists, otherwise None.
-        """
-        logging.warning(
-            "Branch short code mapping will be deprecated in future versions. If you require acronyms, please do it application-side."
-        )
-        return PESUAcademyConstants.BRANCH_SHORT_CODES.get(branch)
 
     async def get_profile_information(
         self, client: httpx.AsyncClient, username: str
@@ -253,9 +243,9 @@ class PESUAcademy:
             dict[str, Any]: A dictionary containing the authentication status, message, and optionally the profile information.
         """
         # Default fields to fetch if fields is not provided
-        fields = PESUAcademyConstants.DEFAULT_FIELDS if fields is None else fields
+        fields = self.DEFAULT_FIELDS if fields is None else fields
         # Check if fields is not the default fields and enable field filtering
-        field_filtering = fields != PESUAcademyConstants.DEFAULT_FIELDS
+        field_filtering = fields != self.DEFAULT_FIELDS
 
         logging.info(
             f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ..."

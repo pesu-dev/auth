@@ -133,7 +133,6 @@ If the authentication fails, this field will not be present in the response.
 | `prn`               | PRN of the user                                        |
 | `srn`               | SRN of the user                                        |
 | `program`           | Academic program that the user is enrolled into        |
-| `branch_short_code` | Abbreviation of the branch that the user is pursuing   |
 | `branch`            | Complete name of the branch that the user is pursuing  |
 | `semester`          | Current semester that the user is in                   |
 | `section`           | Section of the user                                    |
@@ -173,7 +172,6 @@ print(response.json())
     "prn": "PES1201800001",
     "srn": "PES1201800001",
     "program": "Bachelor of Technology",
-    "branch_short_code": "CSE",
     "branch": "Computer Science and Engineering",
     "semester": "NA",
     "section": "NA",
