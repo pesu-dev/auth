@@ -6,7 +6,6 @@ from typing import Any
 
 import httpx
 from selectolax.parser import HTMLParser, Node
-from app.constants import PESUAcademyConstants
 
 from app.exceptions.authentication import (
     ProfileFetchError,
@@ -20,6 +19,20 @@ class PESUAcademy:
     """
     Class to interact with the PESU Academy website.
     """
+
+    DEFAULT_FIELDS: list[str] = [
+        "name",
+        "prn",
+        "srn",
+        "program",
+        "branch",
+        "semester",
+        "section",
+        "email",
+        "phone",
+        "campus_code",
+        "campus",
+    ]
 
     PROFILE_PAGE_HEADER_TO_KEY_MAP = {
         "Name": "name",
@@ -230,9 +243,9 @@ class PESUAcademy:
             dict[str, Any]: A dictionary containing the authentication status, message, and optionally the profile information.
         """
         # Default fields to fetch if fields is not provided
-        fields = PESUAcademyConstants.DEFAULT_FIELDS if fields is None else fields
+        fields = self.DEFAULT_FIELDS if fields is None else fields
         # Check if fields is not the default fields and enable field filtering
-        field_filtering = fields != PESUAcademyConstants.DEFAULT_FIELDS
+        field_filtering = fields != self.DEFAULT_FIELDS
 
         logging.info(
             f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ..."

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator, ConfigDict, Field
-from app.constants import PESUAcademyConstants
+from app.pesu import PESUAcademy
 from typing import Literal
 
 
@@ -27,7 +27,7 @@ class RequestModel(BaseModel):
         json_schema_extra={"example": True},
     )
 
-    fields: list[Literal[*PESUAcademyConstants.DEFAULT_FIELDS]] | None = Field(
+    fields: list[Literal[*PESUAcademy.DEFAULT_FIELDS]] | None = Field(
         None,
         title="Profile Fields",
         description=(
