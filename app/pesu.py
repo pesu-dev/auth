@@ -125,7 +125,6 @@ class PESUAcademy:
             await self._client.aclose()
             self._client = None
 
-
     async def get_profile_information(
         self, client: httpx.AsyncClient, username: str
     ) -> dict[str, Any]:
