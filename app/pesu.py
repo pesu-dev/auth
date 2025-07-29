@@ -132,11 +132,6 @@ class PESUAcademy:
             await self._client.aclose()
             self._client = None
 
-    @property
-    def is_client_idle(self) -> bool:
-        """Public property to check if the internal client is idle."""
-        return self._client is None
-
     @staticmethod
     def map_branch_to_short_code(branch: str) -> str | None:
         """
