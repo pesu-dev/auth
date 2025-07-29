@@ -39,6 +39,12 @@ if __name__ == "__main__":
         help="The base interval between requests (default: 10 minutes)",
     )
     parser.add_argument(
+        "--start-delay",
+        type=int,
+        default=0,
+        help="The delay before starting the benchmark (default: 0 minutes)",
+    )
+    parser.add_argument(
         "--output",
         type=str,
         default="unauthenticated_csrf_token_expiry.csv",
@@ -49,7 +55,16 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    request_count, success, times, waiting_times = 0, list(), list(), [0]
+    request_count, success, times, waiting_times = 0, list(), list(), [args.start_delay * 60]
+
+    for _ in tqdm(
+        range(args.start_delay * 60),
+        desc=f"Waiting {args.start_delay} minutes before starting the benchmark",
+        leave=False,
+        unit="s",
+    ):
+        time.sleep(1)
+
     while True:
         request_count += 1
         response, elapsed = make_request(
