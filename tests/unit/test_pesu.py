@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 
-import app.pesu
 from app.pesu import PESUAcademy
 from app.exceptions.authentication import (
     ProfileFetchError,
@@ -124,12 +123,10 @@ async def test_authenticate_with_profile_no_field_filtering(
     mock_post_response = AsyncMock()
     mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
     mock_post.return_value = mock_post_response
-    mock_get_profile.return_value = {
-        k: "test_value" for k in app.pesu.PESUAcademyConstants.DEFAULT_FIELDS
-    }
+    mock_get_profile.return_value = {k: "test_value" for k in PESUAcademy.DEFAULT_FIELDS}
     result = await pesu.authenticate("testuser", "testpass", profile=True, fields=None)
     assert result["status"] is True
-    for field in app.pesu.PESUAcademyConstants.DEFAULT_FIELDS:
+    for field in PESUAcademy.DEFAULT_FIELDS:
         assert field in result["profile"]
         assert result["profile"][field] == "test_value"
 
@@ -471,3 +468,18 @@ async def test_extract_and_update_profile_unknown_key(pesu):
     with pytest.raises(ProfileParseError) as exc_info:
         await pesu._extract_and_update_profile(node, 0, profile)
     assert "Unknown key: 'UnknownKey' in the profile page" in str(exc_info.value)
+
+
+def test_default_fields_is_list():
+    assert isinstance(PESUAcademy.DEFAULT_FIELDS, list)
+    assert "prn" in PESUAcademy.DEFAULT_FIELDS
+    assert "name" in PESUAcademy.DEFAULT_FIELDS
+    assert "srn" in PESUAcademy.DEFAULT_FIELDS
+    assert "program" in PESUAcademy.DEFAULT_FIELDS
+    assert "branch" in PESUAcademy.DEFAULT_FIELDS
+    assert "semester" in PESUAcademy.DEFAULT_FIELDS
+    assert "section" in PESUAcademy.DEFAULT_FIELDS
+    assert "email" in PESUAcademy.DEFAULT_FIELDS
+    assert "phone" in PESUAcademy.DEFAULT_FIELDS
+    assert "campus_code" in PESUAcademy.DEFAULT_FIELDS
+    assert "campus" in PESUAcademy.DEFAULT_FIELDS
