@@ -108,13 +108,6 @@ class PESUAcademy:
             if mapped_key := self.PROFILE_PAGE_HEADER_TO_KEY_MAP.get(key):
                 logging.debug(f"Adding key: '{mapped_key}', value: '{value}' to profile...")
                 profile[mapped_key] = value
-                if mapped_key == "branch" and (
-                    branch_short_code := self.map_branch_to_short_code(value)
-                ):
-                    profile["branch_short_code"] = branch_short_code
-                    logging.debug(
-                        f"Adding key: 'branch_short_code', value: '{branch_short_code}' to profile..."
-                    )
             else:
                 raise ProfileParseError(
                     f"Unknown key: '{key}' in the profile page. The webpage might have changed."
@@ -132,21 +125,6 @@ class PESUAcademy:
             await self._client.aclose()
             self._client = None
 
-    @staticmethod
-    def map_branch_to_short_code(branch: str) -> str | None:
-        """
-        Map the branch name to its short code.
-
-        Args:
-            branch (str): The full name of the branch.
-
-        Returns:
-            Optional[str]: The short code for the branch if it exists, otherwise None.
-        """
-        logging.warning(
-            "Branch short code mapping will be deprecated in future versions. If you require acronyms, please do it application-side."
-        )
-        return PESUAcademyConstants.BRANCH_SHORT_CODES.get(branch)
 
     async def get_profile_information(
         self, client: httpx.AsyncClient, username: str
