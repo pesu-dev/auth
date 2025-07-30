@@ -19,7 +19,7 @@ returns the user's profile information. No personal data is stored.
 * You can access the PESUAuth API endpoints [here](https://pesu-auth.onrender.com/).
 * You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
 
-#### CRON job status
+#### API Status
 
 > :information_source: All timestamps are in UTC.
 
