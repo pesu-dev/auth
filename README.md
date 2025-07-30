@@ -19,17 +19,19 @@ returns the user's profile information. No personal data is stored.
 * You can access the PESUAuth API endpoints [here](https://pesu-auth.onrender.com/).
 * You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
 
-> :warning: **Warning:** The live version is hosted on a free tier server, so you might experience some latency on the
+#### CRON job status
+
+> :information_source: All timestamps are in UTC.
+
+![Cron job status](https://api.cron-job.org/jobs/4424640/69701a6f8df1d307/status-7.svg)\
+![Cron job status](https://api.cron-job.org/jobs/6338038/9feb0f217be714ec/status-7.svg)\
+![Cron job status](https://api.cron-job.org/jobs/6382178/f8bb5b8b9c1751ed/status-7.svg)\
+![Cron job status](https://api.cron-job.org/jobs/5672615/1d744f1dc18fb505/status-7.svg)\
+![Cron job status](https://api.cron-job.org/jobs/4424663/d5a30351867acec9/status-7.svg)
+
+> :warning: The live version is hosted on a free tier server, so you might experience some latency on the
 > first request since the server might not be awake. Subsequent requests will be faster.
 
-### Cron job status
-![Cron job status](https://api.cron-job.org/jobs/4424640/69701a6f8df1d307/status-7.svg)
-![Cron job status](https://api.cron-job.org/jobs/4424663/d5a30351867acec9/status-7.svg)
-![Cron job status](https://api.cron-job.org/jobs/5672615/1d744f1dc18fb505/status-7.svg)
-![Cron job status](https://api.cron-job.org/jobs/6338038/9feb0f217be714ec/status-7.svg)
-![Cron job status](https://api.cron-job.org/jobs/6382178/f8bb5b8b9c1751ed/status-7.svg)
-
-> NOTE: ℹ️ Note: All timestamps are in UTC.
 
 ## How to run PESUAuth locally
 
