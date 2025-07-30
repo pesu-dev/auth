@@ -29,6 +29,8 @@ returns the user's profile information. No personal data is stored.
 ![Cron job status](https://api.cron-job.org/jobs/6338038/9feb0f217be714ec/status-7.svg)
 ![Cron job status](https://api.cron-job.org/jobs/6382178/f8bb5b8b9c1751ed/status-7.svg)
 
+> NOTE: ℹ️ Note: All timestamps are in UTC.
+
 ## How to run PESUAuth locally
 
 Running the PESUAuth API locally is simple. Clone the repository and follow the steps below to get started.
