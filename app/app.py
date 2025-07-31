@@ -113,11 +113,9 @@ async def health_check():
 
 @app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
 async def readme():
-
     """Redirect to the PESUAuth GitHub Repository"""
 
     return RedirectResponse("https://github.com/pesu-dev/auth")
-
 
 @app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
 async def authenticate(payload: RequestModel):
