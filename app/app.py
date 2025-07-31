@@ -25,16 +25,6 @@ async def lifespan(app: FastAPI):
     """
     Lifespan event handler for startup and shutdown events.
     """
-    # Startup
-    try:
-        logging.info("PESUAuth API startup: Regenerating README.html...")
-        util.convert_readme_to_html()
-        logging.info("README.html regenerated successfully on startup.")
-        # TODO: Cache the README.html file and serve it from the cache if it exists.
-    except Exception:
-        logging.exception(
-            "Failed to regenerate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
-        )
     yield
     # Shutdown
     logging.info("PESUAuth API shutdown.")
