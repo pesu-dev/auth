@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import logging
+from pathlib import Path
 
 import pytz
 import uvicorn
@@ -110,11 +111,11 @@ async def health_check():
     return {"status": "ok"}
 
 
-@app.get("/readme", tags=["Documentation"])
+@app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
 async def readme():
-    """
-    Redirect /readme straight to the GitHub repo
-    """
+
+    """Redirect to the PESUAuth GitHub Repository"""
+
     return RedirectResponse("https://github.com/pesu-dev/auth")
 
 
