@@ -1,13 +1,12 @@
 import argparse
 import datetime
 import logging
-from pathlib import Path
 
 import pytz
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import ValidationError
 from app.pesu import PESUAcademy
 from app.models import ResponseModel, RequestModel
@@ -111,24 +110,12 @@ async def health_check():
     return {"status": "ok"}
 
 
-@app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
-async def readme():
-    """Serve the rendered README.md as HTML."""
-    try:
-        if not Path("README.html").exists():
-            logging.warning("README.html does not exist. Regenerating...")
-            util.convert_readme_to_html()
-        logging.info("Serving README.html...")
-        # TODO: We should cache the README.html file and serve it from the cache if it exists.
-        output = Path("README.html").read_text(encoding="utf-8")
-        return HTMLResponse(
-            status_code=200,
-            content=output,
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
-    except Exception:
-        logging.exception("Could not render README.html. Returning an Internal Server Error.")
-        raise Exception("Internal Server Error. Please try again later.")
+@app.get("/readme", tags=["Documentation"])
+def readme():
+    """
+    Redirect /readme straight to the GitHub repo
+    """
+    return RedirectResponse("https://github.com/pesu-dev/auth")
 
 
 @app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
