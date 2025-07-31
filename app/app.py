@@ -1,12 +1,13 @@
 import argparse
 import datetime
 import logging
+from pathlib import Path
 
 import pytz
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import ValidationError
 from app.pesu import PESUAcademy
 from app.models import ResponseModel, RequestModel
@@ -110,12 +111,12 @@ async def health_check():
     return {"status": "ok"}
 
 
-@app.get("/readme", tags=["Documentation"])
+app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
 async def readme():
-    """
-    Redirect /readme straight to the GitHub repo
-    """
-    return RedirectResponse("https://github.com/pesu-dev/auth")
+
+    """Redirect to the PESUAuth GitHub Repository"""
+
+    return RedirectResponse("https://github.com/pesu-dev/auth"))
 
 
 @app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
