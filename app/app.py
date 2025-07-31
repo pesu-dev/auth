@@ -7,7 +7,7 @@ import pytz
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import ValidationError
 from app.pesu import PESUAcademy
 from app.models import ResponseModel, RequestModel
