@@ -111,7 +111,7 @@ async def health_check():
 
 
 @app.get("/readme", tags=["Documentation"])
-def readme():
+async def readme():
     """
     Redirect /readme straight to the GitHub repo
     """
