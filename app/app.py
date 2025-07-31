@@ -110,7 +110,6 @@ async def health_check():
     logging.info("Health check requested.")
     return {"status": "ok"}
 
-
 @app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
 async def readme():
     """Redirect to the PESUAuth GitHub Repository"""
