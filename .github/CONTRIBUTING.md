@@ -32,7 +32,7 @@ your development environment and contributing to the project.
 - [✨ Code Style Guide](#-code-style-guide)
     - [✅ General Guidelines](#-general-guidelines)
     - [📝 Docstrings & Comments](#-docstrings--comments)
-- [🏷️ GitHub Labels](#-github-labels)
+- [🏷️ GitHub Labels](#%EF%B8%8F-github-labels)
 - [🧩 Feature Suggestions](#-feature-suggestions)
 - [📄 License](#-license)
 
