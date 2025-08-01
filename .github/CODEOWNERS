@@ -1,0 +1,23 @@
+# Maintainers for all files in the repository
+* @pesu-dev/auth-maintainers
+
+# Repository owner review for critical files
+
+## GitHub Configuration and Templates
+.github/ @aditeyabaral
+
+## Project Configuration
+pyproject.toml @aditeyabaral
+requirements.txt @aditeyabaral
+.pre-commit-config.yaml @aditeyabaral
+.env.example @aditeyabaral
+
+## Documentation and Legal
+README.md @aditeyabaral
+LICENSE @aditeyabaral
+
+## Infrastructure and Deployment
+Dockerfile @aditeyabaral
+
+## Testing
+tests/ @aditeyabaral
