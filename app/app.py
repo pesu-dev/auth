@@ -1,12 +1,12 @@
 import argparse
 import datetime
 import logging
-from pathlib import Path
+import asyncio
 
 import pytz
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import ValidationError
 from app.pesu import PESUAcademy
@@ -18,6 +18,32 @@ from fastapi.requests import Request
 from app.exceptions.base import PESUAcademyError
 
 IST = pytz.timezone("Asia/Kolkata")
+README_HTML_CACHE: str | None = None
+REFRESH_INTERVAL_SECONDS = 45 * 60
+CSRF_TOKEN_REFRESH_LOCK = asyncio.Lock()
+
+
+async def _refresh_csrf_token_with_lock():
+    """
+    Refresh the CSRF token with a lock.
+    """
+    logging.debug("Refreshing unauthenticated CSRF token...")
+    async with CSRF_TOKEN_REFRESH_LOCK:
+        await pesu_academy.prefetch_client_with_csrf_token()
+        logging.info("Unauthenticated CSRF token refreshed successfully.")
+
+
+async def _csrf_token_refresh_loop():
+    """
+    Background task to refresh the CSRF token periodically.
+    """
+    while True:
+        try:
+            logging.debug("Refreshing unauthenticated CSRF token...")
+            await _refresh_csrf_token_with_lock()
+        except Exception:
+            logging.exception("Failed to refresh unauthenticated CSRF token in the background.")
+        await asyncio.sleep(REFRESH_INTERVAL_SECONDS)
 
 
 @asynccontextmanager
@@ -25,15 +51,46 @@ async def lifespan(app: FastAPI):
     """
     Lifespan event handler for startup and shutdown events.
     """
+    # Startup
+    # Cache the README.html file
+    global README_HTML_CACHE
+    try:
+        logging.info("PESUAuth API startup")
+        logging.debug("Regenerating README.html...")
+        README_HTML_CACHE = await util.convert_readme_to_html()
+        logging.debug("README.html generated successfully on startup.")
+    except Exception:
+        logging.exception(
+            "Failed to generate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
+        )
+
+    # Prefetch PESUAcademy client for first request
+    await pesu_academy.prefetch_client_with_csrf_token()
+    logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
+
+    # Start the periodic CSRF token refresh background task
+    refresh_task = asyncio.create_task(_csrf_token_refresh_loop())
+    logging.info("Started the unauthenticated CSRF token refresh background task.")
+
     yield
+
     # Shutdown
+    refresh_task.cancel()
+    try:
+        await refresh_task
+    except asyncio.CancelledError:
+        logging.debug("Unauthenticated CSRF token refresh background task cancelled.")
+    except Exception:
+        logging.exception("Failed to cancel unauthenticated CSRF token refresh background task.")
+
+    await pesu_academy.close_client()
     logging.info("PESUAuth API shutdown.")
 
 
 app = FastAPI(
     title="PESUAuth API",
     description="A simple API to authenticate PESU credentials using PESU Academy",
-    version="2.0.0",
+    version="2.1.0",
     docs_url="/",
     lifespan=lifespan,
     openapi_tags=[
@@ -97,8 +154,9 @@ async def health_check():
     """
     Health check endpoint to verify if the API is running.
     """
-    logging.info("Health check requested.")
+    logging.debug("Health check requested.")
     return {"status": "ok"}
+
 
 @app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
 async def readme():
@@ -106,8 +164,9 @@ async def readme():
 
     return RedirectResponse("https://github.com/pesu-dev/auth")
 
+
 @app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
-async def authenticate(payload: RequestModel):
+async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks):
     """
     Authenticate a user using their PESU credentials via the PESU Academy service.
 
@@ -128,10 +187,12 @@ async def authenticate(payload: RequestModel):
     authentication_result = {"timestamp": current_time}
     logging.info(f"Authenticating user={username} with PESU Academy...")
     authentication_result.update(
-        pesu_academy.authenticate(
+        await pesu_academy.authenticate(
             username=username, password=password, profile=profile, fields=fields
         )
     )
+    # Prefetch a new client with an unauthenticated CSRF token for the next request
+    background_tasks.add_task(_refresh_csrf_token_with_lock)
 
     # Validate the response
     try:

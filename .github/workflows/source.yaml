@@ -10,8 +10,9 @@ jobs:
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
       SOURCE_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
       TARGET_REPO: ${{ github.repository }}
-      BRANCH: ${{ github.event.pull_request.head.ref }}
+      TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
 
     steps:
       - name: Print PR source info
@@ -19,14 +20,32 @@ jobs:
           echo "PR source information:"
           echo "  - PR Number: $PR_NUMBER"
           echo "  - Source repo: $SOURCE_REPO"
+          echo "  - Source branch: $SOURCE_BRANCH"
           echo "  - Target repo: $TARGET_REPO"
-          echo "  - Branch: $BRANCH"
+          echo "  - Target branch: $TARGET_BRANCH"
 
-      - name: Fail if PR is not from a feature branch on a fork
+      - name: Validate PR origin and target branch
         run: |
-          if [ "$SOURCE_REPO" = "$TARGET_REPO" ] || { [ "$SOURCE_REPO" != "$TARGET_REPO" ] && [ "$BRANCH" = "main" ]; }; then
-            echo "❌ PRs must come from a fork and from a non-main branch. Failing workflow for PR #$PR_NUMBER."
-            exit 1
-          else
-            echo "✅ PR passed origin checks."
+          # Allow dev → main PRs, but only if it's within the same repo (not a fork)
+          if [ "$SOURCE_REPO" = "$TARGET_REPO" ] && [ "$SOURCE_BRANCH" = "dev" ] && [ "$TARGET_BRANCH" = "main" ]; then
+            echo "✅ Dev to Main PR (release) allowed (same repo)."
+            exit 0
           fi
+
+          # Otherwise: PRs must come from a fork, non-main branch, targeting dev
+          if [ "$SOURCE_REPO" = "$TARGET_REPO" ]; then
+            echo "❌ PR must come from a fork (not the main repo)."
+            exit 1
+          fi
+
+          if [ "$SOURCE_BRANCH" = "main" ]; then
+            echo "❌ PR cannot come from the 'main' branch of a fork."
+            exit 1
+          fi
+
+          if [ "$TARGET_BRANCH" != "dev" ]; then
+            echo "❌ PR must target the 'dev' branch (unless it's a dev → main release)."
+            exit 1
+          fi
+
+          echo "✅ PR passed origin and target branch checks."

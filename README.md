@@ -19,8 +19,20 @@ returns the user's profile information. No personal data is stored.
 * You can access the PESUAuth API endpoints [here](https://pesu-auth.onrender.com/).
 * You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
 
-> :warning: **Warning:** The live version is hosted on a free tier server, so you might experience some latency on the
-> first request since the server might not be awake. Subsequent requests will be faster.
+#### API Status
+
+> [!NOTE]
+> All timestamps are in UTC.
+
+![Cron job status](https://api.cron-job.org/jobs/4424640/69701a6f8df1d307/status-7.svg)\
+![Cron job status](https://api.cron-job.org/jobs/6338038/9feb0f217be714ec/status-7.svg)\
+![Cron job status](https://api.cron-job.org/jobs/6382178/f8bb5b8b9c1751ed/status-7.svg)\
+![Cron job status](https://api.cron-job.org/jobs/5672615/1d744f1dc18fb505/status-7.svg)\
+![Cron job status](https://api.cron-job.org/jobs/4424663/d5a30351867acec9/status-7.svg)
+
+> [!WARNING]
+> The live version is hosted on a free tier server. As a result, you might experience higher latency compared to a local deployment.
+
 
 ## How to run PESUAuth locally
 
@@ -121,7 +133,6 @@ profile data was requested, the response's `profile` key will store a dictionary
 | `profile`   | `ProfileObject` | A nested map storing the profile information, returned only if requested |
 | `message`   | `str`           | A message that provides information corresponding to the status          |
 | `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
-| `details`   | `str`           | Information about the error, if an error occurs.                         |
 
 #### `ProfileObject`
 
@@ -134,7 +145,6 @@ If the authentication fails, this field will not be present in the response.
 | `prn`               | PRN of the user                                        |
 | `srn`               | SRN of the user                                        |
 | `program`           | Academic program that the user is enrolled into        |
-| `branch_short_code` | Abbreviation of the branch that the user is pursuing   |
 | `branch`            | Complete name of the branch that the user is pursuing  |
 | `semester`          | Current semester that the user is in                   |
 | `section`           | Section of the user                                    |
@@ -174,7 +184,6 @@ print(response.json())
     "prn": "PES1201800001",
     "srn": "PES1201800001",
     "program": "Bachelor of Technology",
-    "branch_short_code": "CSE",
     "branch": "Computer Science and Engineering",
     "semester": "NA",
     "section": "NA",
@@ -215,7 +224,7 @@ curl -X POST http://localhost:5000/authenticate \
 
 Made with ❤️ by
 
-[![Contributors](https://contrib.rocks/image?repo=pesu-dev/auth)](https://github.com/pesu-dev/auth/graphs/contributors)
+[![Contributors](https://contrib.rocks/image?repo=pesu-dev/auth&nocache=1)](https://github.com/pesu-dev/auth/graphs/contributors)
 
 *Powered by [contrib.rocks](https://contrib.rocks)*
 

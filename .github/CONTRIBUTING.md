@@ -42,20 +42,30 @@ your development environment and contributing to the project.
 
 ## 🚧 Getting Started
 
-We encourage developers to work on their own forks of the repository. This allows you to work on features or fixes
-without affecting the main codebase
-until your changes are ready to be merged. The standard workflow for contributing is as follows:
+We encourage developers to work on their own forks of the repository. This allows you to work on features or fixes witout affecting the main codebase until your changes are ready to be merged.
+
+### 🌐 Deployment Environment
+
+We maintain two deployment environments:
+
+- **Staging**: https://pesu-auth-dev.onrender.com - [Status Page](https://6ns95sgb.status.cron-job.org/)
+- **Production**: https://pesu-auth.onrender.com - [Status Page](https://xzlk85cp.status.cron-job.org/)
+
+### 🔄 Development Workflow
+
+The standard workflow for contributing is as follows:
 
 1. Fork the repository on GitHub and clone it to your local machine.
 2. Create a new branch for your feature or bug fix.
 3. Make your changes and commit them with clear, descriptive messages.
 4. Push your branch to your fork on GitHub.
-5. Create a Pull Request (PR) against the repository's `main` branch.
+5. Create a Pull Request (PR) against the repository's `dev` branch (not `main`).
 6. Wait for review and feedback from the maintainers, address any comments or suggestions.
-7. Once approved, your changes will be merged into the `main` branch and deployed to production.
+7. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
+8. After successful testing in staging, changes are promoted from `dev` to `main` for production deployment.
 
-Please note that you will not be able to push directly to the `main` branch of the repository.
-All contributions **must** be through a pull request raised from a new branch (not `main`) in your forked repository.
+
+Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository. All PRs must be raised from a feature branch of your forked repository and target the `dev` branch. Direct PRs to `main` will be closed.
 
 ---
 
@@ -126,8 +136,8 @@ pre-commit install
 
 ## 🧰 Running the Application
 
-You can run the application using the same instructions as in the [README.md](README.md) file. To ensure parity with
-production, we recommend testing the app both locally and inside Docker. See the [README.md](README.md) for Docker
+You can run the application using the same instructions as in the [README.md](../README.md) file. To ensure parity with
+production, we recommend testing the app both locally and inside Docker. See the [README.md](../README.md) for Docker
 instructions.
 
 ---
@@ -231,7 +241,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
    git push origin your-feature-name
    ```
 
-2. Open a Pull Request (PR) on GitHub targeting the `main` branch.
+2. Open a Pull Request (PR) on GitHub targeting the `dev` branch.
 
 3. In your PR:
 
@@ -240,8 +250,9 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
     * Link any related issues using `Closes #issue-number`
     * Add screenshots, terminal output, or examples if relevant
 
+
 The maintainers will review your PR, provide feedback, and may request changes. Once approved, your PR will be merged
-and included in the next deployment cycle.
+into the `dev` branch and deployed to staging for testing. After successful validation, changes will be promoted to production.
 
 ---
 
@@ -249,7 +260,7 @@ and included in the next deployment cycle.
 
 If you get stuck or have questions:
 
-1. Check the [README.md](README.md) for setup and usage info.
+1. Check the [README.md](../README.md) for setup and usage info.
 2. Review [open issues](https://github.com/pesu-dev/auth/issues)
    or [pull requests](https://github.com/pesu-dev/auth/pulls) to see if someone else encountered the same problem.
 3. Reach out to the maintainers on PESU Discord.
