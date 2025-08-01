@@ -1,9 +1,7 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from app.app import readme
-import app.app as app_module
-from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
+
 
 @pytest.mark.asyncio
 async def test_unit_readme_redirects():
