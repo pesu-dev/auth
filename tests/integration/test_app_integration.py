@@ -325,12 +325,6 @@ def test_integration_authenticate_fields_invalid_field(client):
     assert "body.fields.0" in data["message"]
 
 
-def test_integration_readme(client):
-    response = client.get("/readme", follow_redirects=False)
-    assert response.status_code == 307
-    assert response.headers["location"] == "https://github.com/pesu-dev/auth"
-
-
 def test_integration_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200

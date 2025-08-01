@@ -11,14 +11,12 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import ValidationError
 from app.pesu import PESUAcademy
 from app.models import ResponseModel, RequestModel
-import app.util as util
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
 from app.exceptions.base import PESUAcademyError
 
 IST = pytz.timezone("Asia/Kolkata")
-README_HTML_CACHE: str | None = None
 REFRESH_INTERVAL_SECONDS = 45 * 60
 CSRF_TOKEN_REFRESH_LOCK = asyncio.Lock()
 
@@ -52,17 +50,7 @@ async def lifespan(app: FastAPI):
     Lifespan event handler for startup and shutdown events.
     """
     # Startup
-    # Cache the README.html file
-    global README_HTML_CACHE
-    try:
-        logging.info("PESUAuth API startup")
-        logging.debug("Regenerating README.html...")
-        README_HTML_CACHE = await util.convert_readme_to_html()
-        logging.debug("README.html generated successfully on startup.")
-    except Exception:
-        logging.exception(
-            "Failed to generate README.html on startup. Subsequent requests to /readme will attempt to regenerate it."
-        )
+    logging.info("PESUAuth API startup")
 
     # Prefetch PESUAcademy client for first request
     await pesu_academy.prefetch_client_with_csrf_token()
