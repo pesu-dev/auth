@@ -136,8 +136,8 @@ pre-commit install
 
 ## 🧰 Running the Application
 
-You can run the application using the same instructions as in the [README.md](README.md) file. To ensure parity with
-production, we recommend testing the app both locally and inside Docker. See the [README.md](README.md) for Docker
+You can run the application using the same instructions as in the [README.md](../README.md) file. To ensure parity with
+production, we recommend testing the app both locally and inside Docker. See the [README.md](../README.md) for Docker
 instructions.
 
 ---
@@ -260,7 +260,7 @@ into the `dev` branch and deployed to staging for testing. After successful vali
 
 If you get stuck or have questions:
 
-1. Check the [README.md](README.md) for setup and usage info.
+1. Check the [README.md](../README.md) for setup and usage info.
 2. Review [open issues](https://github.com/pesu-dev/auth/issues)
    or [pull requests](https://github.com/pesu-dev/auth/pulls) to see if someone else encountered the same problem.
 3. Reach out to the maintainers on PESU Discord.
