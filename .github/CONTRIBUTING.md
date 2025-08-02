@@ -3,7 +3,6 @@
 Thank you for your interest in contributing to auth! This document provides guidelines and instructions for setting up
 your development environment and contributing to the project.
 
----
 
 <details>
 <summary>📚 Table of Contents</summary>
@@ -38,7 +37,6 @@ your development environment and contributing to the project.
 
 </details>
 
----
 
 ## 🚧 Getting Started
 
@@ -67,7 +65,6 @@ The standard workflow for contributing is as follows:
 
 Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository. All PRs must be raised from a feature branch of your forked repository and target the `dev` branch. Direct PRs to `main` will be closed.
 
----
 
 ## 🛠️ Development Environment Setup
 
@@ -132,7 +129,6 @@ your code. Install the pre-commit hooks by running:
 pre-commit install
 ```
 
----
 
 ## 🧰 Running the Application
 
@@ -140,7 +136,6 @@ You can run the application using the same instructions as in the [README.md](..
 production, we recommend testing the app both locally and inside Docker. See the [README.md](../README.md) for Docker
 instructions.
 
----
 
 ## 🧪 Testing and Code Quality
 
@@ -163,14 +158,13 @@ The following checks are enforced:
 
 ### Linting & Formatting
 
-All linting and formatting is handled by `ruff`, `blacken-docs`, and `pyupgrade`. Run the following command to check
+All linting and formatting is handled by `ruff`. Run the following command to check
 all files:
 
 ```bash
 pre-commit run --all-files
 ```
 
----
 
 ## 🧪 Running Tests
 
@@ -197,7 +191,6 @@ pytest --cov
 * Name your test files and functions with the `test_` prefix (required by `pytest` and validated by pre-commit)
 * Keep test cases small, meaningful, and well-named
 
----
 
 ## 🚀 Submitting Changes
 
@@ -254,7 +247,6 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
 The maintainers will review your PR, provide feedback, and may request changes. Once approved, your PR will be merged
 into the `dev` branch and deployed to staging for testing. After successful validation, changes will be promoted to production.
 
----
 
 ## ❓ Need Help?
 
@@ -268,7 +260,6 @@ If you get stuck or have questions:
     - Search for existing discussions before posting.
 4. Open a new issue if you're facing something new or need clarification.
 
----
 
 ## 🔐 Security
 
@@ -277,7 +268,6 @@ If you discover a security vulnerability, **please do not open a public issue**.
 Instead, report it privately by contacting the maintainers. We take all security concerns seriously and will respond
 promptly.
 
----
 
 ## ✨ Code Style Guide
 
@@ -313,24 +303,63 @@ def send_otp(email: str) -> bool:
     """
 ```
 
----
-
 ## 🏷️ GitHub Labels
 
-We use GitHub labels to categorize issues and PRs. Here’s a quick guide to what they mean:
+We use GitHub labels to categorize and prioritize issues and pull requests. Here’s a guide to help you understand what each label means:
 
-| Label              | Purpose                                         |
-|--------------------|-------------------------------------------------|
-| `good first issue` | Beginner-friendly, simple issues to get started |
-| `bug`              | Something is broken or not working as intended  |
-| `enhancement`      | Proposed improvements or new features           |
-| `documentation`    | Docs, comments, or README-related updates       |
-| `question`         | Open questions or clarifications                |
-| `help wanted`      | Maintainers are seeking help or collaboration   |
+### 🧑‍💻 Contribution Level
 
-When creating or working on an issue/PR, feel free to suggest an appropriate label if not already applied.
+| Label              | Description                                                       |
+|--------------------|-------------------------------------------------------------------|
+| `good first issue` | 🟢 Simple, well-scoped tasks good for first-time contributors     |
+| `help wanted`      | 🟡 Maintainers are actively seeking help on this issue            |
 
----
+### 🐞 Bug & Error Handling
+
+| Label        | Description                                                   |
+|--------------|---------------------------------------------------------------|
+| `bug`        | 🔴 A defect or unexpected behavior in the application         |
+| `invalid`    | 🚫 The issue/PR is not valid or based on a misunderstanding   |
+| `wontfix`    | ❌ The issue is acknowledged but will not be fixed            |
+| `duplicate`  | 📑 This issue or PR duplicates an existing one                |
+
+### ✨ Feature Development
+
+| Label         | Description                                                |
+|---------------|------------------------------------------------------------|
+| `enhancement` | 🟢 A request or proposal for improvement or new feature    |
+| `feature`     | 🌟 Work related to adding a new capability                 |
+| `question`    | ❓ Request for clarification or discussion                  |
+
+### 📚 Documentation
+
+| Label            | Description                                                  |
+|------------------|--------------------------------------------------------------|
+| `documentation`  | 📘 Updates to README, docstrings, or inline comments         |
+
+### 🧪 Testing & CI/CD
+
+| Label             | Description                                                     |
+|-------------------|-----------------------------------------------------------------|
+| `tests and ci/cd` | 🧪 Changes or issues related to testing or continuous integration |
+
+### 🔒 Authentication & Core
+
+| Label             | Description                                                       |
+|-------------------|-------------------------------------------------------------------|
+| `authentication`  | 🔐 Login, CSRF, token handling, error flows                        |
+| `pesuacademy`     | 🎓 PESUAcademy client, authentication, and scraping logic          |
+| `student profile` | 🧑‍🎓 HTML parsing & profile field extraction logic                  |
+
+### 🧠 Meta / Organization
+
+| Label       | Description                                             |
+|-------------|---------------------------------------------------------|
+| `api`       | ⚙️ Core FastAPI application and route handlers           |
+| `discussion`| 🗣️ Open-ended conversation about project direction       |
+
+> ✅ **Tip**: When opening or triaging issues and PRs, feel free to suggest an appropriate label. Maintainers will review and apply them accordingly.
+
 
 ## 🧩 Feature Suggestions
 
@@ -340,7 +369,6 @@ If you want to propose a new feature:
 2. Open a new issue using the **"Feature Request"** template if available
 3. Clearly explain the use case, proposed solution, and any relevant context
 
----
 
 ## 📄 License
 
