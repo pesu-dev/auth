@@ -1,13 +1,22 @@
+"""Script to test the unauthenticated CSRF token expiry."""
+
 import argparse
-import time
 import os
+import time
+
 from tqdm.auto import tqdm
 from util import make_request
 
 
 def test_response(response: dict, no_profile: bool) -> bool:
-    """
-    Test the response from the authenticate endpoint.
+    """Test the response from the authenticate endpoint.
+
+    Args:
+        response (dict): The response from the authenticate endpoint.
+        no_profile (bool): Whether to fetch the profile information or not.
+
+    Returns:
+        bool: True if the response is successful, False otherwise.
     """
     if response.get("status"):
         if not no_profile:
@@ -17,6 +26,11 @@ def test_response(response: dict, no_profile: bool) -> bool:
 
 
 if __name__ == "__main__":
+    """Main function to test the unauthenticated CSRF token expiry.
+
+    This script tests the unauthenticated CSRF token expiry by making requests to the authenticate endpoint.
+    It can be run in parallel using threads or sequentially.
+    """
     parser = argparse.ArgumentParser(description="Test unauthenticated CSRF token expiry.")
     parser.add_argument(
         "--host",
@@ -27,10 +41,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-profile",
         action="store_true",
-        help="Run the authenticate endpoint benchmark without fetching profile information (default: fetch profile info)",
+        help="Run the authenticate endpoint benchmark without fetching profile information "
+        "(default: fetch profile info)",
     )
     parser.add_argument(
-        "--timeout", type=int, default=10, help="The timeout for the request (default: 10)"
+        "--timeout",
+        type=int,
+        default=10,
+        help="The timeout for the request (default: 10)",
     )
     parser.add_argument(
         "--interval",
@@ -51,11 +69,18 @@ if __name__ == "__main__":
         help="The output file name (default: unauthenticated_csrf_token_expiry.csv)",
     )
     parser.add_argument(
-        "--verbose", action="store_true", help="Print the response for each request"
+        "--verbose",
+        action="store_true",
+        help="Print the response for each request",
     )
     args = parser.parse_args()
 
-    request_count, success, times, waiting_times = 0, list(), list(), [args.start_delay * 60]
+    request_count, success, times, waiting_times = (
+        0,
+        list(),
+        list(),
+        [args.start_delay * 60],
+    )
 
     for _ in tqdm(
         range(args.start_delay * 60),
@@ -68,7 +93,10 @@ if __name__ == "__main__":
     while True:
         request_count += 1
         response, elapsed = make_request(
-            host=args.host, timeout=args.timeout, profile=not args.no_profile, route="authenticate"
+            host=args.host,
+            timeout=args.timeout,
+            profile=not args.no_profile,
+            route="authenticate",
         )
         success.append(int(test_response(response, args.no_profile)))
         times.append(elapsed)
@@ -90,5 +118,4 @@ if __name__ == "__main__":
 
     with open(args.output, "w") as f:
         f.write("status,time,waiting_time\n")
-        for s, t, w in zip(success, times, waiting_times):
-            f.write(f"{s},{t},{w}\n")
+        f.writelines(f"{s},{t},{w}\n" for s, t, w in zip(success, times, waiting_times, strict=False))

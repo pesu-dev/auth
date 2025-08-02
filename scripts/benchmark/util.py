@@ -1,3 +1,5 @@
+"""Utility functions for the benchmark scripts."""
+
 import os
 import time
 
@@ -13,8 +15,7 @@ def make_request(
     profile: bool = True,
     timeout: float = 10.0,
 ) -> tuple[dict, float]:
-    """
-    Make a request to the authentication endpoint and return the response and elapsed time.
+    """Make a request to the authentication endpoint and return the response and elapsed time.
 
     Args:
         host: The host to make the request to

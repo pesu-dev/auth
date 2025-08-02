@@ -77,7 +77,6 @@ Please provide a concise summary of the changes:
 
 - [ ] `app/app.py` – Modified `/authenticate` route logic
 - [ ] `app/pesu.py` – Updated scraping or authentication handling
-- [ ] `app/util.py` – General helper functions
 
 
 ### 🧩 Models

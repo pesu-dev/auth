@@ -1,8 +1,9 @@
 import os
 
 import pytest
-from fastapi.testclient import TestClient
 from fastapi import APIRouter
+from fastapi.testclient import TestClient
+
 from app.app import app
 
 unhandled_router = APIRouter()
@@ -104,9 +105,9 @@ def test_integration_authenticate_with_specific_profile_fields(client):
     assert data["message"] == "Login successful."
     assert "profile" in data
     profile = data["profile"]
-    assert len(profile) == len(expected_fields), (
-        f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
-    )
+    assert len(profile) == len(
+        expected_fields
+    ), f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
 
     assert profile["prn"] == prn
     assert profile["branch"] == branch
@@ -172,9 +173,7 @@ def test_integration_authenticate_with_all_profile_fields(client):
     assert data["message"] == "Login successful."
     assert "profile" in data
     profile = data["profile"]
-    assert len(profile) == len(all_fields), (
-        f"Expected {len(all_fields)} fields in profile, got {len(profile)}"
-    )
+    assert len(profile) == len(all_fields), f"Expected {len(all_fields)} fields in profile, got {len(profile)}"
 
     assert profile["name"] == name
     assert profile["prn"] == prn
@@ -325,10 +324,13 @@ def test_integration_authenticate_fields_invalid_field(client):
     assert "body.fields.0" in data["message"]
 
 
-def test_integration_readme(client):
-    response = client.get("/readme")
-    assert response.status_code == 200
-    assert "html" in response.headers["content-type"]
+def test_integration_readme_redirect(client):
+    redirect_url = "https://github.com/pesu-dev/auth"
+    response = client.get("/readme", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.reason_phrase == "Temporary Redirect"
+    assert response.headers["location"] == redirect_url
+    assert str(response.next_request.url) == redirect_url
 
 
 def test_integration_health_check(client):

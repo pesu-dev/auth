@@ -2,8 +2,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.exceptions.authentication import AuthenticationError, CSRFTokenError
 from app.pesu import PESUAcademy
-from app.exceptions.authentication import CSRFTokenError, AuthenticationError
 
 
 @pytest.fixture
