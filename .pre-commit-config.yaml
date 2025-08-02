@@ -7,12 +7,6 @@ repos:
         types_or: [ python, pyi, jupyter ]
       - id: ruff-format
 
-  # - repo: https://github.com/asottile/pyupgrade
-  #   rev: v3.20.0
-  #   hooks:
-  #     - id: pyupgrade
-  #       args: [ "--py311-plus" ]
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
