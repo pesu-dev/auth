@@ -1,14 +1,15 @@
 import argparse
 import statistics
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
 
 
 def analyze_benchmark(df: pd.DataFrame):
-    """
-    Analyze benchmark CSV output and print a summary.
+    """Analyze benchmark CSV output and print a summary.
+
     Args:
         df (pd.DataFrame): The benchmark DataFrame.
     """
@@ -49,13 +50,13 @@ def analyze_benchmark(df: pd.DataFrame):
 
 
 def plot_distribution(dfs: list[pd.DataFrame], files: list[str]):
-    """
-    Plot the distribution of response times for each benchmark on the same plot.
+    """Plot the distribution of response times for each benchmark on the same plot.
+
     Args:
         dfs (list[pd.DataFrame]): The benchmark DataFrames.
         files (list[str]): The file names.
     """
-    for df, file in zip(dfs, files):
+    for df, file in zip(dfs, files, strict=False):
         df["label"] = file
     df = pd.concat(dfs)
     plt.figure(figsize=(10, 6))
@@ -78,14 +79,14 @@ def plot_distribution(dfs: list[pd.DataFrame], files: list[str]):
 
 
 def plot_response_time_over_requests(dfs: list[pd.DataFrame], files: list[str]):
-    """
-    Plot the response time over requests for each benchmark on the same plot.
+    """Plot the response time over requests for each benchmark on the same plot.
+
     Args:
         dfs (list[pd.DataFrame]): The benchmark DataFrames.
         files (list[str]): The file names.
     """
     plt.figure(figsize=(12, 6))
-    for df, file in zip(dfs, files):
+    for df, file in zip(dfs, files, strict=False):
         df = df.reset_index().rename(columns={"index": "request"})
         sns.lineplot(data=df, x="request", y="time", label=file, marker="o", linewidth=1)
     plt.title("Response Time Over Requests")

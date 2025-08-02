@@ -1,7 +1,5 @@
 class PESUAcademyError(Exception):
-    """
-    Base class for all PESU Academy-related errors.
-    """
+    """Base class for all PESU Academy-related errors."""
 
     def __init__(self, message: str, status_code: int):
         self.message = message

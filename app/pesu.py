@@ -8,17 +8,15 @@ import httpx
 from selectolax.parser import HTMLParser, Node
 
 from app.exceptions.authentication import (
+    AuthenticationError,
+    CSRFTokenError,
     ProfileFetchError,
     ProfileParseError,
-    CSRFTokenError,
-    AuthenticationError,
 )
 
 
 class PESUAcademy:
-    """
-    Class to interact with the PESU Academy website.
-    """
+    """Class to interact with the PESU Academy website."""
 
     DEFAULT_FIELDS: list[str] = [
         "name",
@@ -62,8 +60,7 @@ class PESUAcademy:
             csrf_token = node.attributes["content"]
             logging.info(f"Fetched CSRF token: {csrf_token}")
             return client, csrf_token
-        else:
-            raise CSRFTokenError("CSRF token not found in the pre-authentication response.")
+        raise CSRFTokenError("CSRF token not found in the pre-authentication response.")
 
     async def _prefetch_client_with_csrf_token(self):
         """Prefetch a new client with an unauthenticated CSRF token."""
@@ -96,8 +93,7 @@ class PESUAcademy:
         return client_to_use, token_to_use
 
     async def _extract_and_update_profile(self, node: Node, idx: int, profile: dict):
-        """
-        Extracts the profile data from a node and updates the profile dictionary.
+        """Extracts the profile data from a node and updates the profile dictionary.
 
         Args:
             node (Node): Pre-parsed node containing the profile information
@@ -123,7 +119,7 @@ class PESUAcademy:
                 profile[mapped_key] = value
             else:
                 raise ProfileParseError(
-                    f"Unknown key: '{key}' in the profile page. The webpage might have changed."
+                    f"Unknown key: '{key}' in the profile page. The webpage might have changed.",
                 )
 
         await asyncio.to_thread(parse_and_update)
@@ -139,10 +135,11 @@ class PESUAcademy:
             self._client = None
 
     async def get_profile_information(
-        self, client: httpx.AsyncClient, username: str
+        self,
+        client: httpx.AsyncClient,
+        username: str,
     ) -> dict[str, Any]:
-        """
-        Get the profile information of the user.
+        """Get the profile information of the user.
 
         Args:
             client (httpx.Client): The HTTP client to use for making requests.
@@ -167,7 +164,7 @@ class PESUAcademy:
         # If the status code is not 200, raise an exception because the profile page is not accessible
         if response.status_code != 200:
             raise ProfileFetchError(
-                f"Failed to fetch student profile page from PESU Academy for user={username}."
+                f"Failed to fetch student profile page from PESU Academy for user={username}.",
             )
         logging.debug("Student profile page fetched successfully.")
 
@@ -180,7 +177,7 @@ class PESUAcademy:
             or len(details_nodes) < 7
         ):
             raise ProfileParseError(
-                f"Failed to parse student profile page from PESU Academy for user={username}. The webpage might have changed."
+                f"Failed to parse student profile page from PESU Academy for user={username}. The webpage might have changed.",
             )
 
         # Extract the profile information from the profile page
@@ -213,7 +210,7 @@ class PESUAcademy:
                 profile["campus"] = "EC"
             else:
                 logging.warning(
-                    f"Unknown campus code: {campus_code} parsed from PRN={profile['prn']} for user={username}"
+                    f"Unknown campus code: {campus_code} parsed from PRN={profile['prn']} for user={username}",
                 )
 
         # Check if we extracted any profile data
@@ -230,8 +227,7 @@ class PESUAcademy:
         profile: bool = False,
         fields: list[str] | None = None,
     ) -> dict[str, Any]:
-        """
-        Authenticate the user with the provided username and password.
+        """Authenticate the user with the provided username and password.
 
         Args:
             username (str): The username of the user, usually their PRN/email/phone number.
@@ -248,7 +244,7 @@ class PESUAcademy:
         field_filtering = fields != self.DEFAULT_FIELDS
 
         logging.info(
-            f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ..."
+            f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ...",
         )
 
         # Get a pre-fetched csrf token and client
@@ -273,7 +269,7 @@ class PESUAcademy:
         if soup.css_first("div.login-form"):
             # Log the error and return the error message
             raise AuthenticationError(
-                f"Invalid username or password, or user does not exist for user={username}."
+                f"Invalid username or password, or user does not exist for user={username}.",
             )
 
         # If the user is successfully authenticated
@@ -285,7 +281,7 @@ class PESUAcademy:
             logging.debug(f"Authenticated CSRF token: {csrf_token}")
         else:
             raise CSRFTokenError(
-                f"CSRF token not found in the post-authentication response for user={username}."
+                f"CSRF token not found in the post-authentication response for user={username}.",
             )
 
         result = {"status": status, "message": "Login successful."}
@@ -300,7 +296,7 @@ class PESUAcademy:
                     key: value for key, value in result["profile"].items() if key in fields
                 }
                 logging.info(
-                    f"Field filtering enabled. Filtered profile data for user={username}: {result['profile']}"
+                    f"Field filtering enabled. Filtered profile data for user={username}: {result['profile']}",
                 )
 
         logging.info(f"Authentication process for user={username} completed successfully.")

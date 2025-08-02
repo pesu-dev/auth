@@ -1,13 +1,14 @@
-import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.pesu import PESUAcademy
+import pytest
+
 from app.exceptions.authentication import (
-    ProfileFetchError,
-    CSRFTokenError,
     AuthenticationError,
+    CSRFTokenError,
+    ProfileFetchError,
     ProfileParseError,
 )
+from app.pesu import PESUAcademy
 
 
 @pytest.fixture
@@ -85,7 +86,10 @@ async def test_authenticate_csrf_token_missing_after_login(mock_post, mock_get, 
 @patch("app.pesu.PESUAcademy.get_profile_information")
 @pytest.mark.asyncio
 async def test_authenticate_with_profile_field_filtering(
-    mock_get_profile, mock_post, mock_get, pesu
+    mock_get_profile,
+    mock_post,
+    mock_get,
+    pesu,
 ):
     mock_get_response = AsyncMock()
     mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
@@ -115,7 +119,10 @@ async def test_authenticate_with_profile_field_filtering(
 @patch("app.pesu.PESUAcademy.get_profile_information")
 @pytest.mark.asyncio
 async def test_authenticate_with_profile_no_field_filtering(
-    mock_get_profile, mock_post, mock_get, pesu
+    mock_get_profile,
+    mock_post,
+    mock_get,
+    pesu,
 ):
     mock_get_response = AsyncMock()
     mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
@@ -123,7 +130,7 @@ async def test_authenticate_with_profile_no_field_filtering(
     mock_post_response = AsyncMock()
     mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
     mock_post.return_value = mock_post_response
-    mock_get_profile.return_value = {k: "test_value" for k in PESUAcademy.DEFAULT_FIELDS}
+    mock_get_profile.return_value = dict.fromkeys(PESUAcademy.DEFAULT_FIELDS, "test_value")
     result = await pesu.authenticate("testuser", "testpass", profile=True, fields=None)
     assert result["status"] is True
     for field in PESUAcademy.DEFAULT_FIELDS:
@@ -184,7 +191,10 @@ async def test_authenticate_login_form_present(mock_get, mock_post, mock_html_pa
 @patch("app.pesu.httpx.AsyncClient.get")
 @pytest.mark.asyncio
 async def test_authenticate_csrf_token_missing_after_login_strict(
-    mock_get, mock_post, mock_html_parser, pesu
+    mock_get,
+    mock_post,
+    mock_html_parser,
+    pesu,
 ):
     mock_get_response = AsyncMock()
     mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
@@ -196,10 +206,10 @@ async def test_authenticate_csrf_token_missing_after_login_strict(
 
     def css_first(selector):
         if selector == "div.login-form":
-            return None
+            return
         if selector == "meta[name='csrf-token']":
-            return None
-        return None
+            return
+        return
 
     mock_soup.css_first.side_effect = css_first
     mock_html_parser.return_value = mock_soup
@@ -211,7 +221,10 @@ async def test_authenticate_csrf_token_missing_after_login_strict(
 @patch("app.pesu.httpx.AsyncClient.get")
 @pytest.mark.asyncio
 async def test_get_profile_information_unknown_campus_code(
-    mock_get, mock_html_parser, pesu, caplog
+    mock_get,
+    mock_html_parser,
+    pesu,
+    caplog,
 ):
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -393,7 +406,10 @@ async def test_get_profile_information_no_profile_data(mock_get, mock_html_parse
 @patch("app.pesu.PESUAcademy._extract_and_update_profile", new_callable=AsyncMock)
 @pytest.mark.asyncio
 async def test_get_profile_information_empty_profile_triggers_final_parse_error(
-    mock_extract, mock_get, mock_html_parser, pesu
+    mock_extract,
+    mock_get,
+    mock_html_parser,
+    pesu,
 ):
     mock_extract.return_value = None
 

@@ -1,6 +1,8 @@
-from pydantic import BaseModel, field_validator, ConfigDict, Field
-from app.pesu import PESUAcademy
 from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.pesu import PESUAcademy
 
 
 class RequestModel(BaseModel):
@@ -39,9 +41,7 @@ class RequestModel(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
-        """
-        Validate that username is not empty after stripping whitespace.
-        """
+        """Validate that username is not empty after stripping whitespace."""
         v = v.strip()
         if not v:
             raise ValueError("Username cannot be empty.")
@@ -50,9 +50,7 @@ class RequestModel(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        """
-        Validate that password is not empty after stripping whitespace.
-        """
+        """Validate that password is not empty after stripping whitespace."""
         v = v.strip()
         if not v:
             raise ValueError("Password cannot be empty.")
@@ -61,9 +59,7 @@ class RequestModel(BaseModel):
     @field_validator("fields")
     @classmethod
     def validate_fields(cls, v: list[str] | None) -> list[str] | None:
-        """
-        Validate that fields is either None or a non-empty list containing only allowed field names.
-        """
+        """Validate that fields is either None or a non-empty list containing only allowed field names."""
         if v is not None and not v:
             raise ValueError("Fields must be a non-empty list or None.")
         return v

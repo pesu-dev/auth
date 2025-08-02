@@ -1,20 +1,20 @@
 import argparse
+import asyncio
 import datetime
 import logging
-import asyncio
+from contextlib import asynccontextmanager
 
 import pytz
 import uvicorn
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from pydantic import ValidationError
-from app.pesu import PESUAcademy
-from app.models import ResponseModel, RequestModel
-
+from fastapi import BackgroundTasks, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from pydantic import ValidationError
+
 from app.exceptions.base import PESUAcademyError
+from app.models import RequestModel, ResponseModel
+from app.pesu import PESUAcademy
 
 IST = pytz.timezone("Asia/Kolkata")
 REFRESH_INTERVAL_SECONDS = 45 * 60
@@ -22,9 +22,7 @@ CSRF_TOKEN_REFRESH_LOCK = asyncio.Lock()
 
 
 async def _refresh_csrf_token_with_lock():
-    """
-    Refresh the CSRF token with a lock.
-    """
+    """Refresh the CSRF token with a lock."""
     logging.debug("Refreshing unauthenticated CSRF token...")
     async with CSRF_TOKEN_REFRESH_LOCK:
         await pesu_academy.prefetch_client_with_csrf_token()
@@ -32,9 +30,7 @@ async def _refresh_csrf_token_with_lock():
 
 
 async def _csrf_token_refresh_loop():
-    """
-    Background task to refresh the CSRF token periodically.
-    """
+    """Background task to refresh the CSRF token periodically."""
     while True:
         try:
             logging.debug("Refreshing unauthenticated CSRF token...")
@@ -46,9 +42,7 @@ async def _csrf_token_refresh_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Lifespan event handler for startup and shutdown events.
-    """
+    """Lifespan event handler for startup and shutdown events."""
     # Startup
     logging.info("PESUAuth API startup")
 
@@ -139,9 +133,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health", tags=["Monitoring"])
 async def health_check():
-    """
-    Health check endpoint to verify if the API is running.
-    """
+    """Health check endpoint to verify if the API is running."""
     logging.debug("Health check requested.")
     return {"status": "ok"}
 
@@ -149,14 +141,12 @@ async def health_check():
 @app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
 async def readme():
     """Redirect to the PESUAuth GitHub Repository"""
-
     return RedirectResponse("https://github.com/pesu-dev/auth")
 
 
 @app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
 async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks):
-    """
-    Authenticate a user using their PESU credentials via the PESU Academy service.
+    """Authenticate a user using their PESU credentials via the PESU Academy service.
 
     Request body parameters:
     - username (str): The user's SRN, PRN, email address, or phone number.
@@ -176,8 +166,11 @@ async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks)
     logging.info(f"Authenticating user={username} with PESU Academy...")
     authentication_result.update(
         await pesu_academy.authenticate(
-            username=username, password=password, profile=profile, fields=fields
-        )
+            username=username,
+            password=password,
+            profile=profile,
+            fields=fields,
+        ),
     )
     # Prefetch a new client with an unauthenticated CSRF token for the next request
     background_tasks.add_task(_refresh_csrf_token_with_lock)
@@ -195,17 +188,16 @@ async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks)
     except ValidationError:
         logging.exception(f"Validation error on ResponseModel for user={username}.")
         raise PESUAcademyError(
-            status_code=500, message="Internal Server Error. Please try again later."
+            status_code=500,
+            message="Internal Server Error. Please try again later.",
         )
 
 
 def main():
-    """
-    Main function to run the FastAPI application with command line arguments.
-    """
+    """Main function to run the FastAPI application with command line arguments."""
     # Set up argument parser for command line arguments
     parser = argparse.ArgumentParser(
-        description="PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy."
+        description="PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy.",
     )
     parser.add_argument(
         "--host",

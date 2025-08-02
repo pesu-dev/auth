@@ -1,9 +1,8 @@
 import argparse
-from tqdm.auto import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from tqdm.auto import tqdm
 from util import make_request
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark PESUAuth API.")
@@ -74,12 +73,16 @@ if __name__ == "__main__":
     times = []
     if parallel:
         print(
-            f"Running benchmark with max {max_workers} workers and {num_requests} requests in parallel..."
+            f"Running benchmark with max {max_workers} workers and {num_requests} requests in parallel...",
         )
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(
-                    make_request, profile=profile, host=host, route=route, timeout=timeout
+                    make_request,
+                    profile=profile,
+                    host=host,
+                    route=route,
+                    timeout=timeout,
                 )
                 for _ in range(num_requests)
             ]
@@ -99,7 +102,10 @@ if __name__ == "__main__":
         print(f"Running benchmark with {num_requests} requests sequentially...")
         for _ in tqdm(range(num_requests), desc="Processing requests"):
             response, elapsed = make_request(
-                profile=profile, host=host, route=route, timeout=timeout
+                profile=profile,
+                host=host,
+                route=route,
+                timeout=timeout,
             )
             times.append(elapsed)
             if verbose:
@@ -120,8 +126,7 @@ if __name__ == "__main__":
         "w",
     ) as f:
         f.write("status,time\n")
-        for s, t in zip(success, times):
-            f.write(f"{s},{t}\n")
+        f.writelines(f"{s},{t}\n" for s, t in zip(success, times, strict=False))
 
     print(f"Benchmark completed. Successful requests: {sum(success)} out of {len(success)}")
     print(f"Average time per request: {sum(times) / len(times):.2f} seconds")

@@ -15,8 +15,6 @@ dependencies = [
     "pydantic>=2.6.0",
     "pytz>=2025.2",
     "selectolax>=0.3.30",
-    "aiofiles>=24.1.0",
-    "emoji>=2.14.1",
 ]
 
 [project.optional-dependencies]
@@ -47,12 +45,33 @@ markers = [
     "secret_required: marks tests that require secrets or environment variables (e.g. TEST_PRN, TEST_PASSWORD)"
 ]
 
+[tool.ruff.lint]
+select = [
+    "E", # Pycodestyle errors
+    "F", # Pyflakes errors
+    "W", # Pycodestyle warnings
+    "UP", # Pyupgrade rules
+    "I", # Import related rules
+    "C90", # Complexity rules
+    "D", # Documentation rules
+    "ANN", # Annotations rules
+    "TYP", # Type checking rules
+    "N", # Naming rules
+    "Q000", # Quotation style rules
+    "RET", # Return type rules
+]
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+exclude = [
+    "tests/",
+    "scripts/"
+]
 
 [tool.ruff.format]
 quote-style = "double"
+docstring-code-format = true

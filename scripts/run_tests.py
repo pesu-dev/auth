@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
+import logging
+import os
 import subprocess
 import sys
-import os
-import logging
+
 from dotenv import load_dotenv
 
 

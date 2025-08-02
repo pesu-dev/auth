@@ -1,8 +1,9 @@
 import os
 
 import pytest
-from fastapi.testclient import TestClient
 from fastapi import APIRouter
+from fastapi.testclient import TestClient
+
 from app.app import app
 
 unhandled_router = APIRouter()
@@ -326,13 +327,12 @@ def test_integration_authenticate_fields_invalid_field(client):
 
 
 def test_integration_readme_redirect(client):
-    """
-    Integration test for the /readme endpoint.
-    It should return a 307 redirect to the correct GitHub repository.
-    """
+    redirect_url = "https://github.com/pesu-dev/auth"
     response = client.get("/readme", follow_redirects=False)
     assert response.status_code == 307
-    assert response.headers["location"] == "https://github.com/pesu-dev/auth"
+    assert response.reason_phrase == "Temporary Redirect"
+    assert response.headers["location"] == redirect_url
+    assert str(response.next_request.url) == redirect_url
 
 
 def test_integration_health_check(client):
