@@ -1,4 +1,4 @@
-"""Custom exceptions for various PESU Academy related errors."""
+"""Custom exception classes for various PESU Academy related errors. All errors inherit from PESUAcademyError."""
 
 from app.exceptions.base import PESUAcademyError
 

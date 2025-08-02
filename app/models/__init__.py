@@ -1,4 +1,4 @@
-"""This defines custom models for the application."""
+"""Custom models for the PESUAuth API."""
 
 from .profile import ProfileModel as ProfileModel
 from .request import RequestModel as RequestModel

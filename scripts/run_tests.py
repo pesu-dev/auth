@@ -1,3 +1,5 @@
+"""Script to run all the tests with coverage."""
+
 #!/usr/bin/env python3
 
 import logging
@@ -8,7 +10,8 @@ import sys
 from dotenv import load_dotenv
 
 
-def run_tests():
+def run_tests() -> int:
+    """Run all the tests with coverage and return the exit code."""
     load_dotenv()
 
     test_username = os.getenv("TEST_EMAIL") and os.getenv("TEST_PRN") and os.getenv("TEST_PHONE")

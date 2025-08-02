@@ -1,4 +1,4 @@
-"""PESUAcademy class."""
+"""PESUAcademy class that serves as an interface to the PESU Academy website."""
 
 import asyncio
 import logging
@@ -18,7 +18,21 @@ from app.exceptions.authentication import (
 
 
 class PESUAcademy:
-    """Class to interact with the PESU Academy website."""
+    """Class to interact with the PESU Academy server.
+
+    This class provides methods to authenticate users, fetch profile information, and handle CSRF token management.
+
+    Attributes:
+        DEFAULT_FIELDS (list[str]): The default fields to fetch from the profile page.
+        PROFILE_PAGE_HEADER_TO_KEY_MAP (dict[str, str]): A mapping of profile page headers to the corresponding keys
+        in the profile dictionary.
+
+    Methods:
+        prefetch_client_with_csrf_token: Prefetch a new client with an unauthenticated CSRF token.
+        close_client: Close the internal client if it exists.
+        get_profile_information: Get the profile information of the user.
+        authenticate: Authenticate the user with the provided username and password.
+    """
 
     DEFAULT_FIELDS: list[str] = [
         "name",
@@ -52,7 +66,7 @@ class PESUAcademy:
 
     @staticmethod
     async def _fetch_new_client_with_csrf_token() -> tuple[httpx.AsyncClient, str]:
-        """Fetch a fresh client with an unauthenticated CSRF token from PESU Academy."""
+        """Initialize a fresh client with an unauthenticated CSRF token from PESU Academy."""
         logging.info("Fetching a new client with an unauthenticated CSRF token...")
         # Create a new client
         client = httpx.AsyncClient(follow_redirects=True, timeout=10.0)
@@ -66,7 +80,12 @@ class PESUAcademy:
         raise CSRFTokenError("CSRF token not found in the pre-authentication response.")
 
     async def _prefetch_client_with_csrf_token(self) -> None:
-        """Prefetch a new client with an unauthenticated CSRF token."""
+        """Prefetch a new client with an unauthenticated CSRF token.
+
+        This method is used to prefetch a new client with an unauthenticated CSRF token.
+        It is used to avoid the overhead of fetching a new client with an unauthenticated CSRF token
+        for each request.
+        """
         logging.info("Prefetching a new client with an unauthenticated CSRF token...")
         client, token = await self._fetch_new_client_with_csrf_token()
         async with self._csrf_lock:
@@ -79,7 +98,12 @@ class PESUAcademy:
         logging.info("Cache refreshed with new unauthenticated CSRF token.")
 
     async def _get_client_with_csrf_token(self) -> tuple[httpx.AsyncClient, str]:
-        """Get the client with the cached CSRF token."""
+        """Get the client with the cached CSRF token.
+
+        This method is used to get the client with the cached CSRF token.
+        It is used to avoid the overhead of fetching a new client with an unauthenticated CSRF token
+        for each request.
+        """
         async with self._csrf_lock:
             # If cache is empty (first call), populate it
             if not (self._client and self._csrf_token):
@@ -99,7 +123,7 @@ class PESUAcademy:
         return client_to_use, token_to_use
 
     async def _extract_and_update_profile(self, node: Node, idx: int, profile: dict) -> None:
-        """Extracts the profile data from a node and updates the profile dictionary.
+        """Extract the profile data from a node and update the profile dictionary.
 
         Args:
             node (Node): Pre-parsed node containing the profile information
@@ -108,6 +132,7 @@ class PESUAcademy:
         """
 
         def parse_and_update() -> None:
+            """Parse the profile data from a node and update the profile dictionary."""
             # Use the selector `label.lbl-title-light` to find the key label
             if not (key_node := node.css_first("label.lbl-title-light")) or not (key := key_node.text(strip=True)):
                 raise ProfileParseError(f"Could not parse key for field at index {idx}.")
@@ -129,11 +154,20 @@ class PESUAcademy:
         await asyncio.to_thread(parse_and_update)
 
     async def prefetch_client_with_csrf_token(self) -> None:
-        """Public method to prefetch a new client with an unauthenticated CSRF token."""
+        """Public method to prefetch a new client with an unauthenticated CSRF token.
+
+        This method is used to prefetch a new client with an unauthenticated CSRF token.
+        It is used to avoid the overhead of fetching a new client with an unauthenticated CSRF token
+        for each request.
+        """
         await self._prefetch_client_with_csrf_token()
 
     async def close_client(self) -> None:
-        """Public method to close the internal client if it exists."""
+        """Public method to close the internal client if it exists.
+
+        This method is used to close the internal client if it exists.
+        It is used to avoid the overhead of closing the client for each request.
+        """
         if self._client is not None:
             await self._client.aclose()
             self._client = None

@@ -1,4 +1,4 @@
-"""PESUAuth Response Model."""
+"""Model representing the response after a student's authentication request."""
 
 from datetime import datetime
 

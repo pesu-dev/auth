@@ -1,4 +1,4 @@
-"""PESUAcademy Error Handling Module."""
+"""Base exception class for PESUAcademy."""
 
 
 class PESUAcademyError(Exception):

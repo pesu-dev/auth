@@ -1,4 +1,4 @@
-"""PESUAuth Request Model."""
+"""Model representing the student's authentication request."""
 
 from typing import Literal
 

@@ -1,3 +1,5 @@
+"""Script to benchmark the PESUAuth API."""
+
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -5,6 +7,11 @@ from tqdm.auto import tqdm
 from util import make_request
 
 if __name__ == "__main__":
+    """Main function to benchmark the PESUAuth API.
+
+    This script benchmarks the PESUAuth API by making requests to the specified endpoint.
+    It can be run in parallel using threads or sequentially.
+    """
     parser = argparse.ArgumentParser(description="Benchmark PESUAuth API.")
     parser.add_argument(
         "--max-workers",
@@ -21,7 +28,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-profile",
         action="store_true",
-        help="Run the authenticate endpoint benchmark without fetching profile information (default: fetch profile info)",
+        help="Run the authenticate endpoint benchmark without fetching profile information "
+        "(default: fetch profile info)",
     )
     parser.add_argument(
         "--parallel",
@@ -118,7 +126,10 @@ if __name__ == "__main__":
     outfile = (
         output
         if output
-        else f"benchmark_[num_requests={num_requests}]_[max_workers={max_workers}]_[parallel={parallel}]_[route={route}]_[timeout={timeout}].csv"
+        else (
+            f"benchmark_[num_requests={num_requests}]_[max_workers={max_workers}]_"
+            f"[parallel={parallel}]_[route={route}]_[timeout={timeout}].csv"
+        )
     )
 
     with open(

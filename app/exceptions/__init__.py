@@ -1,1 +1,1 @@
-"""Custom exceptions for the PESUAuth API."""
+"""Custom exception classes for the PESUAuth API."""

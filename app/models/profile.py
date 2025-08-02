@@ -1,4 +1,4 @@
-"""PESUAuth Profile Model."""
+"""Model representing the user's profile data returned after successful authentication."""
 
 from typing import Literal
 

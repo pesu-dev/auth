@@ -68,8 +68,7 @@ convention = "google"
 line-length = 120
 target-version = "py311"
 exclude = [
-    "tests/",
-    "scripts/"
+    "tests/"
 ]
 
 [tool.ruff.format]

@@ -1,3 +1,5 @@
+"""Utility functions for the benchmark scripts."""
+
 import os
 import time
 

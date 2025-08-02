@@ -1,3 +1,5 @@
+"""Script to test the unauthenticated CSRF token expiry."""
+
 import argparse
 import os
 import time
@@ -7,7 +9,15 @@ from util import make_request
 
 
 def test_response(response: dict, no_profile: bool) -> bool:
-    """Test the response from the authenticate endpoint."""
+    """Test the response from the authenticate endpoint.
+
+    Args:
+        response (dict): The response from the authenticate endpoint.
+        no_profile (bool): Whether to fetch the profile information or not.
+
+    Returns:
+        bool: True if the response is successful, False otherwise.
+    """
     if response.get("status"):
         if not no_profile:
             return response.get("profile").get("prn") == os.getenv("TEST_PRN")
@@ -16,6 +26,11 @@ def test_response(response: dict, no_profile: bool) -> bool:
 
 
 if __name__ == "__main__":
+    """Main function to test the unauthenticated CSRF token expiry.
+
+    This script tests the unauthenticated CSRF token expiry by making requests to the authenticate endpoint.
+    It can be run in parallel using threads or sequentially.
+    """
     parser = argparse.ArgumentParser(description="Test unauthenticated CSRF token expiry.")
     parser.add_argument(
         "--host",
@@ -26,7 +41,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-profile",
         action="store_true",
-        help="Run the authenticate endpoint benchmark without fetching profile information (default: fetch profile info)",
+        help="Run the authenticate endpoint benchmark without fetching profile information "
+        "(default: fetch profile info)",
     )
     parser.add_argument(
         "--timeout",

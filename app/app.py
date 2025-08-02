@@ -1,4 +1,4 @@
-"""PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy."""
+"""FastAPI Entrypoint for PESUAuth API."""
 
 import argparse
 import asyncio
@@ -98,7 +98,7 @@ pesu_academy = PESUAcademy()
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """Handle request validation errors."""
+    """Handler for request validation errors."""
     logging.exception("Request data could not be validated.")
     errors = exc.errors()
     message = "; ".join([f"{'.'.join(str(loc) for loc in e['loc'])}: {e['msg']}" for e in errors])
@@ -113,7 +113,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(PESUAcademyError)
 async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSONResponse:
-    """Handle PESUAcademy specific errors."""
+    """Handler for PESUAcademy specific errors."""
     logging.exception(f"PESUAcademyError: {exc.message}")
     return JSONResponse(
         status_code=exc.status_code,
@@ -126,7 +126,7 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Handle unhandled exceptions."""
+    """Handler for unhandled exceptions."""
     logging.exception("Unhandled exception occurred.")
     return JSONResponse(
         status_code=500,
@@ -139,14 +139,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 @app.get("/health", tags=["Monitoring"])
 async def health_check() -> dict[str, str]:
-    """Health check endpoint to verify if the API is running."""
+    """Health check endpoint."""
     logging.debug("Health check requested.")
     return {"status": "ok"}
 
 
 @app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
 async def readme() -> RedirectResponse:
-    """Redirect to the PESUAuth GitHub Repository."""
+    """Redirect to the PESUAuth GitHub repository."""
     return RedirectResponse("https://github.com/pesu-dev/auth")
 
 
