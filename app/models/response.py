@@ -1,3 +1,5 @@
+"""PESUAuth Response Model."""
+
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -6,6 +8,8 @@ from app.models import ProfileModel
 
 
 class ResponseModel(BaseModel):
+    """Model representing the response after a student's authentication request."""
+
     model_config = ConfigDict(strict=True)
 
     status: bool = Field(

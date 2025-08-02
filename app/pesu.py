@@ -1,3 +1,5 @@
+"""PESUAcademy class."""
+
 import asyncio
 import logging
 import re
@@ -42,7 +44,8 @@ class PESUAcademy:
         "Section": "section",
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the PESUAcademy class."""
         self._csrf_token: str | None = None
         self._client: httpx.AsyncClient | None = None
         self._csrf_lock = asyncio.Lock()
@@ -62,7 +65,7 @@ class PESUAcademy:
             return client, csrf_token
         raise CSRFTokenError("CSRF token not found in the pre-authentication response.")
 
-    async def _prefetch_client_with_csrf_token(self):
+    async def _prefetch_client_with_csrf_token(self) -> None:
         """Prefetch a new client with an unauthenticated CSRF token."""
         logging.info("Prefetching a new client with an unauthenticated CSRF token...")
         client, token = await self._fetch_new_client_with_csrf_token()
@@ -80,7 +83,10 @@ class PESUAcademy:
         async with self._csrf_lock:
             # If cache is empty (first call), populate it
             if not (self._client and self._csrf_token):
-                self._client, self._csrf_token = await self._fetch_new_client_with_csrf_token()
+                (
+                    self._client,
+                    self._csrf_token,
+                ) = await self._fetch_new_client_with_csrf_token()
             # Hand out the cached client/token for *this* request
             client_to_use, token_to_use = self._client, self._csrf_token
             # Immediately clear the cache so the next caller doesn't reuse this client/token
@@ -92,7 +98,7 @@ class PESUAcademy:
         # Return a dedicated client/token for this request
         return client_to_use, token_to_use
 
-    async def _extract_and_update_profile(self, node: Node, idx: int, profile: dict):
+    async def _extract_and_update_profile(self, node: Node, idx: int, profile: dict) -> None:
         """Extracts the profile data from a node and updates the profile dictionary.
 
         Args:
@@ -101,11 +107,9 @@ class PESUAcademy:
             profile (dict): The profile dictionary to update in-place
         """
 
-        def parse_and_update():
+        def parse_and_update() -> None:
             # Use the selector `label.lbl-title-light` to find the key label
-            if not (key_node := node.css_first("label.lbl-title-light")) or not (
-                key := key_node.text(strip=True)
-            ):
+            if not (key_node := node.css_first("label.lbl-title-light")) or not (key := key_node.text(strip=True)):
                 raise ProfileParseError(f"Could not parse key for field at index {idx}.")
             # Use the adjacent sibling selector `+` to find value label
             if not (value_node := node.css_first("label.lbl-title-light + label")) or not (
@@ -124,11 +128,11 @@ class PESUAcademy:
 
         await asyncio.to_thread(parse_and_update)
 
-    async def prefetch_client_with_csrf_token(self):
+    async def prefetch_client_with_csrf_token(self) -> None:
         """Public method to prefetch a new client with an unauthenticated CSRF token."""
         await self._prefetch_client_with_csrf_token()
 
-    async def close_client(self):
+    async def close_client(self) -> None:
         """Public method to close the internal client if it exists."""
         if self._client is not None:
             await self._client.aclose()
@@ -177,7 +181,8 @@ class PESUAcademy:
             or len(details_nodes) < 7
         ):
             raise ProfileParseError(
-                f"Failed to parse student profile page from PESU Academy for user={username}. The webpage might have changed.",
+                f"Failed to parse student profile page from PESU Academy for user={username}."
+                "The webpage might have changed.",
             )
 
         # Extract the profile information from the profile page
@@ -233,10 +238,12 @@ class PESUAcademy:
             username (str): The username of the user, usually their PRN/email/phone number.
             password (str): The password of the user.
             profile (bool, optional): Whether to fetch the profile information or not. Defaults to False.
-            fields (Optional[list[str]], optional): The fields to fetch from the profile. Defaults to None, which means all default fields will be fetched.
+            fields (Optional[list[str]], optional): The fields to fetch from the profile.
+            Defaults to None, which means all default fields will be fetched.
 
         Returns:
-            dict[str, Any]: A dictionary containing the authentication status, message, and optionally the profile information.
+            dict[str, Any]: A dictionary containing the authentication status, message,
+            and optionally the profile information.
         """
         # Default fields to fetch if fields is not provided
         fields = self.DEFAULT_FIELDS if fields is None else fields
@@ -292,9 +299,7 @@ class PESUAcademy:
             result["profile"] = await self.get_profile_information(client, username)
             # Filter the fields if field filtering is enabled
             if field_filtering:
-                result["profile"] = {
-                    key: value for key, value in result["profile"].items() if key in fields
-                }
+                result["profile"] = {key: value for key, value in result["profile"].items() if key in fields}
                 logging.info(
                     f"Field filtering enabled. Filtered profile data for user={username}: {result['profile']}",
                 )

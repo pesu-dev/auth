@@ -59,7 +59,12 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    request_count, success, times, waiting_times = 0, list(), list(), [args.start_delay * 60]
+    request_count, success, times, waiting_times = (
+        0,
+        list(),
+        list(),
+        [args.start_delay * 60],
+    )
 
     for _ in tqdm(
         range(args.start_delay * 60),
@@ -97,6 +102,4 @@ if __name__ == "__main__":
 
     with open(args.output, "w") as f:
         f.write("status,time,waiting_time\n")
-        f.writelines(
-            f"{s},{t},{w}\n" for s, t, w in zip(success, times, waiting_times, strict=False)
-        )
+        f.writelines(f"{s},{t},{w}\n" for s, t, w in zip(success, times, waiting_times, strict=False))

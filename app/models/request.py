@@ -1,3 +1,5 @@
+"""PESUAuth Request Model."""
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -6,6 +8,8 @@ from app.pesu import PESUAcademy
 
 
 class RequestModel(BaseModel):
+    """Model representing the student's authentication request."""
+
     model_config = ConfigDict(strict=True)
 
     username: str = Field(
@@ -32,9 +36,7 @@ class RequestModel(BaseModel):
     fields: list[Literal[*PESUAcademy.DEFAULT_FIELDS]] | None = Field(
         None,
         title="Profile Fields",
-        description=(
-            "List of profile fields to fetch. If omitted, all default fields will be returned."
-        ),
+        description=("List of profile fields to fetch. If omitted, all default fields will be returned."),
         json_schema_extra={"example": ["name", "email", "campus", "branch", "semester"]},
     )
 

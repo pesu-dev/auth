@@ -105,9 +105,9 @@ def test_integration_authenticate_with_specific_profile_fields(client):
     assert data["message"] == "Login successful."
     assert "profile" in data
     profile = data["profile"]
-    assert len(profile) == len(expected_fields), (
-        f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
-    )
+    assert len(profile) == len(
+        expected_fields
+    ), f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
 
     assert profile["prn"] == prn
     assert profile["branch"] == branch
@@ -173,9 +173,7 @@ def test_integration_authenticate_with_all_profile_fields(client):
     assert data["message"] == "Login successful."
     assert "profile" in data
     profile = data["profile"]
-    assert len(profile) == len(all_fields), (
-        f"Expected {len(all_fields)} fields in profile, got {len(profile)}"
-    )
+    assert len(profile) == len(all_fields), f"Expected {len(all_fields)} fields in profile, got {len(profile)}"
 
     assert profile["name"] == name
     assert profile["prn"] == prn

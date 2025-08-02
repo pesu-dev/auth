@@ -1,7 +1,10 @@
+"""PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy."""
+
 import argparse
 import asyncio
 import datetime
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import pytz
@@ -21,7 +24,7 @@ REFRESH_INTERVAL_SECONDS = 45 * 60
 CSRF_TOKEN_REFRESH_LOCK = asyncio.Lock()
 
 
-async def _refresh_csrf_token_with_lock():
+async def _refresh_csrf_token_with_lock() -> None:
     """Refresh the CSRF token with a lock."""
     logging.debug("Refreshing unauthenticated CSRF token...")
     async with CSRF_TOKEN_REFRESH_LOCK:
@@ -29,7 +32,7 @@ async def _refresh_csrf_token_with_lock():
         logging.info("Unauthenticated CSRF token refreshed successfully.")
 
 
-async def _csrf_token_refresh_loop():
+async def _csrf_token_refresh_loop() -> None:
     """Background task to refresh the CSRF token periodically."""
     while True:
         try:
@@ -41,7 +44,7 @@ async def _csrf_token_refresh_loop():
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Lifespan event handler for startup and shutdown events."""
     # Startup
     logging.info("PESUAuth API startup")
@@ -94,7 +97,8 @@ pesu_academy = PESUAcademy()
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Handle request validation errors."""
     logging.exception("Request data could not be validated.")
     errors = exc.errors()
     message = "; ".join([f"{'.'.join(str(loc) for loc in e['loc'])}: {e['msg']}" for e in errors])
@@ -108,7 +112,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 @app.exception_handler(PESUAcademyError)
-async def pesu_exception_handler(request: Request, exc: PESUAcademyError):
+async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSONResponse:
+    """Handle PESUAcademy specific errors."""
     logging.exception(f"PESUAcademyError: {exc.message}")
     return JSONResponse(
         status_code=exc.status_code,
@@ -120,7 +125,8 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError):
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle unhandled exceptions."""
     logging.exception("Unhandled exception occurred.")
     return JSONResponse(
         status_code=500,
@@ -132,20 +138,20 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health", tags=["Monitoring"])
-async def health_check():
+async def health_check() -> dict[str, str]:
     """Health check endpoint to verify if the API is running."""
     logging.debug("Health check requested.")
     return {"status": "ok"}
 
 
 @app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
-async def readme():
-    """Redirect to the PESUAuth GitHub Repository"""
+async def readme() -> RedirectResponse:
+    """Redirect to the PESUAuth GitHub Repository."""
     return RedirectResponse("https://github.com/pesu-dev/auth")
 
 
 @app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
-async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks):
+async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks) -> JSONResponse:
     """Authenticate a user using their PESU credentials via the PESU Academy service.
 
     Request body parameters:
@@ -193,7 +199,7 @@ async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks)
         )
 
 
-def main():
+def main() -> None:
     """Main function to run the FastAPI application with command line arguments."""
     # Set up argument parser for command line arguments
     parser = argparse.ArgumentParser(

@@ -1,9 +1,13 @@
+"""PESUAuth Profile Model."""
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProfileModel(BaseModel):
+    """Model representing the user's profile data returned after successful authentication."""
+
     model_config = ConfigDict(strict=True)
 
     name: str | None = Field(

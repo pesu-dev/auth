@@ -169,14 +169,10 @@ async def test_authenticate_login_form_present(mock_get, mock_post, mock_html_pa
     mock_get.return_value = mock_get_response
     mock_soup_csrf = MagicMock()
     mock_soup_csrf.css_first.side_effect = lambda selector: (
-        MagicMock(attributes={"content": "fake-csrf-token"})
-        if selector == "meta[name='csrf-token']"
-        else None
+        MagicMock(attributes={"content": "fake-csrf-token"}) if selector == "meta[name='csrf-token']" else None
     )
     mock_soup_login = MagicMock()
-    mock_soup_login.css_first.side_effect = lambda selector: (
-        MagicMock() if selector == "div.login-form" else None
-    )
+    mock_soup_login.css_first.side_effect = lambda selector: (MagicMock() if selector == "div.login-form" else None)
     mock_html_parser.side_effect = [mock_soup_csrf, mock_soup_login]
     mock_post_response = MagicMock()
     mock_post_response.text = "<html><body><div class='login-form'></div></body></html>"
@@ -294,8 +290,7 @@ async def test_get_profile_information_unknown_campus_code(
             for record in caplog.records
         )
         assert any(
-            "Complete profile information retrieved for user=testuser" in record.message
-            for record in caplog.records
+            "Complete profile information retrieved for user=testuser" in record.message for record in caplog.records
         )
 
 
@@ -385,9 +380,7 @@ async def test_get_profile_information_no_profile_data(mock_get, mock_html_parse
     mock_get.return_value = mock_response
     mock_soup = MagicMock()
     mock_soup.any_css_matches.return_value = True
-    mock_soup.css.return_value = [
-        MagicMock(text=MagicMock(return_value="foo bar")) for _ in range(7)
-    ]
+    mock_soup.css.return_value = [MagicMock(text=MagicMock(return_value="foo bar")) for _ in range(7)]
     mock_soup.css_first.return_value = None
     mock_html_parser.return_value = mock_soup
 
@@ -395,10 +388,9 @@ async def test_get_profile_information_no_profile_data(mock_get, mock_html_parse
     client.get.return_value = mock_response
     with pytest.raises(ProfileParseError) as exc_info:
         await pesu.get_profile_information(client, "testuser")
-    assert (
-        "Failed to parse student profile page from PESU Academy for user=testuser. The webpage might have changed."
-        in str(exc_info.value)
-    )
+    assert "Failed to parse student profile page from PESU Academy for user=testuser."  in str(exc_info.value)
+    assert "The webpage might have changed." in str(exc_info.value)
+
 
 
 @patch("app.pesu.HTMLParser")
@@ -421,9 +413,7 @@ async def test_get_profile_information_empty_profile_triggers_final_parse_error(
     mock_container = MagicMock()
     mock_container.css.return_value = [MagicMock() for _ in range(7)]
     mock_soup = MagicMock()
-    mock_soup.css_first.side_effect = (
-        lambda selector: mock_container if selector == "div.elem-info-wrapper" else None
-    )
+    mock_soup.css_first.side_effect = lambda selector: mock_container if selector == "div.elem-info-wrapper" else None
     mock_html_parser.return_value = mock_soup
 
     client = AsyncMock()
