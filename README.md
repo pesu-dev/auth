@@ -108,9 +108,21 @@ uv run python -m app.app
 
 ## How to use the PESUAuth API
 
-You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON
-object,
-with the user's profile information if requested.
+
+The API provides multiple endpoints for authentication, documentation, and monitoring.
+
+### API Endpoints
+
+| **Endpoint**       | **Method** | **Description**                                                 |
+|--------------------|------------|-----------------------------------------------------------------|
+| `/`                | `GET`      | Serves the interactive API documentation (Swagger UI).          |
+| `/authenticate`    | `POST`     | Authenticates a user using their PESU credentials.              |
+| `/health`          | `GET`      | A health check endpoint to monitor the API's status.            |
+| `/readme`          | `GET`      | Redirects to the project's official GitHub repository.          |
+
+### `/authenticate` endpoint
+
+You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON object, with the user's profile information if requested.
 
 ### Request Parameters
 
