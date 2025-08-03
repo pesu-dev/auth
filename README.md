@@ -146,6 +146,36 @@ profile data was requested, the response's `profile` key will store a dictionary
 | `message`   | `str`           | A message that provides information corresponding to the status          |
 | `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
 
+
+### `/health` endpoint
+
+This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks.
+
+### Request Parameters
+
+This endpoint does not take any request parameters.
+
+### Response Object
+
+| **Field** | **Type** | **Description**                        |
+|-----------|----------|----------------------------------------|
+| `status`  | `str`    | The status of the API, typically "ok". |
+
+
+### `/readme` endpoint
+
+This endpoint redirects to the project's official GitHub repository.
+
+
+### Request Parameters
+
+This endpoint does not take any request parameters.
+
+### Response Object
+
+This endpoint returns a `307 Temporary Redirect` to the GitHub repository.
+
+
 #### `ProfileObject`
 
 This object contains the user's profile information, which is returned only if the `profile` parameter is set to `True`.
