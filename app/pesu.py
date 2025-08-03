@@ -122,7 +122,7 @@ class PESUAcademy:
         # Return a dedicated client/token for this request
         return client_to_use, token_to_use
 
-    async def _extract_and_update_profile(self, node: Node, idx: int, profile: dict) -> None:
+    def _extract_and_update_profile(self, node: Node, idx: int, profile: dict) -> None:
         """Extract the profile data from a node and update the profile dictionary.
 
         Args:
@@ -130,28 +130,23 @@ class PESUAcademy:
             idx (int): Index of the node
             profile (dict): The profile dictionary to update in-place
         """
-
-        def parse_and_update() -> None:
-            """Parse the profile data from a node and update the profile dictionary."""
-            # Use the selector `label.lbl-title-light` to find the key label
-            if not (key_node := node.css_first("label.lbl-title-light")) or not (key := key_node.text(strip=True)):
-                raise ProfileParseError(f"Could not parse key for field at index {idx}.")
-            # Use the adjacent sibling selector `+` to find value label
-            if not (value_node := node.css_first("label.lbl-title-light + label")) or not (
-                value := value_node.text(strip=True)
-            ):
-                raise ProfileParseError(f"Could not parse value for field at index {idx}.")
-            logging.debug(f"Extracted key: '{key}' with value: '{value}' at index {idx}.")
-            # If the key is in the map, add it to the profile
-            if mapped_key := self.PROFILE_PAGE_HEADER_TO_KEY_MAP.get(key):
-                logging.debug(f"Adding key: '{mapped_key}', value: '{value}' to profile...")
-                profile[mapped_key] = value
-            else:
-                raise ProfileParseError(
-                    f"Unknown key: '{key}' in the profile page. The webpage might have changed.",
-                )
-
-        await asyncio.to_thread(parse_and_update)
+        # Use the selector `label.lbl-title-light` to find the key label
+        if not (key_node := node.css_first("label.lbl-title-light")) or not (key := key_node.text(strip=True)):
+            raise ProfileParseError(f"Could not parse key for field at index {idx}.")
+        # Use the adjacent sibling selector `+` to find value label
+        if not (value_node := node.css_first("label.lbl-title-light + label")) or not (
+            value := value_node.text(strip=True)
+        ):
+            raise ProfileParseError(f"Could not parse value for field at index {idx}.")
+        logging.debug(f"Extracted key: '{key}' with value: '{value}' at index {idx}.")
+        # If the key is in the map, add it to the profile
+        if mapped_key := self.PROFILE_PAGE_HEADER_TO_KEY_MAP.get(key):
+            logging.debug(f"Adding key: '{mapped_key}', value: '{value}' to profile...")
+            profile[mapped_key] = value
+        else:
+            raise ProfileParseError(
+                f"Unknown key: '{key}' in the profile page. The webpage might have changed.",
+            )
 
     async def prefetch_client_with_csrf_token(self) -> None:
         """Public method to prefetch a new client with an unauthenticated CSRF token.
@@ -221,8 +216,8 @@ class PESUAcademy:
 
         # Extract the profile information from the profile page
         profile: dict[str, Any] = {}
-        tasks = [self._extract_and_update_profile(details_nodes[i], i, profile) for i in range(7)]
-        await asyncio.gather(*tasks)
+        for i in range(7):
+            self._extract_and_update_profile(details_nodes[i], i, profile)
 
         # Get the email and phone number from the profile page
         if (
