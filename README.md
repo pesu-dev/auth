@@ -183,10 +183,6 @@ This endpoint can be used to check the health of the API. It's useful for monito
 This endpoint redirects to the project's official GitHub repository. This endpoint does not take any request parameters.
 
 
-#### Response Object
-
-This endpoint returns a `307 Temporary Redirect` to the GitHub repository.
-
 ### Integrating your application with the PESUAuth API
 
 Here are some examples of how you can integrate your application with the PESUAuth API using Python and cURL.
