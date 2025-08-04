@@ -108,11 +108,23 @@ uv run python -m app.app
 
 ## How to use the PESUAuth API
 
-You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON
-object,
-with the user's profile information if requested.
 
-### Request Parameters
+The API provides multiple endpoints for authentication, documentation, and monitoring.
+
+
+
+| **Endpoint**       | **Method** | **Description**                                                 |
+|--------------------|------------|-----------------------------------------------------------------|
+| `/`                | `GET`      | Serves the interactive API documentation (Swagger UI).          |
+| `/authenticate`    | `POST`     | Authenticates a user using their PESU credentials.              |
+| `/health`          | `GET`      | A health check endpoint to monitor the API's status.            |
+| `/readme`          | `GET`      | Redirects to the project's official GitHub repository.          |
+
+### `/authenticate`
+
+You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON object, with the user's profile information if requested.
+
+#### Request Parameters
 
 | **Parameter** | **Optional** | **Type**    | **Default** | **Description**                                                                                 |
 |---------------|--------------|-------------|-------------|-------------------------------------------------------------------------------------------------|
@@ -121,7 +133,7 @@ with the user's profile information if requested.
 | `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information                                                            |
 | `fields`      | Yes          | `list[str]` | `None`      | Which fields to fetch from the profile information. If not provided, all fields will be fetched |
 
-### Response Object
+#### Response Object
 
 On authentication, it returns the following parameters in a JSON object. If the authentication was successful and
 profile data was requested, the response's `profile` key will store a dictionary with a user's profile information.
@@ -134,7 +146,8 @@ profile data was requested, the response's `profile` key will store a dictionary
 | `message`   | `str`           | A message that provides information corresponding to the status          |
 | `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
 
-#### `ProfileObject`
+
+##### `ProfileObject`
 
 This object contains the user's profile information, which is returned only if the `profile` parameter is set to `True`.
 If the authentication fails, this field will not be present in the response.
@@ -152,6 +165,23 @@ If the authentication fails, this field will not be present in the response.
 | `phone`             | Phone number of the user registered with PESU          |
 | `campus_code`       | The integer code of the campus (1 for RR and 2 for EC) |
 | `campus`            | Abbreviation of the user's campus name                 |
+
+
+### `/health`
+
+This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks. This endpoint does not take any request parameters.
+
+#### Response Object
+
+| **Field** | **Type** | **Description**                        |
+|-----------|----------|----------------------------------------|
+| `status`  | `str`    | The status of the API, typically "ok". |
+
+
+### `/readme`
+
+This endpoint redirects to the project's official GitHub repository. This endpoint does not take any request parameters.
+
 
 ### Integrating your application with the PESUAuth API
 
