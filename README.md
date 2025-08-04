@@ -111,7 +111,7 @@ uv run python -m app.app
 
 The API provides multiple endpoints for authentication, documentation, and monitoring.
 
-### API Endpoints
+
 
 | **Endpoint**       | **Method** | **Description**                                                 |
 |--------------------|------------|-----------------------------------------------------------------|
@@ -120,7 +120,7 @@ The API provides multiple endpoints for authentication, documentation, and monit
 | `/health`          | `GET`      | A health check endpoint to monitor the API's status.            |
 | `/readme`          | `GET`      | Redirects to the project's official GitHub repository.          |
 
-### `/authenticate` endpoint
+### `/authenticate`
 
 You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON object, with the user's profile information if requested.
 
@@ -147,35 +147,6 @@ profile data was requested, the response's `profile` key will store a dictionary
 | `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
 
 
-### `/health` endpoint
-
-This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks.
-
-### Request Parameters
-
-This endpoint does not take any request parameters.
-
-### Response Object
-
-| **Field** | **Type** | **Description**                        |
-|-----------|----------|----------------------------------------|
-| `status`  | `str`    | The status of the API, typically "ok". |
-
-
-### `/readme` endpoint
-
-This endpoint redirects to the project's official GitHub repository.
-
-
-### Request Parameters
-
-This endpoint does not take any request parameters.
-
-### Response Object
-
-This endpoint returns a `307 Temporary Redirect` to the GitHub repository.
-
-
 #### `ProfileObject`
 
 This object contains the user's profile information, which is returned only if the `profile` parameter is set to `True`.
@@ -194,6 +165,27 @@ If the authentication fails, this field will not be present in the response.
 | `phone`             | Phone number of the user registered with PESU          |
 | `campus_code`       | The integer code of the campus (1 for RR and 2 for EC) |
 | `campus`            | Abbreviation of the user's campus name                 |
+
+
+### `/health`
+
+This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks. This endpoint does not take any request parameters.
+
+### Response Object
+
+| **Field** | **Type** | **Description**                        |
+|-----------|----------|----------------------------------------|
+| `status`  | `str`    | The status of the API, typically "ok". |
+
+
+### `/readme`
+
+This endpoint redirects to the project's official GitHub repository. This endpoint does not take any request parameters.
+
+
+### Response Object
+
+This endpoint returns a `307 Temporary Redirect` to the GitHub repository.
 
 ### Integrating your application with the PESUAuth API
 

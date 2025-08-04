@@ -1,5 +1,5 @@
 <!--
-Set the PR title like this: #IssueNumber - [Pull Request Description]
+Set the PR title like this: `#IssueNumber` - [Pull Request Description]
 
 Then delete this comment.
 -->
