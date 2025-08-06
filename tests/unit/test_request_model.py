@@ -82,7 +82,9 @@ def test_validate_fields_invalid_field():
 def test_validate_fields_multiple_invalid_fields():
     with pytest.raises(ValidationError) as exc_info:
         RequestModel(
-            username="testuser", password="testpass", fields=["invalid_field1", "invalid_field2"]
+            username="testuser",
+            password="testpass",
+            fields=["invalid_field1", "invalid_field2"],
         )
 
     assert exc_info.value.errors()[0]["type"] == "literal_error"

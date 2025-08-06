@@ -1,5 +1,9 @@
 blank_issues_enabled: true
 contact_links:
+  - name: 🗂️ Project Board
+    url: https://github.com/orgs/pesu-dev/projects/4
+    about: View the project board for ongoing work and updates.
+
   - name: 🗨️ GitHub Discussions
     url: https://github.com/orgs/pesu-dev/discussions
     about: Use GitHub Discussions for general Q&A and brainstorming.

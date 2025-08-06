@@ -1,5 +1,5 @@
 <!--
-Set the PR title like this: [Pull Request Description] – #IssueNumber
+Set the PR title like this: `#IssueNumber` - [Pull Request Description]
 
 Then delete this comment.
 -->
@@ -14,8 +14,8 @@ Please provide a concise summary of the changes:
 
 
 > ℹ️ **Fixes / Related Issues**
-> Fixes: `#123`
-> Related: `#456`
+> Fixes: #123
+> Related: #456
 
 
 ## 🧱 Type of Change
@@ -77,7 +77,6 @@ Please provide a concise summary of the changes:
 
 - [ ] `app/app.py` – Modified `/authenticate` route logic
 - [ ] `app/pesu.py` – Updated scraping or authentication handling
-- [ ] `app/util.py` – General helper functions
 
 
 ### 🧩 Models
