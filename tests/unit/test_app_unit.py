@@ -38,9 +38,9 @@ def test_authenticate_general_exception(mock_authenticate, client):
 
 
 @patch("app.app.argparse.ArgumentParser.parse_args")
-@patch("app.app.logging.basicConfig")
+@patch("app.app.configure_logging")
 @patch("app.app.uvicorn.run")
-def test_main_function_default_args(mock_run, mock_logging, mock_parse_args):
+def test_main_function_default_args(mock_run, mock_configure_logging, mock_parse_args):
     mock_args = MagicMock()
     mock_args.host = "0.0.0.0"
     mock_args.port = 5000
@@ -49,14 +49,21 @@ def test_main_function_default_args(mock_run, mock_logging, mock_parse_args):
 
     main()
 
-    mock_logging.assert_called_once()
-    mock_run.assert_called_once_with("app.app:app", host="0.0.0.0", port=5000, reload=False)
+    # Should not reconfigure logging for non-debug mode (already configured at module level)
+    mock_configure_logging.assert_not_called()
+    mock_run.assert_called_once_with(
+        "app.app:app", 
+        host="0.0.0.0", 
+        port=5000, 
+        reload=False, 
+        log_config=None
+    )
 
 
 @patch("app.app.argparse.ArgumentParser.parse_args")
-@patch("app.app.logging.basicConfig")
+@patch("app.app.configure_logging")
 @patch("app.app.uvicorn.run")
-def test_main_function_debug_mode(mock_run, mock_logging, mock_parse_args):
+def test_main_function_debug_mode(mock_run, mock_configure_logging, mock_parse_args):
     mock_args = MagicMock()
     mock_args.host = "127.0.0.1"
     mock_args.port = 8000
@@ -65,5 +72,12 @@ def test_main_function_debug_mode(mock_run, mock_logging, mock_parse_args):
 
     main()
 
-    mock_logging.assert_called_once()
-    mock_run.assert_called_once_with("app.app:app", host="127.0.0.1", port=8000, reload=True)
+    # Should reconfigure logging once for debug mode
+    mock_configure_logging.assert_called_once()
+    mock_run.assert_called_once_with(
+        "app.app:app", 
+        host="127.0.0.1", 
+        port=8000, 
+        reload=True, 
+        log_config=None
+    )

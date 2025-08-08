@@ -5,16 +5,21 @@ description = "A simple API to authenticate PESU credentials using PESU Academy.
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [
-    { name = "Aditeya Baral", email = "aditeya.baral@gmail.com" }
-]
+authors = [{ name = "Aditeya Baral", email = "aditeya.baral@gmail.com" }]
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn>=0.27.0",
     "httpx>=0.28.1",
     "pydantic>=2.6.0",
+    "pydantic-settings>=2.0.0",
     "pytz>=2025.2",
     "selectolax>=0.3.30",
+    "slowapi>=0.1.9",
+    "redis>=5.0.0",
+    "prometheus-client>=0.20.0",
+    "structlog>=24.1.0",
+    "psutil>=6.0.0",
+    "pytest>=8.4.1",
 ]
 
 [project.optional-dependencies]
@@ -42,23 +47,23 @@ packages = ["."]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 markers = [
-    "secret_required: marks tests that require secrets or environment variables (e.g. TEST_PRN, TEST_PASSWORD)"
+    "secret_required: marks tests that require secrets or environment variables (e.g. TEST_PRN, TEST_PASSWORD)",
 ]
 
 [tool.ruff.lint]
 select = [
-    "E", # Pycodestyle errors
-    "F", # Pyflakes errors
-    "W", # Pycodestyle warnings
-    "UP", # Pyupgrade rules
-    "I", # Import related rules
-    "C90", # Complexity rules
-    "D", # Documentation rules
-    "ANN", # Annotations rules
-    "TYP", # Type checking rules
-    "N", # Naming rules
+    "E",    # Pycodestyle errors
+    "F",    # Pyflakes errors
+    "W",    # Pycodestyle warnings
+    "UP",   # Pyupgrade rules
+    "I",    # Import related rules
+    "C90",  # Complexity rules
+    "D",    # Documentation rules
+    "ANN",  # Annotations rules
+    "TYP",  # Type checking rules
+    "N",    # Naming rules
     "Q000", # Quotation style rules
-    "RET", # Return type rules
+    "RET",  # Return type rules
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -67,10 +72,13 @@ convention = "google"
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-exclude = [
-    "tests/"
-]
+exclude = ["tests/"]
 
 [tool.ruff.format]
 quote-style = "double"
 docstring-code-format = true
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.7",
+]

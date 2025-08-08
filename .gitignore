@@ -1,19 +1,47 @@
+# IDE
 .idea/
 .vscode/
+
+# Python
 __pycache__/
-github-markdown-css/
-images/
-.pytest_cache/
-*.log
-README.html
-README_tmp*
-.venv
-pyrightconfig.json
-*.bru
-bruno.json
+*.pyc
+*.pyo
+*.pyd
+.Python
 .coverage
+.pytest_cache/
+
+# Environment and Config
 .env
+.env.local
+.env.production
+.env.staging
+
+# Dependencies
+.venv
 .uv/
+
+# Tools
 .ruff_cache/
+pyrightconfig.json
+
+# Logs and Data
+*.log
 *.csv
 *.png
+
+# Documentation Build
+github-markdown-css/
+images/
+README.html
+README_tmp*
+
+# API Testing
+*.bru
+bruno.json
+test.py
+
+# Temporary Files
+*.tmp
+.DS_Store
+Thumbs.db

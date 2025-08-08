@@ -1,20 +1,25 @@
 """PESUAcademy class that serves as an interface to the PESU Academy website."""
 
 import asyncio
-import logging
 import re
+import time
 from datetime import datetime
 from typing import Any
 
 import httpx
 from selectolax.parser import HTMLParser, Node
 
+from app.config import settings
 from app.exceptions.authentication import (
     AuthenticationError,
     CSRFTokenError,
     ProfileFetchError,
     ProfileParseError,
 )
+from app.middleware.logging import get_logger
+from app.middleware.metrics import PROFILE_FETCH_DURATION, record_csrf_operation, record_pesu_academy_request
+
+logger = get_logger("pesu")
 
 
 class PESUAcademy:
@@ -67,17 +72,31 @@ class PESUAcademy:
     @staticmethod
     async def _fetch_new_client_with_csrf_token() -> tuple[httpx.AsyncClient, str]:
         """Initialize a fresh client with an unauthenticated CSRF token from PESU Academy."""
-        logging.info("Fetching a new client with an unauthenticated CSRF token...")
+        logger.info("Fetching a new client with an unauthenticated CSRF token")
         # Create a new client
-        client = httpx.AsyncClient(follow_redirects=True, timeout=10.0)
+        client = httpx.AsyncClient(
+            follow_redirects=True,
+            timeout=settings.pesu_academy_timeout
+        )
         # Fetch the CSRF token
-        resp = await client.get("https://www.pesuacademy.com/Academy/")
-        soup = await asyncio.to_thread(HTMLParser, resp.text)
-        if node := soup.css_first("meta[name='csrf-token']"):
-            csrf_token = node.attributes["content"]
-            logging.info(f"Fetched CSRF token: {csrf_token}")
-            return client, csrf_token
-        raise CSRFTokenError("CSRF token not found in the pre-authentication response.")
+        try:
+            resp = await client.get(settings.pesu_academy_base_url)
+            record_pesu_academy_request("base_url", resp.status_code)
+
+            soup = await asyncio.to_thread(HTMLParser, resp.text)
+            if node := soup.css_first("meta[name='csrf-token']"):
+                csrf_token = node.attributes["content"]
+                logger.info("Fetched CSRF token successfully", token_length=len(csrf_token))
+                record_csrf_operation("fetch_success")
+                return client, csrf_token
+            record_csrf_operation("fetch_error")
+            raise CSRFTokenError("CSRF token not found in the pre-authentication response.")
+        except Exception as e:
+            if resp:
+                record_pesu_academy_request("base_url", getattr(resp, "status_code", 0))
+            record_csrf_operation("fetch_error")
+            logger.error("Failed to fetch CSRF token", error=str(e))
+            raise
 
     async def _prefetch_client_with_csrf_token(self) -> None:
         """Prefetch a new client with an unauthenticated CSRF token.
@@ -86,7 +105,7 @@ class PESUAcademy:
         It is used to avoid the overhead of fetching a new client with an unauthenticated CSRF token
         for each request.
         """
-        logging.info("Prefetching a new client with an unauthenticated CSRF token...")
+        logger.info("Prefetching a new client with an unauthenticated CSRF token")
         client, token = await self._fetch_new_client_with_csrf_token()
         async with self._csrf_lock:
             # Close old cached client (if any) to avoid leaks
@@ -95,7 +114,8 @@ class PESUAcademy:
             # Store the new cached client/token
             self._client = client
             self._csrf_token = token
-        logging.info("Cache refreshed with new unauthenticated CSRF token.")
+        logger.info("Cache refreshed with new unauthenticated CSRF token")
+        record_csrf_operation("cache_refresh")
 
     async def _get_client_with_csrf_token(self) -> tuple[httpx.AsyncClient, str]:
         """Get the client with the cached CSRF token.
@@ -138,10 +158,10 @@ class PESUAcademy:
             value := value_node.text(strip=True)
         ):
             raise ProfileParseError(f"Could not parse value for field at index {idx}.")
-        logging.debug(f"Extracted key: '{key}' with value: '{value}' at index {idx}.")
+        logger.debug("Extracted profile field", key=key, value=value, index=idx)
         # If the key is in the map, add it to the profile
         if mapped_key := self.PROFILE_PAGE_HEADER_TO_KEY_MAP.get(key):
-            logging.debug(f"Adding key: '{mapped_key}', value: '{value}' to profile...")
+            logger.debug("Adding profile field", mapped_key=mapped_key, value=value)
             profile[mapped_key] = value
         else:
             raise ProfileParseError(
@@ -182,7 +202,8 @@ class PESUAcademy:
             dict[str, Any]: A dictionary containing the user's profile information.
         """
         # Fetch the profile data from the student profile page
-        logging.info(f"Fetching profile data for user={username} from the student profile page...")
+        start_time = time.time()
+        logger.info("Fetching profile data from student profile page", username=username)
         profile_url = "https://www.pesuacademy.com/Academy/s/studentProfilePESUAdmin"
         query = {
             "menuId": "670",
@@ -193,13 +214,20 @@ class PESUAcademy:
             "selectedData": "0",
             "_": str(int(datetime.now().timestamp() * 1000)),
         }
-        response = await client.get(profile_url, params=query)
-        # If the status code is not 200, raise an exception because the profile page is not accessible
-        if response.status_code != 200:
-            raise ProfileFetchError(
-                f"Failed to fetch student profile page from PESU Academy for user={username}.",
-            )
-        logging.debug("Student profile page fetched successfully.")
+
+        try:
+            response = await client.get(profile_url, params=query)
+            record_pesu_academy_request("profile", response.status_code)
+
+            # If the status code is not 200, raise an exception because the profile page is not accessible
+            if response.status_code != 200:
+                raise ProfileFetchError(
+                    f"Failed to fetch student profile page from PESU Academy for user={username}.",
+                )
+            logger.debug("Student profile page fetched successfully", username=username)
+        except Exception as e:
+            logger.error("Failed to fetch profile page", username=username, error=str(e))
+            raise
 
         # Parse the response text
         soup = await asyncio.to_thread(HTMLParser, response.text)
@@ -243,14 +271,22 @@ class PESUAcademy:
             elif campus_code == "2":
                 profile["campus"] = "EC"
             else:
-                logging.warning(
-                    f"Unknown campus code: {campus_code} parsed from PRN={profile['prn']} for user={username}",
+                logger.warning(
+                    "Unknown campus code detected",
+                    campus_code=campus_code,
+                    prn=profile.get("prn"),
+                    username=username
                 )
 
         # Check if we extracted any profile data
         if not profile:
             raise ProfileParseError(f"No profile data could be extracted for user={username}.")
-        logging.info(f"Complete profile information retrieved for user={username}: {profile}.")
+
+        # Record metrics for profile fetch duration
+        duration = time.time() - start_time
+        PROFILE_FETCH_DURATION.observe(duration)
+
+        logger.info("Complete profile information retrieved", username=username, field_count=len(profile))
 
         return profile
 
@@ -279,13 +315,18 @@ class PESUAcademy:
         # Check if fields is not the default fields and enable field filtering
         field_filtering = fields != self.DEFAULT_FIELDS
 
-        logging.info(
-            f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ...",
+        logger.info(
+            "Starting authentication with PESU Academy",
+            username=username,
+            profile=profile,
+            field_count=len(fields) if fields else 0,
+            field_filtering=field_filtering
         )
 
         # Get a pre-fetched csrf token and client
         client, csrf_token = await self._get_client_with_csrf_token()
-        logging.debug(f"Using cached CSRF token for user={username}.")
+        logger.debug("Using cached CSRF token", username=username)
+        record_csrf_operation("cache_hit")
 
         # Prepare the login data for auth call
         data = {
@@ -294,12 +335,13 @@ class PESUAcademy:
             "j_password": password,
         }
 
-        logging.debug("Attempting to authenticate user...")
+        logger.debug("Attempting user authentication", username=username)
         # Make a post request to authenticate the user
-        auth_url = "https://www.pesuacademy.com/Academy/j_spring_security_check"
+        auth_url = settings.pesu_academy_auth_url
         response = await client.post(auth_url, data=data)
+        record_pesu_academy_request("auth", response.status_code)
         soup = await asyncio.to_thread(HTMLParser, response.text)
-        logging.debug("Authentication response received.")
+        logger.debug("Authentication response received", username=username)
 
         # If class login-form is present, login failed
         if soup.css_first("div.login-form"):
@@ -309,12 +351,12 @@ class PESUAcademy:
             )
 
         # If the user is successfully authenticated
-        logging.info(f"Login successful for user={username}.")
+        logger.info("Login successful", username=username)
         status = True
         # Get the newly authenticated csrf token
         if csrf_node := soup.css_first("meta[name='csrf-token']"):
             csrf_token = csrf_node.attributes.get("content")
-            logging.debug(f"Authenticated CSRF token: {csrf_token}")
+            logger.debug("Authenticated CSRF token obtained", username=username, token_length=len(csrf_token))
         else:
             raise CSRFTokenError(
                 f"CSRF token not found in the post-authentication response for user={username}.",
@@ -323,17 +365,19 @@ class PESUAcademy:
         result = {"status": status, "message": "Login successful."}
 
         if profile:
-            logging.info(f"Profile data requested for user={username}. Fetching profile data...")
+            logger.info("Profile data requested, fetching profile data", username=username)
             # Fetch the profile information
             result["profile"] = await self.get_profile_information(client, username)
             # Filter the fields if field filtering is enabled
             if field_filtering:
                 result["profile"] = {key: value for key, value in result["profile"].items() if key in fields}
-                logging.info(
-                    f"Field filtering enabled. Filtered profile data for user={username}: {result['profile']}",
+                logger.info(
+                    "Field filtering applied to profile data",
+                    username=username,
+                    filtered_fields=list(result["profile"].keys())
                 )
 
-        logging.info(f"Authentication process for user={username} completed successfully.")
+        logger.info("Authentication process completed successfully", username=username)
 
         # Close the client and return the result
         await client.aclose()

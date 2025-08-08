@@ -26,20 +26,33 @@ idna==3.10
     # via
     #   anyio
     #   httpx
+prometheus-client==0.21.1
+    # via pesu-auth (pyproject.toml)
+psutil==6.1.0
+    # via pesu-auth (pyproject.toml)
 pydantic==2.11.7
     # via
     #   pesu-auth (pyproject.toml)
     #   fastapi
+    #   pydantic-settings
 pydantic-core==2.33.2
     # via pydantic
+pydantic-settings==2.7.0
+    # via pesu-auth (pyproject.toml)
 pytz==2025.2
     # via pesu-auth (pyproject.toml)
+redis==5.2.1
+    # via pesu-auth (pyproject.toml)
 selectolax==0.3.32
+    # via pesu-auth (pyproject.toml)
+slowapi==0.1.9
     # via pesu-auth (pyproject.toml)
 sniffio==1.3.1
     # via anyio
 starlette==0.47.2
     # via fastapi
+structlog==24.5.0
+    # via pesu-auth (pyproject.toml)
 typing-extensions==4.14.1
     # via
     #   anyio
