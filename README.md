@@ -156,7 +156,6 @@ does not take any request parameters.
 | `message` | `str`      | "ok" if healthy, error message otherwise                          |
 | `timestamp` | `string` | A timezone offset timestamp indicating the time of authentication |
 
-
 ### `/readme`
 
 This endpoint redirects to the project's official GitHub repository. This endpoint does not take any request parameters.
