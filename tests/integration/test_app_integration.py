@@ -105,9 +105,9 @@ def test_integration_authenticate_with_specific_profile_fields(client):
     assert data["message"] == "Login successful."
     assert "profile" in data
     profile = data["profile"]
-    assert len(profile) == len(
-        expected_fields
-    ), f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
+    assert len(profile) == len(expected_fields), (
+        f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
+    )
 
     assert profile["prn"] == prn
     assert profile["branch"] == branch
@@ -327,8 +327,8 @@ def test_integration_authenticate_fields_invalid_field(client):
 def test_integration_readme_redirect(client):
     redirect_url = "https://github.com/pesu-dev/auth"
     response = client.get("/readme", follow_redirects=False)
-    assert response.status_code == 307
-    assert response.reason_phrase == "Temporary Redirect"
+    assert response.status_code == 308
+    assert response.reason_phrase == "Permanent Redirect"
     assert response.headers["location"] == redirect_url
     assert str(response.next_request.url) == redirect_url
 

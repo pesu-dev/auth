@@ -12,7 +12,7 @@ import uvicorn
 from fastapi import BackgroundTasks, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import ValidationError
 
 from app.exceptions.base import PESUAcademyError
@@ -107,6 +107,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "status": False,
             "message": f"Could not validate request data - {message}",
+            "timestamp": datetime.datetime.now(IST).isoformat(),
         },
     )
 
@@ -120,6 +121,7 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
         content={
             "status": False,
             "message": exc.message,
+            "timestamp": datetime.datetime.now(IST).isoformat(),
         },
     )
 
@@ -133,24 +135,236 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         content={
             "status": False,
             "message": "Internal Server Error. Please try again later.",
+            "timestamp": datetime.datetime.now(IST).isoformat(),
         },
     )
 
 
-@app.get("/health", tags=["Monitoring"])
+@app.get(
+    "/health",
+    responses={
+        200: {
+            "description": "Successful Health Check.",
+            "model": ResponseModel,
+            "content": {
+                "application/json": {
+                    "example": {"status": True, "message": "ok", "timestamp": "2024-07-28T22:30:10.103368+05:30"}
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "model": ResponseModel,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": False,
+                        "message": "Internal Server Error. Please try again later.",
+                        "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                    }
+                }
+            },
+        },
+    },
+    tags=["Monitoring"],
+)
 async def health_check() -> dict[str, str]:
     """Health check endpoint."""
     logging.debug("Health check requested.")
     return {"status": "ok"}
 
 
-@app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
+@app.get(
+    "/readme",
+    response_class=RedirectResponse,
+    status_code=308,
+    responses={
+        308: {
+            "description": "Redirect to the PESUAuth GitHub repository.",
+            "content": {
+                "text/html": {
+                    "example": '<html><head><title>Redirecting...</title></head><body><a href="https://github.com/pesu-dev/auth">Redirect</a></body></html>'
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "model": ResponseModel,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": False,
+                        "message": "Internal Server Error. Please try again later.",
+                    }
+                }
+            },
+        },
+    },
+    tags=["Documentation"],
+)
 async def readme() -> RedirectResponse:
     """Redirect to the PESUAuth GitHub repository."""
-    return RedirectResponse("https://github.com/pesu-dev/auth")
+    return RedirectResponse("https://github.com/pesu-dev/auth", status_code=308)
 
 
-@app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
+@app.post(
+    "/authenticate",
+    response_model=ResponseModel,
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "basic_srn_auth": {
+                            "summary": "Simple Authentication",
+                            "description": "Simple authentication using username without requesting profile data",
+                            "value": {"username": "PES1201800001", "password": "mySecurePassword123", "profile": False},
+                        },
+                        "email_auth_with_profile": {
+                            "summary": "Authentication with Full Profile",
+                            "description": "Authentication using username and requesting all profile fields",
+                            "value": {
+                                "username": "johndoe@gmail.com",
+                                "password": "mySecurePassword123",
+                                "profile": True,
+                            },
+                        },
+                        "phone_auth_selective_fields": {
+                            "summary": "Authentication with Selected Fields",
+                            "description": "Authentication using username and requesting specific profile fields only",
+                            "value": {
+                                "username": "1234567890",
+                                "password": "mySecurePassword123",
+                                "profile": True,
+                                "fields": ["name", "email", "campus", "branch", "semester"],
+                            },
+                        },
+                    }
+                }
+            }
+        }
+    },
+    responses={
+        200: {
+            "description": "Successful Authentication",
+            "model": ResponseModel,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "authentication_only": {
+                            "summary": "Simple Authentication",
+                            "value": {
+                                "status": True,
+                                "message": "Login successful.",
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                        "authentication_with_profile": {
+                            "summary": "Authentication with Full Profile",
+                            "value": {
+                                "status": True,
+                                "message": "Login successful.",
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                                "profile": {
+                                    "name": "John Doe",
+                                    "prn": "PES1201800001",
+                                    "srn": "PES1201800001",
+                                    "program": "Bachelor of Technology",
+                                    "branch": "Computer Science and Engineering",
+                                    "semester": "2",
+                                    "section": "C",
+                                    "email": "johndoe@gmail.com",
+                                    "phone": "1234567890",
+                                    "campus_code": 1,
+                                    "campus": "RR",
+                                },
+                            },
+                        },
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Bad Request - Invalid request data",
+            "model": ResponseModel,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": False,
+                        "message": "Could not validate request data - body.password: Field required",
+                        "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Unauthorized - Invalid credentials",
+            "model": ResponseModel,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": False,
+                        "message": "Invalid username or password, or user does not exist.",
+                        "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                    }
+                }
+            },
+        },
+        422: {
+            "description": "Unprocessable entity - Profile parsing error",
+            "model": ResponseModel,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": False,
+                        "message": "Failed to parse student profile page from PESU Academy.",
+                        "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error",
+            "model": ResponseModel,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": False,
+                        "message": "Internal Server Error. Please try again later.",
+                        "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                    }
+                }
+            },
+        },
+        502: {
+            "description": "Bad Gateway - External service error",
+            "model": ResponseModel,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "csrf_token_error": {
+                            "summary": "CSRF token extraction failed",
+                            "value": {
+                                "status": False,
+                                "message": "CSRF token could not be extracted from the response.",
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                        "profile_fetch_error": {
+                            "summary": "Profile page fetching failed",
+                            "value": {
+                                "status": False,
+                                "message": "Failed to fetch student profile page from PESU Academy.",
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                    }
+                }
+            },
+        },
+    },
+    tags=["Authentication"],
+)
 async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks) -> JSONResponse:
     """Authenticate a user using their PESU credentials via the PESU Academy service.
 

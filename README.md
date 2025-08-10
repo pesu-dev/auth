@@ -26,13 +26,12 @@ returns the user's profile information. No personal data is stored.
 
 ![Cron job status](https://api.cron-job.org/jobs/4424640/69701a6f8df1d307/status-7.svg)\
 ![Cron job status](https://api.cron-job.org/jobs/6338038/9feb0f217be714ec/status-7.svg)\
-![Cron job status](https://api.cron-job.org/jobs/6382178/f8bb5b8b9c1751ed/status-7.svg)\
 ![Cron job status](https://api.cron-job.org/jobs/5672615/1d744f1dc18fb505/status-7.svg)\
 ![Cron job status](https://api.cron-job.org/jobs/4424663/d5a30351867acec9/status-7.svg)
 
 > [!WARNING]
-> The live version is hosted on a free tier server. As a result, you might experience higher latency compared to a local deployment.
-
+> The live version is hosted on a free tier server. As a result, you might experience higher latency compared to a local
+> deployment.
 
 ## How to run PESUAuth locally
 
@@ -108,21 +107,19 @@ uv run python -m app.app
 
 ## How to use the PESUAuth API
 
-
 The API provides multiple endpoints for authentication, documentation, and monitoring.
 
-
-
-| **Endpoint**       | **Method** | **Description**                                                 |
-|--------------------|------------|-----------------------------------------------------------------|
-| `/`                | `GET`      | Serves the interactive API documentation (Swagger UI).          |
-| `/authenticate`    | `POST`     | Authenticates a user using their PESU credentials.              |
-| `/health`          | `GET`      | A health check endpoint to monitor the API's status.            |
-| `/readme`          | `GET`      | Redirects to the project's official GitHub repository.          |
+| **Endpoint**    | **Method** | **Description**                                        |
+|-----------------|------------|--------------------------------------------------------|
+| `/`             | `GET`      | Serves the interactive API documentation (Swagger UI). |
+| `/authenticate` | `POST`     | Authenticates a user using their PESU credentials.     |
+| `/health`       | `GET`      | A health check endpoint to monitor the API's status.   |
+| `/readme`       | `GET`      | Redirects to the project's official GitHub repository. |
 
 ### `/authenticate`
 
-You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON object, with the user's profile information if requested.
+You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON
+object, with the user's profile information if requested.
 
 #### Request Parameters
 
@@ -146,30 +143,29 @@ profile data was requested, the response's `profile` key will store a dictionary
 | `message`   | `str`           | A message that provides information corresponding to the status          |
 | `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
 
-
 ##### `ProfileObject`
 
 This object contains the user's profile information, which is returned only if the `profile` parameter is set to `True`.
 If the authentication fails, this field will not be present in the response.
 
-| **Field**           | **Description**                                        |
-|---------------------|--------------------------------------------------------|
-| `name`              | Name of the user                                       |
-| `prn`               | PRN of the user                                        |
-| `srn`               | SRN of the user                                        |
-| `program`           | Academic program that the user is enrolled into        |
-| `branch`            | Complete name of the branch that the user is pursuing  |
-| `semester`          | Current semester that the user is in                   |
-| `section`           | Section of the user                                    |
-| `email`             | Email address of the user registered with PESU         |
-| `phone`             | Phone number of the user registered with PESU          |
-| `campus_code`       | The integer code of the campus (1 for RR and 2 for EC) |
-| `campus`            | Abbreviation of the user's campus name                 |
-
+| **Field**     | **Description**                                        |
+|---------------|--------------------------------------------------------|
+| `name`        | Name of the user                                       |
+| `prn`         | PRN of the user                                        |
+| `srn`         | SRN of the user                                        |
+| `program`     | Academic program that the user is enrolled into        |
+| `branch`      | Complete name of the branch that the user is pursuing  |
+| `semester`    | Current semester that the user is in                   |
+| `section`     | Section of the user                                    |
+| `email`       | Email address of the user registered with PESU         |
+| `phone`       | Phone number of the user registered with PESU          |
+| `campus_code` | The integer code of the campus (1 for RR and 2 for EC) |
+| `campus`      | Abbreviation of the user's campus name                 |
 
 ### `/health`
 
-This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks. This endpoint does not take any request parameters.
+This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks. This endpoint
+does not take any request parameters.
 
 #### Response Object
 
@@ -177,11 +173,9 @@ This endpoint can be used to check the health of the API. It's useful for monito
 |-----------|----------|----------------------------------------|
 | `status`  | `str`    | The status of the API, typically "ok". |
 
-
 ### `/readme`
 
 This endpoint redirects to the project's official GitHub repository. This endpoint does not take any request parameters.
-
 
 ### Integrating your application with the PESUAuth API
 
@@ -258,4 +252,5 @@ Made with ❤️ by
 
 *Powered by [contrib.rocks](https://contrib.rocks)*
 
-If you'd like to contribute, please follow our [contribution guidelines](https://github.com/pesu-dev/auth/blob/main/.github/CONTRIBUTING.md).
+If you'd like to contribute, please follow
+our [contribution guidelines](https://github.com/pesu-dev/auth/blob/main/.github/CONTRIBUTING.md).
