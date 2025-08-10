@@ -22,6 +22,7 @@ readme_docs = ApiDocs(
                     "example": {
                         "status": False,
                         "message": "Internal Server Error. Please try again later.",
+                        "timestamp": "2024-07-28T22:30:10.103368+05:30",
                     }
                 }
             },

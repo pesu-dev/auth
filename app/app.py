@@ -75,7 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="PESUAuth API",
-    description="A simple API to authenticate PESU credentials using PESU Academy",
+    description="A simple and lightweight API to authenticate PESU credentials using PESU Academy",
     version="2.1.0",
     docs_url="/",
     lifespan=lifespan,
@@ -141,11 +141,23 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-@app.get("/health", responses=health_docs.response_examples, tags=["Monitoring"])
-async def health_check() -> dict[str, str]:
+@app.get(
+    "/health",
+    response_class=JSONResponse,
+    responses=health_docs.response_examples,
+    tags=["Monitoring"],
+)
+async def health() -> JSONResponse:
     """Health check endpoint."""
     logging.debug("Health check requested.")
-    return {"status": "ok"}
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": True,
+            "message": "ok",
+            "timestamp": datetime.datetime.now(IST).isoformat(),
+        },
+    )
 
 
 @app.get(
@@ -163,6 +175,7 @@ async def readme() -> RedirectResponse:
 @app.post(
     "/authenticate",
     response_model=ResponseModel,
+    response_class=JSONResponse,
     openapi_extra=authenticate_docs.request_examples,
     responses=authenticate_docs.response_examples,
     tags=["Authentication"],

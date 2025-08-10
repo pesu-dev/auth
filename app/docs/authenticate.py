@@ -74,6 +74,21 @@ authenticate_docs = ApiDocs(
                                 },
                             },
                         },
+                        "authentication_with_selected_fields": {
+                            "summary": "Authentication with Selected Fields",
+                            "value": {
+                                "status": True,
+                                "message": "Login successful.",
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                                "profile": {
+                                    "name": "John Doe",
+                                    "branch": "Computer Science and Engineering",
+                                    "semester": "2",
+                                    "email": "johndoe@gmail.com",
+                                    "campus": "RR",
+                                },
+                            },
+                        },
                     }
                 }
             },
