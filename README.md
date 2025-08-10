@@ -9,7 +9,7 @@
 [![Docker Image Version (tag)](https://img.shields.io/docker/v/aditeyabaral/pesu-auth/latest?logo=docker&label=build%20commit)](https://hub.docker.com/r/aditeyabaral/pesu-auth/tags)
 [![Docker Image Size (tag)](https://img.shields.io/docker/image-size/aditeyabaral/pesu-auth/latest?logo=docker)](https://hub.docker.com/r/aditeyabaral/pesu-auth)
 
-A simple API to authenticate PESU credentials using PESU Academy.
+A simple and lightweight API to authenticate PESU credentials using PESU Academy.
 
 The API is secure and protects user privacy by not storing any user credentials. It only validates credentials and
 returns the user's profile information. No personal data is stored.
@@ -21,18 +21,17 @@ returns the user's profile information. No personal data is stored.
 
 #### API Status
 
-> [!NOTE]
-> All timestamps are in UTC.
-
 ![Cron job status](https://api.cron-job.org/jobs/4424640/69701a6f8df1d307/status-7.svg)\
 ![Cron job status](https://api.cron-job.org/jobs/6338038/9feb0f217be714ec/status-7.svg)\
-![Cron job status](https://api.cron-job.org/jobs/6382178/f8bb5b8b9c1751ed/status-7.svg)\
 ![Cron job status](https://api.cron-job.org/jobs/5672615/1d744f1dc18fb505/status-7.svg)\
 ![Cron job status](https://api.cron-job.org/jobs/4424663/d5a30351867acec9/status-7.svg)
 
-> [!WARNING]
-> The live version is hosted on a free tier server. As a result, you might experience higher latency compared to a local deployment.
+> [!NOTE]
+> All timestamps are in UTC.
 
+> [!WARNING]
+> The live version is hosted on a free tier server. As a result, you might experience higher latency compared to a local
+> deployment.
 
 ## How to run PESUAuth locally
 
@@ -47,82 +46,61 @@ following commands to start the API.
 
     1. You can build the Docker image from the source code by running the following command in the root directory of
        the repository.
-
-   ```bash
-   docker build . --tag pesu-auth
-   ```
+       ```bash
+       docker build . --tag pesu-auth
+       ```
 
     2. You can also pull the pre-built Docker image
        from [Docker Hub](https://hub.docker.com/repository/docker/aditeyabaral/pesu-auth/general) by running the
        following command:
-
-   ```bash
-   docker pull aditeyabaral/pesu-auth:latest
-   ```
+       ```bash
+       docker pull aditeyabaral/pesu-auth:latest
+       ```
 
 2. Run the Docker container
-
-```bash
-docker run --name pesu-auth -d -p 5000:5000 pesu-auth
-# If you pulled the pre-built image, use the following command instead:
-docker run --name pesu-auth -d -p 5000:5000 aditeyabaral/pesu-auth:latest
-```
+    ```bash
+    docker run --name pesu-auth -d -p 5000:5000 pesu-auth
+    # If you pulled the pre-built image, use the following command instead:
+    docker run --name pesu-auth -d -p 5000:5000 aditeyabaral/pesu-auth:latest
+    ```
 
 3. Access the API at `http://localhost:5000/`
 
 ### Running without Docker
 
-If you don't have Docker installed, you can run the API using Python. Ensure you have Python 3.10 or higher installed
-on your system.
+If you don't have Docker installed, you can run the API natively. Ensure you have Python 3.11 or higher
+installed on your system. We recommend using a package manager like [`uv`](https://docs.astral.sh/uv/) to manage
+dependencies.
 
-1. Create a virtual environment using `conda`, `uv` or any other virtual environment manager of your choice and activate
-   it. Then, install the dependencies using the following command.
-
-#### For `conda` users:
-
-```bash
-pip install -r requirements.txt
-```
-
-#### For `uv` users:
-
-```bash
-uv sync
-```
+1. Create a virtual environment using and activate it. Then, install the dependencies using the following commands.
+    ```bash
+    uv venv --python=3.11
+    source .venv/bin/activate
+    uv sync
+    ```
 
 2. Run the API using the following command.
+    ```bash
+    uv run python -m app.app
+    ```
 
-#### For `conda` users:
-
-```bash
-python -m app.app
-```
-
-#### For `uv` users:
-
-```bash
-uv run python -m app.app
-```
-
-3. Access the API as previously mentioned.
+3. Access the API as previously mentioned on `http://localhost:5000/`
 
 ## How to use the PESUAuth API
 
-
 The API provides multiple endpoints for authentication, documentation, and monitoring.
 
-
-
-| **Endpoint**       | **Method** | **Description**                                                 |
-|--------------------|------------|-----------------------------------------------------------------|
-| `/`                | `GET`      | Serves the interactive API documentation (Swagger UI).          |
-| `/authenticate`    | `POST`     | Authenticates a user using their PESU credentials.              |
-| `/health`          | `GET`      | A health check endpoint to monitor the API's status.            |
-| `/readme`          | `GET`      | Redirects to the project's official GitHub repository.          |
+| **Endpoint**    | **Method** | **Description**                                        |
+|-----------------|------------|--------------------------------------------------------|
+| `/`             | `GET`      | Serves the interactive API documentation (Swagger UI). |
+| `/authenticate` | `POST`     | Authenticates a user using their PESU credentials.     |
+| `/health`       | `GET`      | A health check endpoint to monitor the API's status.   |
+| `/readme`       | `GET`      | Redirects to the project's official GitHub repository. |
 
 ### `/authenticate`
 
-You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON object, with the user's profile information if requested.
+You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON
+object, with the user's profile information if requested.
 
 #### Request Parameters
 
@@ -146,42 +124,41 @@ profile data was requested, the response's `profile` key will store a dictionary
 | `message`   | `str`           | A message that provides information corresponding to the status          |
 | `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
 
-
 ##### `ProfileObject`
 
 This object contains the user's profile information, which is returned only if the `profile` parameter is set to `True`.
 If the authentication fails, this field will not be present in the response.
 
-| **Field**           | **Description**                                        |
-|---------------------|--------------------------------------------------------|
-| `name`              | Name of the user                                       |
-| `prn`               | PRN of the user                                        |
-| `srn`               | SRN of the user                                        |
-| `program`           | Academic program that the user is enrolled into        |
-| `branch`            | Complete name of the branch that the user is pursuing  |
-| `semester`          | Current semester that the user is in                   |
-| `section`           | Section of the user                                    |
-| `email`             | Email address of the user registered with PESU         |
-| `phone`             | Phone number of the user registered with PESU          |
-| `campus_code`       | The integer code of the campus (1 for RR and 2 for EC) |
-| `campus`            | Abbreviation of the user's campus name                 |
-
+| **Field**     | **Description**                                        |
+|---------------|--------------------------------------------------------|
+| `name`        | Name of the user                                       |
+| `prn`         | PRN of the user                                        |
+| `srn`         | SRN of the user                                        |
+| `program`     | Academic program that the user is enrolled into        |
+| `branch`      | Complete name of the branch that the user is pursuing  |
+| `semester`    | Current semester that the user is in                   |
+| `section`     | Section of the user                                    |
+| `email`       | Email address of the user registered with PESU         |
+| `phone`       | Phone number of the user registered with PESU          |
+| `campus_code` | The integer code of the campus (1 for RR and 2 for EC) |
+| `campus`      | Abbreviation of the user's campus name                 |
 
 ### `/health`
 
-This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks. This endpoint does not take any request parameters.
+This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks. This endpoint
+does not take any request parameters.
 
 #### Response Object
 
-| **Field** | **Type** | **Description**                        |
-|-----------|----------|----------------------------------------|
-| `status`  | `str`    | The status of the API, typically "ok". |
-
+| **Field** | **Type**   | **Description**                                                   |
+|-----------|------------|-------------------------------------------------------------------|
+| `status`  | `str`      | `true` if healthy, `false` if there was an error                  |
+| `message` | `str`      | "ok" if healthy, error message otherwise                          |
+| `timestamp` | `string` | A timezone offset timestamp indicating the time of authentication |
 
 ### `/readme`
 
 This endpoint redirects to the project's official GitHub repository. This endpoint does not take any request parameters.
-
 
 ### Integrating your application with the PESUAuth API
 
@@ -258,4 +235,4 @@ Made with ❤️ by
 
 *Powered by [contrib.rocks](https://contrib.rocks)*
 
-If you'd like to contribute, please follow our [contribution guidelines](https://github.com/pesu-dev/auth/blob/main/.github/CONTRIBUTING.md).
+If you'd like to contribute, please follow our [contribution guidelines](.github/CONTRIBUTING.md).

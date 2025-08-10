@@ -12,15 +12,16 @@ import uvicorn
 from fastapi import BackgroundTasks, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import ValidationError
 
+from app.docs import authenticate_docs, health_docs, readme_docs
 from app.exceptions.base import PESUAcademyError
 from app.models import RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
 IST = pytz.timezone("Asia/Kolkata")
-REFRESH_INTERVAL_SECONDS = 45 * 60
+CSRF_TOKEN_REFRESH_INTERVAL_SECONDS = 45 * 60
 CSRF_TOKEN_REFRESH_LOCK = asyncio.Lock()
 
 
@@ -40,7 +41,7 @@ async def _csrf_token_refresh_loop() -> None:
             await _refresh_csrf_token_with_lock()
         except Exception:
             logging.exception("Failed to refresh unauthenticated CSRF token in the background.")
-        await asyncio.sleep(REFRESH_INTERVAL_SECONDS)
+        await asyncio.sleep(CSRF_TOKEN_REFRESH_INTERVAL_SECONDS)
 
 
 @asynccontextmanager
@@ -74,7 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="PESUAuth API",
-    description="A simple API to authenticate PESU credentials using PESU Academy",
+    description="A simple and lightweight API to authenticate PESU credentials using PESU Academy",
     version="2.1.0",
     docs_url="/",
     lifespan=lifespan,
@@ -107,6 +108,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "status": False,
             "message": f"Could not validate request data - {message}",
+            "timestamp": datetime.datetime.now(IST).isoformat(),
         },
     )
 
@@ -120,6 +122,7 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
         content={
             "status": False,
             "message": exc.message,
+            "timestamp": datetime.datetime.now(IST).isoformat(),
         },
     )
 
@@ -133,24 +136,50 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         content={
             "status": False,
             "message": "Internal Server Error. Please try again later.",
+            "timestamp": datetime.datetime.now(IST).isoformat(),
         },
     )
 
 
-@app.get("/health", tags=["Monitoring"])
-async def health_check() -> dict[str, str]:
+@app.get(
+    "/health",
+    response_class=JSONResponse,
+    responses=health_docs.response_examples,
+    tags=["Monitoring"],
+)
+async def health() -> JSONResponse:
     """Health check endpoint."""
     logging.debug("Health check requested.")
-    return {"status": "ok"}
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": True,
+            "message": "ok",
+            "timestamp": datetime.datetime.now(IST).isoformat(),
+        },
+    )
 
 
-@app.get("/readme", response_class=HTMLResponse, tags=["Documentation"])
+@app.get(
+    "/readme",
+    response_class=RedirectResponse,
+    status_code=308,
+    responses=readme_docs.response_examples,
+    tags=["Documentation"],
+)
 async def readme() -> RedirectResponse:
     """Redirect to the PESUAuth GitHub repository."""
-    return RedirectResponse("https://github.com/pesu-dev/auth")
+    return RedirectResponse("https://github.com/pesu-dev/auth", status_code=308)
 
 
-@app.post("/authenticate", response_model=ResponseModel, tags=["Authentication"])
+@app.post(
+    "/authenticate",
+    response_model=ResponseModel,
+    response_class=JSONResponse,
+    openapi_extra=authenticate_docs.request_examples,
+    responses=authenticate_docs.response_examples,
+    tags=["Authentication"],
+)
 async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks) -> JSONResponse:
     """Authenticate a user using their PESU credentials via the PESU Academy service.
 
