@@ -9,11 +9,9 @@ your development environment and contributing to the project.
 
 - [🤝 Contributing to auth](#-contributing-to-auth)
 - [🚧 Getting Started](#-getting-started)
-- [🛠️ Development Environment Setup](#️-development-environment-setup)
+- [🛠️ Development Environment Setup](#-development-environment-setup)
     - [Prerequisites](#prerequisites)
     - [Setting Up Your Environment](#setting-up-your-environment)
-        - [Option 1: Using conda](#option-1-using-conda)
-        - [Option 2: Using uv](#option-2-using-uv)
     - [Set Up Environment Variables](#set-up-environment-variables)
     - [Pre-commit Hooks](#pre-commit-hooks)
 - [🧰 Running the Application](#-running-the-application)
@@ -24,23 +22,23 @@ your development environment and contributing to the project.
     - [Writing Tests](#writing-tests)
 - [🚀 Submitting Changes](#-submitting-changes)
     - [🔀 Create a Branch](#-create-a-branch)
-    - [✏️ Make and Commit Changes](#️-make-and-commit-changes)
+    - [✏️ Make and Commit Changes](#-make-and-commit-changes)
     - [📤 Push and Open a Pull Request](#-push-and-open-a-pull-request)
 - [❓ Need Help?](#-need-help)
 - [🔐 Security](#-security)
 - [✨ Code Style Guide](#-code-style-guide)
     - [✅ General Guidelines](#-general-guidelines)
     - [📝 Docstrings & Comments](#-docstrings--comments)
-- [🏷️ GitHub Labels](#%EF%B8%8F-github-labels)
+- [🏷️ GitHub Labels](#-github-labels)
 - [🧩 Feature Suggestions](#-feature-suggestions)
 - [📄 License](#-license)
 
 </details>
 
-
 ## 🚧 Getting Started
 
-We encourage developers to work on their own forks of the repository. This allows you to work on features or fixes witout affecting the main codebase until your changes are ready to be merged.
+We encourage developers to work on their own forks of the repository. This allows you to work on features or fixes
+without affecting the main codebase until your changes are ready to be merged.
 
 ### 🌐 Deployment Environment
 
@@ -62,15 +60,15 @@ The standard workflow for contributing is as follows:
 7. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
 8. After successful testing in staging, changes are promoted from `dev` to `main` for production deployment.
 
-
-Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository. All PRs must be raised from a feature branch of your forked repository and target the `dev` branch. Direct PRs to `main` will be closed.
-
+Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository. All PRs
+must be raised from a feature branch of your forked repository and target the `dev` branch. Direct PRs to `main` will be
+closed.
 
 ## 🛠️ Development Environment Setup
 
-This section provides instructions for setting up your development environment to work on the auth project. We recommend
-using a virtual environment to manage dependencies and avoid conflicts with other projects. You can use either `conda`
-or `uv` for this purpose.
+This section provides instructions for setting up your development environment to work on the project. We recommend
+using a package manager like [`uv`](https://docs.astral.sh/uv/) to manage dependencies and avoid conflicts with other
+projects.
 
 ### Prerequisites
 
@@ -79,24 +77,6 @@ or `uv` for this purpose.
 - Docker
 
 ### Setting Up Your Environment
-
-You can set up your development environment using either `conda` or `uv`.
-
-#### Option 1: Using conda
-
-1. **Create and activate a virtual environment:**
-   ```bash
-   conda create -n pesu-auth python=3.11
-   conda activate pesu-auth
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   pip install pytest pytest-cov httpx python-dotenv pre-commit
-   ```
-
-#### Option 2: Using uv
 
 1. **Create and activate a virtual environment:**
    ```bash
@@ -129,13 +109,11 @@ your code. Install the pre-commit hooks by running:
 pre-commit install
 ```
 
-
 ## 🧰 Running the Application
 
 You can run the application using the same instructions as in the [README.md](../README.md) file. To ensure parity with
 production, we recommend testing the app both locally and inside Docker. See the [README.md](../README.md) for Docker
 instructions.
-
 
 ## 🧪 Testing and Code Quality
 
@@ -154,7 +132,8 @@ The following checks are enforced:
 * ✅ `debug-statements` to prevent committed `print()` or `pdb`
 * ✅ A local `pytest` hook that runs the full test suite
 
-> ⚠️ You will not be able to commit code that fails these checks.
+> [!WARNING]
+> You will not be able to commit code that fails these checks.
 
 ### Linting & Formatting
 
@@ -165,7 +144,6 @@ all files:
 pre-commit run --all-files
 ```
 
-
 ## 🧪 Running Tests
 
 We use `pytest`, and a pre-commit hook ensures tests are run automatically before every commit.
@@ -173,15 +151,16 @@ We use `pytest`, and a pre-commit hook ensures tests are run automatically befor
 To run tests manually:
 
 ```bash
-pytest
+uv run pytest
 ```
 
 To check coverage:
 
 ```bash
-pytest --cov
+uv run pytest --cov
 ```
 
+> [!NOTE]
 > The pre-commit hook runs `python scripts/run_tests.py`, which uses the same underlying `pytest` runner.
 
 ### Writing Tests
@@ -190,7 +169,6 @@ pytest --cov
 * Place them in the `tests/` directory
 * Name your test files and functions with the `test_` prefix (required by `pytest` and validated by pre-commit)
 * Keep test cases small, meaningful, and well-named
-
 
 ## 🚀 Submitting Changes
 
@@ -229,7 +207,6 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
 ### 📤 Push and Open a Pull Request
 
 1. Push your branch to your fork:
-
    ```bash
    git push origin your-feature-name
    ```
@@ -243,10 +220,9 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
     * Link any related issues using `Closes #issue-number`
     * Add screenshots, terminal output, or examples if relevant
 
-
 The maintainers will review your PR, provide feedback, and may request changes. Once approved, your PR will be merged
-into the `dev` branch and deployed to staging for testing. After successful validation, changes will be promoted to production.
-
+into the `dev` branch and deployed to staging for testing. After successful validation, changes will be promoted to
+production.
 
 ## ❓ Need Help?
 
@@ -260,14 +236,12 @@ If you get stuck or have questions:
     - Search for existing discussions before posting.
 4. Open a new issue if you're facing something new or need clarification.
 
-
 ## 🔐 Security
 
 If you discover a security vulnerability, **please do not open a public issue**.
 
 Instead, report it privately by contacting the maintainers. We take all security concerns seriously and will respond
 promptly.
-
 
 ## ✨ Code Style Guide
 
@@ -305,61 +279,63 @@ def send_otp(email: str) -> bool:
 
 ## 🏷️ GitHub Labels
 
-We use GitHub labels to categorize and prioritize issues and pull requests. Here’s a guide to help you understand what each label means:
+We use GitHub labels to categorize and prioritize issues and pull requests. Here’s a guide to help you understand what
+each label means:
 
 ### 🧑‍💻 Contribution Level
 
-| Label              | Description                                                       |
-|--------------------|-------------------------------------------------------------------|
-| `good first issue` | 🟢 Simple, well-scoped tasks good for first-time contributors     |
-| `help wanted`      | 🟡 Maintainers are actively seeking help on this issue            |
+| Label              | Description                                                   |
+|--------------------|---------------------------------------------------------------|
+| `good first issue` | 🟢 Simple, well-scoped tasks good for first-time contributors |
+| `help wanted`      | 🟡 Maintainers are actively seeking help on this issue        |
 
 ### 🐞 Bug & Error Handling
 
-| Label        | Description                                                   |
-|--------------|---------------------------------------------------------------|
-| `bug`        | 🔴 A defect or unexpected behavior in the application         |
-| `invalid`    | 🚫 The issue/PR is not valid or based on a misunderstanding   |
-| `wontfix`    | ❌ The issue is acknowledged but will not be fixed            |
-| `duplicate`  | 📑 This issue or PR duplicates an existing one                |
+| Label       | Description                                                 |
+|-------------|-------------------------------------------------------------|
+| `bug`       | 🔴 A defect or unexpected behavior in the application       |
+| `invalid`   | 🚫 The issue/PR is not valid or based on a misunderstanding |
+| `wontfix`   | ❌ The issue is acknowledged but will not be fixed           |
+| `duplicate` | 📑 This issue or PR duplicates an existing one              |
 
 ### ✨ Feature Development
 
-| Label         | Description                                                |
-|---------------|------------------------------------------------------------|
-| `enhancement` | 🟢 A request or proposal for improvement or new feature    |
-| `feature`     | 🌟 Work related to adding a new capability                 |
-| `question`    | ❓ Request for clarification or discussion                  |
+| Label         | Description                                             |
+|---------------|---------------------------------------------------------|
+| `enhancement` | 🟢 A request or proposal for improvement or new feature |
+| `feature`     | 🌟 Work related to adding a new capability              |
+| `question`    | ❓ Request for clarification or discussion               |
 
 ### 📚 Documentation
 
-| Label            | Description                                                  |
-|------------------|--------------------------------------------------------------|
-| `documentation`  | 📘 Updates to README, docstrings, or inline comments         |
+| Label           | Description                                          |
+|-----------------|------------------------------------------------------|
+| `documentation` | 📘 Updates to README, docstrings, or inline comments |
 
 ### 🧪 Testing & CI/CD
 
-| Label             | Description                                                     |
-|-------------------|-----------------------------------------------------------------|
+| Label             | Description                                                       |
+|-------------------|-------------------------------------------------------------------|
 | `tests and ci/cd` | 🧪 Changes or issues related to testing or continuous integration |
 
 ### 🔒 Authentication & Core
 
-| Label             | Description                                                       |
-|-------------------|-------------------------------------------------------------------|
-| `authentication`  | 🔐 Login, CSRF, token handling, error flows                        |
-| `pesuacademy`     | 🎓 PESUAcademy client, authentication, and scraping logic          |
-| `student profile` | 🧑‍🎓 HTML parsing & profile field extraction logic                  |
+| Label             | Description                                               |
+|-------------------|-----------------------------------------------------------|
+| `authentication`  | 🔐 Login, CSRF, token handling, error flows               |
+| `pesuacademy`     | 🎓 PESUAcademy client, authentication, and scraping logic |
+| `student profile` | 🧑‍🎓 HTML parsing & profile field extraction logic       |
 
 ### 🧠 Meta / Organization
 
-| Label       | Description                                             |
-|-------------|---------------------------------------------------------|
-| `api`       | ⚙️ Core FastAPI application and route handlers           |
-| `discussion`| 🗣️ Open-ended conversation about project direction       |
+| Label        | Description                                         |
+|--------------|-----------------------------------------------------|
+| `api`        | ⚙️ Core FastAPI application and route handlers      |
+| `discussion` | 🗣️ Open-ended conversation about project direction |
 
-> ✅ **Tip**: When opening or triaging issues and PRs, feel free to suggest an appropriate label. Maintainers will review and apply them accordingly.
-
+> [!NOTE]
+> When opening or triaging issues and PRs, feel free to suggest an appropriate label. Maintainers will review
+> and apply them accordingly.
 
 ## 🧩 Feature Suggestions
 
@@ -369,8 +345,7 @@ If you want to propose a new feature:
 2. Open a new issue using the **"Feature Request"** template if available
 3. Clearly explain the use case, proposed solution, and any relevant context
 
-
 ## 📄 License
 
 By contributing to this repository, you agree that your contributions will be licensed under the **MIT License**.
-See [`LICENSE`](LICENSE) for full license text.
+See [`LICENSE`](../LICENSE) for full license text.
