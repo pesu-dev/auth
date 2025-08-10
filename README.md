@@ -233,5 +233,4 @@ Made with ❤️ by
 
 *Powered by [contrib.rocks](https://contrib.rocks)*
 
-If you'd like to contribute, please follow
-our [contribution guidelines](https://github.com/pesu-dev/auth/blob/main/.github/CONTRIBUTING.md).
+If you'd like to contribute, please follow our [contribution guidelines](.github/CONTRIBUTING.md).
