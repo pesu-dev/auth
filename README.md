@@ -150,9 +150,11 @@ does not take any request parameters.
 
 #### Response Object
 
-| **Field** | **Type** | **Description**                        |
-|-----------|----------|----------------------------------------|
-| `status`  | `str`    | The status of the API, typically "ok". |
+| **Field** | **Type**   | **Description**                                                   |
+|-----------|------------|-------------------------------------------------------------------|
+| `status`  | `str`      | `true` if healthy, `false` if there was an error                  |
+| `message` | `str`      | "ok" if healthy, error message otherwise                          |
+| `timestamp` | `string` | A timezone offset timestamp indicating the time of authentication |
 
 ### `/readme`
 
