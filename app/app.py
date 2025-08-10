@@ -21,7 +21,7 @@ from app.models import RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
 IST = pytz.timezone("Asia/Kolkata")
-CSRF_REFRESH_INTERVAL_SECONDS = 45 * 60
+CSRF_TOKEN_REFRESH_INTERVAL_SECONDS = 45 * 60
 CSRF_TOKEN_REFRESH_LOCK = asyncio.Lock()
 
 
@@ -41,7 +41,7 @@ async def _csrf_token_refresh_loop() -> None:
             await _refresh_csrf_token_with_lock()
         except Exception:
             logging.exception("Failed to refresh unauthenticated CSRF token in the background.")
-        await asyncio.sleep(CSRF_REFRESH_INTERVAL_SECONDS)
+        await asyncio.sleep(CSRF_TOKEN_REFRESH_INTERVAL_SECONDS)
 
 
 @asynccontextmanager
