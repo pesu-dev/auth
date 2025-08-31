@@ -16,7 +16,9 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import ValidationError
 
 from app.docs import authenticate_docs, health_docs, readme_docs
+from app.docs.metrics import metrics_docs
 from app.exceptions.base import PESUAcademyError
+from app.metrics import metrics  # Global metrics instance
 from app.models import RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
@@ -29,8 +31,13 @@ async def _refresh_csrf_token_with_lock() -> None:
     """Refresh the CSRF token with a lock."""
     logging.debug("Refreshing unauthenticated CSRF token...")
     async with CSRF_TOKEN_REFRESH_LOCK:
-        await pesu_academy.prefetch_client_with_csrf_token()
-        logging.info("Unauthenticated CSRF token refreshed successfully.")
+        try:
+            await pesu_academy.prefetch_client_with_csrf_token()
+            metrics.inc("csrf_token_refresh_success_total")
+            logging.info("Unauthenticated CSRF token refreshed successfully.")
+        except Exception:
+            metrics.inc("csrf_token_refresh_failure_total")
+            raise
 
 
 async def _csrf_token_refresh_loop() -> None:
@@ -40,6 +47,7 @@ async def _csrf_token_refresh_loop() -> None:
             logging.debug("Refreshing unauthenticated CSRF token...")
             await _refresh_csrf_token_with_lock()
         except Exception:
+            metrics.inc("csrf_token_refresh_failure_total")
             logging.exception("Failed to refresh unauthenticated CSRF token in the background.")
         await asyncio.sleep(CSRF_TOKEN_REFRESH_INTERVAL_SECONDS)
 
@@ -100,6 +108,7 @@ pesu_academy = PESUAcademy()
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Handler for request validation errors."""
+    metrics.inc("validation_error_total")
     logging.exception("Request data could not be validated.")
     errors = exc.errors()
     message = "; ".join([f"{'.'.join(str(loc) for loc in e['loc'])}: {e['msg']}" for e in errors])
@@ -116,6 +125,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(PESUAcademyError)
 async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSONResponse:
     """Handler for PESUAcademy specific errors."""
+    metrics.inc("pesu_academy_error_total")
+
+    # Track specific error types
+    exc_type = type(exc).__name__.lower()
+    if "csrf" in exc_type:
+        metrics.inc("csrf_token_error_total")
+    elif "profile_fetch" in exc_type:
+        metrics.inc("profile_fetch_error_total")
+    elif "profile_parse" in exc_type:
+        metrics.inc("profile_parse_error_total")
+    elif "authentication" in exc_type:
+        metrics.inc("auth_failure_total")
+
     logging.exception(f"PESUAcademyError: {exc.message}")
     return JSONResponse(
         status_code=exc.status_code,
@@ -130,6 +152,7 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handler for unhandled exceptions."""
+    metrics.inc("unhandled_exception_total")
     logging.exception("Unhandled exception occurred.")
     return JSONResponse(
         status_code=500,
@@ -156,6 +179,27 @@ async def health() -> JSONResponse:
             "status": True,
             "message": "ok",
             "timestamp": datetime.datetime.now(IST).isoformat(),
+        },
+    )
+
+
+@app.get(
+    "/metrics",
+    response_class=JSONResponse,
+    responses=metrics_docs.response_examples,
+    tags=["Monitoring"],
+)
+async def get_metrics() -> JSONResponse:
+    """Get current application metrics."""
+    logging.debug("Metrics requested.")
+    current_metrics = metrics.get()
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": True,
+            "message": "Metrics retrieved successfully",
+            "timestamp": datetime.datetime.now(IST).isoformat(),
+            "metrics": current_metrics,
         },
     )
 
@@ -199,6 +243,7 @@ async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks)
     # Authenticate the user
     authentication_result = {"timestamp": current_time}
     logging.info(f"Authenticating user={username} with PESU Academy...")
+
     authentication_result.update(
         await pesu_academy.authenticate(
             username=username,
@@ -207,6 +252,7 @@ async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks)
             fields=fields,
         ),
     )
+
     # Prefetch a new client with an unauthenticated CSRF token for the next request
     background_tasks.add_task(_refresh_csrf_token_with_lock)
 
@@ -216,6 +262,10 @@ async def authenticate(payload: RequestModel, background_tasks: BackgroundTasks)
         logging.info(f"Returning auth result for user={username}: {authentication_result}")
         authentication_result = authentication_result.model_dump(exclude_none=True)
         authentication_result["timestamp"] = current_time.isoformat()
+
+        # Track successful authentication only after validation succeeds
+        metrics.inc("auth_success_total")
+
         return JSONResponse(
             status_code=200,
             content=authentication_result,

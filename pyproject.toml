@@ -15,6 +15,7 @@ dependencies = [
     "pydantic>=2.6.0",
     "pytz>=2025.2",
     "selectolax>=0.3.30",
+    "ruff>=0.12.7",
 ]
 
 [project.optional-dependencies]

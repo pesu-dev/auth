@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -647,6 +647,7 @@ dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pytz" },
+    { name = "ruff" },
     { name = "selectolax" },
     { name = "uvicorn" },
 ]
@@ -680,6 +681,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.2.1" },
     { name = "python-dotenv", marker = "extra == 'dev'", specifier = ">=1.1.0" },
     { name = "pytz", specifier = ">=2025.2" },
+    { name = "ruff", specifier = ">=0.12.7" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.12.2" },
     { name = "seaborn", marker = "extra == 'dev'", specifier = ">=0.13.2" },
     { name = "selectolax", specifier = ">=0.3.30" },
