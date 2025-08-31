@@ -12,7 +12,9 @@ metrics_docs = ApiDocs(
                     "examples": {
                         "metrics_response": {
                             "summary": "Current Metrics",
-                            "description": "All current application metrics including authentication counts and error rates",
+                            "description": (
+                                "All current application metrics including authentication counts and error rates"
+                            ),
                             "value": {
                                 "status": True,
                                 "message": "Metrics retrieved successfully",

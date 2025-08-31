@@ -31,7 +31,7 @@ class TestMetricsIntegration:
         """Test that metrics endpoint returns empty metrics initially."""
         response = client.get("/metrics")
         assert response.status_code == 200
-        
+
         data = response.json()
         assert data["status"] is True
         assert data["message"] == "Metrics retrieved successfully"
@@ -46,7 +46,7 @@ class TestMetricsIntegration:
                 "status": True,
                 "message": "Login successful",
             }
-            
+
             # Make authentication request
             auth_response = client.post("/authenticate", json={
                 "username": "testuser",
@@ -54,21 +54,21 @@ class TestMetricsIntegration:
                 "profile": False
             })
             assert auth_response.status_code == 200
-            
+
             # Check metrics
             metrics_response = client.get("/metrics")
             assert metrics_response.status_code == 200
-            
+
             data = metrics_response.json()
             assert data["metrics"]["auth_success_total"] == 1
 
     def test_metrics_endpoint_after_authentication_error(self, client):
         """Test that metrics are collected after authentication error."""
         from app.exceptions.authentication import AuthenticationError
-        
+
         with patch("app.app.pesu_academy.authenticate") as mock_auth:
             mock_auth.side_effect = AuthenticationError("Invalid credentials")
-            
+
             # Make authentication request
             auth_response = client.post("/authenticate", json={
                 "username": "baduser",
@@ -76,11 +76,11 @@ class TestMetricsIntegration:
                 "profile": False
             })
             assert auth_response.status_code == 401
-            
+
             # Check metrics
             metrics_response = client.get("/metrics")
             assert metrics_response.status_code == 200
-            
+
             data = metrics_response.json()
             assert data["metrics"]["pesu_academy_error_total"] == 1
             assert data["metrics"]["auth_failure_total"] == 1
@@ -93,21 +93,21 @@ class TestMetricsIntegration:
             "password": "testpass"
         })
         assert auth_response.status_code == 400
-        
+
         # Check metrics
         metrics_response = client.get("/metrics")
         assert metrics_response.status_code == 200
-        
+
         data = metrics_response.json()
         assert data["metrics"]["validation_error_total"] == 1
 
     def test_metrics_endpoint_after_csrf_token_error(self, client):
         """Test that metrics are collected after CSRF token error."""
         from app.exceptions.authentication import CSRFTokenError
-        
+
         with patch("app.app.pesu_academy.authenticate") as mock_auth:
             mock_auth.side_effect = CSRFTokenError("CSRF token error")
-            
+
             # Make authentication request
             auth_response = client.post("/authenticate", json={
                 "username": "testuser",
@@ -115,11 +115,11 @@ class TestMetricsIntegration:
                 "profile": False
             })
             assert auth_response.status_code == 502
-            
+
             # Check metrics
             metrics_response = client.get("/metrics")
             assert metrics_response.status_code == 200
-            
+
             data = metrics_response.json()
             assert data["metrics"]["pesu_academy_error_total"] == 1
             assert data["metrics"]["csrf_token_error_total"] == 1
@@ -127,10 +127,10 @@ class TestMetricsIntegration:
     def test_metrics_endpoint_after_profile_fetch_error(self, client):
         """Test that metrics are collected after profile fetch error."""
         from app.exceptions.authentication import ProfileFetchError
-        
+
         with patch("app.app.pesu_academy.authenticate") as mock_auth:
             mock_auth.side_effect = ProfileFetchError("Profile fetch failed")
-            
+
             # Make authentication request
             auth_response = client.post("/authenticate", json={
                 "username": "testuser",
@@ -138,11 +138,11 @@ class TestMetricsIntegration:
                 "profile": True
             })
             assert auth_response.status_code == 502
-            
+
             # Check metrics
             metrics_response = client.get("/metrics")
             assert metrics_response.status_code == 200
-            
+
             data = metrics_response.json()
             assert data["metrics"]["pesu_academy_error_total"] == 1
             assert data["metrics"]["profile_fetch_error_total"] == 1
@@ -150,10 +150,10 @@ class TestMetricsIntegration:
     def test_metrics_endpoint_after_profile_parse_error(self, client):
         """Test that metrics are collected after profile parse error."""
         from app.exceptions.authentication import ProfileParseError
-        
+
         with patch("app.app.pesu_academy.authenticate") as mock_auth:
             mock_auth.side_effect = ProfileParseError("Profile parse failed")
-            
+
             # Make authentication request
             auth_response = client.post("/authenticate", json={
                 "username": "testuser",
@@ -161,11 +161,11 @@ class TestMetricsIntegration:
                 "profile": True
             })
             assert auth_response.status_code == 422
-            
+
             # Check metrics
             metrics_response = client.get("/metrics")
             assert metrics_response.status_code == 200
-            
+
             data = metrics_response.json()
             assert data["metrics"]["pesu_academy_error_total"] == 1
             assert data["metrics"]["profile_parse_error_total"] == 1
@@ -174,7 +174,7 @@ class TestMetricsIntegration:
         """Test that metrics are collected after unhandled exception."""
         with patch("app.app.pesu_academy.authenticate") as mock_auth:
             mock_auth.side_effect = RuntimeError("Unexpected error")
-            
+
             # Make authentication request
             auth_response = client.post("/authenticate", json={
                 "username": "testuser",
@@ -182,11 +182,11 @@ class TestMetricsIntegration:
                 "profile": False
             })
             assert auth_response.status_code == 500
-            
+
             # Check metrics
             metrics_response = client.get("/metrics")
             assert metrics_response.status_code == 200
-            
+
             data = metrics_response.json()
             assert data["metrics"]["unhandled_exception_total"] == 1
 
@@ -195,22 +195,22 @@ class TestMetricsIntegration:
         # Make multiple validation error requests
         for _ in range(3):
             client.post("/authenticate", json={"username": "", "password": "test"})
-        
+
         # Make a successful request
         with patch("app.app.pesu_academy.authenticate") as mock_auth:
             mock_auth.return_value = {"status": True, "message": "Login successful"}
             client.post("/authenticate", json={"username": "test", "password": "test"})
-        
+
         # Make an authentication error request
         with patch("app.app.pesu_academy.authenticate") as mock_auth:
             from app.exceptions.authentication import AuthenticationError
             mock_auth.side_effect = AuthenticationError("Invalid credentials")
             client.post("/authenticate", json={"username": "bad", "password": "bad"})
-        
+
         # Check accumulated metrics
         metrics_response = client.get("/metrics")
         assert metrics_response.status_code == 200
-        
+
         data = metrics_response.json()
         assert data["metrics"]["validation_error_total"] == 3
         assert data["metrics"]["auth_success_total"] == 1
@@ -223,13 +223,13 @@ class TestMetricsIntegration:
         for _ in range(5):
             response = client.get("/health")
             assert response.status_code == 200
-        
+
         # Check that no authentication metrics were recorded
         metrics_response = client.get("/metrics")
         data = metrics_response.json()
-        
+
         # Should only have empty metrics or no auth-related metrics
-        auth_metrics = {k: v for k, v in data["metrics"].items() 
+        auth_metrics = {k: v for k, v in data["metrics"].items()
                        if "auth" in k or "error" in k}
         assert len(auth_metrics) == 0
 
@@ -238,12 +238,12 @@ class TestMetricsIntegration:
         # Make readme request
         response = client.get("/readme", follow_redirects=False)
         assert response.status_code == 308
-        
+
         # Check that no authentication metrics were recorded
         metrics_response = client.get("/metrics")
         data = metrics_response.json()
-        
+
         # Should only have empty metrics or no auth-related metrics
-        auth_metrics = {k: v for k, v in data["metrics"].items() 
+        auth_metrics = {k: v for k, v in data["metrics"].items()
                        if "auth" in k or "error" in k}
         assert len(auth_metrics) == 0

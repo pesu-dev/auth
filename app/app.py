@@ -131,9 +131,9 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
     exc_type = type(exc).__name__.lower()
     if "csrf" in exc_type:
         metrics.inc("csrf_token_error_total")
-    elif "profile_fetch" in exc_type:
+    elif "profilefetch" in exc_type:
         metrics.inc("profile_fetch_error_total")
-    elif "profile_parse" in exc_type:
+    elif "profileparse" in exc_type:
         metrics.inc("profile_parse_error_total")
     elif "authentication" in exc_type:
         metrics.inc("auth_failure_total")

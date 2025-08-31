@@ -33,17 +33,39 @@ def make_request(
                 "password": os.getenv("TEST_PASSWORD"),
                 "profile": profile,
             }
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "Benchmark-Test/1.0"
+            }
             start_time = time.time()
             response = client.post(
                 f"{host}/{route}",
                 json=data,
+                headers=headers,
                 follow_redirects=True,
             )
         else:
+            headers = {
+                "Accept": "application/json",
+                "User-Agent": "Benchmark-Test/1.0"
+            }
             start_time = time.time()
             response = client.get(
                 f"{host}/{route}",
+                headers=headers,
                 follow_redirects=True,
             )
     elapsed_time = time.time() - start_time
-    return response.json(), elapsed_time
+    
+    # Handle different response types
+    try:
+        return response.json(), elapsed_time
+    except ValueError:
+        # For non-JSON responses (like HTML redirects), return status info
+        return {
+            "status_code": response.status_code,
+            "content_type": response.headers.get("content-type", ""),
+            "content_length": len(response.content),
+            "response_time": elapsed_time
+        }, elapsed_time
