@@ -36,7 +36,7 @@ def make_request(
             headers = {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "Benchmark-Test/1.0"
+                "User-Agent": "Benchmark-Test/1.0",
             }
             start_time = time.time()
             response = client.post(
@@ -46,10 +46,7 @@ def make_request(
                 follow_redirects=True,
             )
         else:
-            headers = {
-                "Accept": "application/json",
-                "User-Agent": "Benchmark-Test/1.0"
-            }
+            headers = {"Accept": "application/json", "User-Agent": "Benchmark-Test/1.0"}
             start_time = time.time()
             response = client.get(
                 f"{host}/{route}",
@@ -57,7 +54,7 @@ def make_request(
                 follow_redirects=True,
             )
     elapsed_time = time.time() - start_time
-    
+
     # Handle different response types
     try:
         return response.json(), elapsed_time
@@ -67,5 +64,5 @@ def make_request(
             "status_code": response.status_code,
             "content_type": response.headers.get("content-type", ""),
             "content_length": len(response.content),
-            "response_time": elapsed_time
+            "response_time": elapsed_time,
         }, elapsed_time
