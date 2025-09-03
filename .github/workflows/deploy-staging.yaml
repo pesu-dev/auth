@@ -18,7 +18,7 @@ jobs:
             echo "❌ Staging deploy hook missing!"
             exit 1
           fi
-      
+
       - name: Deploy to Staging Environment
         run: |
           echo "🚀 Deploying to Staging..."
