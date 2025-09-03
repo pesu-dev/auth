@@ -1,0 +1,31 @@
+name: Deploy to Staging
+
+on:
+  workflow_run:
+    workflows: [ "Pre-Commit Checks" ]
+    types:
+      - completed
+
+jobs:
+  # Deploy to staging environment
+  deploy-staging:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'dev' }}
+    env:
+      RENDER_DEPLOY_HOOK_URL_DEV: ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}
+    steps:
+      - name: Check Staging Deploy Hook URL
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}" ]; then
+            echo "❌ Staging deploy hook missing!"
+            exit 1
+          fi
+
+      - name: Deploy to Staging Environment
+        run: |
+          echo "🚀 Deploying to Staging..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }} || {
+            echo "❌ Staging deploy failed!"
+            exit 1
+          }
+          echo "✅ Staging deployment completed successfully!"
