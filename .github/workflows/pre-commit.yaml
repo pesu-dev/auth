@@ -1,6 +1,15 @@
 name: Pre-Commit Checks
 
-on: [ push, pull_request ]
+on:
+  push:
+    branches-ignore:
+      - main
+      - dev
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
   pre-commit:
@@ -16,7 +25,6 @@ jobs:
       TEST_SRN: ${{ secrets.TEST_SRN }}
       TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
       TEST_BRANCH: ${{ secrets.TEST_BRANCH }}
-      TEST_BRANCH_SHORT_CODE: ${{ secrets.TEST_BRANCH_SHORT_CODE }}
       TEST_PROGRAM: ${{ secrets.TEST_PROGRAM }}
       TEST_SEMESTER: ${{ secrets.TEST_SEMESTER }}
       TEST_SECTION: ${{ secrets.TEST_SECTION }}
@@ -26,18 +34,18 @@ jobs:
       TEST_CAMPUS_CODE: ${{ secrets.TEST_CAMPUS_CODE }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pre-commit pytest pytest-cov httpx python-dotenv pytest-asyncio
+          pip install .
+          pip install .[dev]
 
       - name: Run pre-commit hooks
         run: pre-commit run --all-files

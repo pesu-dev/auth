@@ -26,25 +26,21 @@ jobs:
 
       - name: Validate PR origin and target branch
         run: |
-          # Allow dev → main PRs, but only if it's within the same repo (not a fork)
-          if [ "$SOURCE_REPO" = "$TARGET_REPO" ] && [ "$SOURCE_BRANCH" = "dev" ] && [ "$TARGET_BRANCH" = "main" ]; then
-            echo "✅ Dev to Main PR (release) allowed (same repo)."
-            exit 0
-          fi
-
-          # Otherwise: PRs must come from a fork, non-main branch, targeting dev
+          # PRs must come from a fork
           if [ "$SOURCE_REPO" = "$TARGET_REPO" ]; then
-            echo "❌ PR must come from a fork (not the main repo)."
+            echo "❌ PR must come from a fork."
             exit 1
           fi
 
+          # PRs cannot come from the 'main' branch of a fork
           if [ "$SOURCE_BRANCH" = "main" ]; then
             echo "❌ PR cannot come from the 'main' branch of a fork."
             exit 1
           fi
 
+          # PRs must target the 'dev' branch only
           if [ "$TARGET_BRANCH" != "dev" ]; then
-            echo "❌ PR must target the 'dev' branch (unless it's a dev → main release)."
+            echo "❌ PR must target the 'dev' branch only. PRs to 'main' are not allowed."
             exit 1
           fi
 
