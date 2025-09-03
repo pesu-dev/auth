@@ -1,14 +1,16 @@
 name: Deploy to Staging
 
 on:
-  push:
-    branches:
-      - dev
+  workflow_run:
+    workflows: [ "Pre-Commit Checks" ]
+    types:
+      - completed
 
 jobs:
   # Deploy to staging environment
   deploy-staging:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'dev' }}
     env:
       RENDER_DEPLOY_HOOK_URL_DEV: ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}
     steps:

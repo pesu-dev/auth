@@ -1,15 +1,6 @@
 name: Pre-Commit Checks
 
-on:
-  push:
-    branches-ignore:
-      - main
-      - dev
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
+on: [ push, pull_request ]
 
 jobs:
   pre-commit-checks:
