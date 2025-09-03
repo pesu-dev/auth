@@ -3,7 +3,7 @@ name: Deploy to Production
 on:
   workflow_dispatch:
 
-env:
+vars:
   # Array of usernames allowed to trigger production deploys
   ALLOWED_USERS: '["aditeyabaral", "achyu-dev", "ndigvijay"]'
 
@@ -11,7 +11,7 @@ jobs:
   # Sync dev branch to main before deployment
   sync-dev-to-main:
     runs-on: ubuntu-latest
-    if: ${{ contains(fromJson(env.ALLOWED_USERS), github.actor) }}
+    if: ${{ contains(fromJson(vars.ALLOWED_USERS), github.actor) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
   push-to-dockerhub:
     runs-on: ubuntu-latest
     needs: sync-dev-to-main
-    if: ${{ contains(fromJson(env.ALLOWED_USERS), github.actor) }}
+    if: ${{ contains(fromJson(vars.ALLOWED_USERS), github.actor) }}
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
@@ -89,7 +89,7 @@ jobs:
   push-to-ghcr:
     runs-on: ubuntu-latest
     needs: sync-dev-to-main
-    if: ${{ contains(fromJson(env.ALLOWED_USERS), github.actor) }}
+    if: ${{ contains(fromJson(vars.ALLOWED_USERS), github.actor) }}
     permissions:
       contents: read
       packages: write
@@ -124,7 +124,7 @@ jobs:
   deploy-prod-and-staging:
     runs-on: ubuntu-latest
     needs: [sync-dev-to-main, push-to-dockerhub, push-to-ghcr]
-    if: ${{ contains(fromJson(env.ALLOWED_USERS), github.actor) }}
+    if: ${{ contains(fromJson(vars.ALLOWED_USERS), github.actor) }}
     env:
       RENDER_DEPLOY_HOOK_URL_PROD: ${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }}
       RENDER_DEPLOY_HOOK_URL_DEV: ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}
