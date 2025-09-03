@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
 
 env:
-    # Array of usernames allowed to trigger production deploys
-    ALLOWED_USERS: '["aditeyabaral", "achyu-dev", "ndigvijay"]'
+  # Array of usernames allowed to trigger production deploys
+  ALLOWED_USERS: ${{ vars.PROD_DEPLOYMENT_ALLOWED_USERS }}
 
 jobs:
   # Sync dev branch to main before deployment
