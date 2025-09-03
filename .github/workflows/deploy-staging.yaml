@@ -7,7 +7,7 @@ on:
 
 jobs:
   # Deploy to staging environment
-  deploy-to-staging:
+  deploy-staging:
     runs-on: ubuntu-latest
     env:
       RENDER_DEPLOY_HOOK_URL_DEV: ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}

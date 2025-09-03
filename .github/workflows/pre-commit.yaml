@@ -12,7 +12,7 @@ on:
       - reopened
 
 jobs:
-  pre-commit:
+  pre-commit-checks:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 1
