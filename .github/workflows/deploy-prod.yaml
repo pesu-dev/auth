@@ -3,15 +3,11 @@ name: Deploy to Production
 on:
   workflow_dispatch:
 
-env:
-  # Array of usernames allowed to trigger production deploys
-  ALLOWED_USERS: ${{ vars.PROD_DEPLOYMENT_ALLOWED_USERS }}
-
 jobs:
   # Sync dev branch to main before deployment
   sync-dev-to-main:
     runs-on: ubuntu-latest
-    if: ${{ contains(fromJson(env.ALLOWED_USERS), github.actor) }}
+    if: ${{ contains(fromJson(vars.PROD_DEPLOYMENT_ALLOWED_USERS), github.actor) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,7 +44,7 @@ jobs:
   push-to-dockerhub:
     runs-on: ubuntu-latest
     needs: sync-dev-to-main
-    if: ${{ contains(fromJson(env.ALLOWED_USERS), github.actor) }}
+    if: ${{ contains(fromJson(vars.PROD_DEPLOYMENT_ALLOWED_USERS), github.actor) }}
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
@@ -89,7 +85,7 @@ jobs:
   push-to-ghcr:
     runs-on: ubuntu-latest
     needs: sync-dev-to-main
-    if: ${{ contains(fromJson(env.ALLOWED_USERS), github.actor) }}
+    if: ${{ contains(fromJson(vars.PROD_DEPLOYMENT_ALLOWED_USERS), github.actor) }}
     permissions:
       contents: read
       packages: write
@@ -124,7 +120,7 @@ jobs:
   deploy-prod-and-staging:
     runs-on: ubuntu-latest
     needs: [sync-dev-to-main, push-to-dockerhub, push-to-ghcr]
-    if: ${{ contains(fromJson(env.ALLOWED_USERS), github.actor) }}
+    if: ${{ contains(fromJson(vars.PROD_DEPLOYMENT_ALLOWED_USERS), github.actor) }}
     env:
       RENDER_DEPLOY_HOOK_URL_PROD: ${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }}
       RENDER_DEPLOY_HOOK_URL_DEV: ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}
@@ -140,15 +136,6 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy to Production
-        run: |
-          echo "🚀 Deploying to Production..."
-          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }} || {
-            echo "❌ Production deploy failed!"
-            exit 1
-          }
-          echo "✅ Production deployment completed successfully!"
-
       - name: Deploy to Staging
         run: |
           echo "🚀 Deploying to Staging..."
@@ -158,10 +145,19 @@ jobs:
           }
           echo "✅ Staging deployment completed successfully!"
 
+      - name: Deploy to Production
+        run: |
+          echo "🚀 Deploying to Production..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }} || {
+            echo "❌ Production deploy failed!"
+            exit 1
+          }
+          echo "✅ Production deployment completed successfully!"
+
       - name: Deployment Summary
         run: |
           echo "🎉 All deployments completed successfully!"
           echo "✅ Branch sync: dev → main"
           echo "✅ Docker images: pushed to Docker Hub and GHCR"
-          echo "✅ Production: deployed"
           echo "✅ Staging: deployed"
+          echo "✅ Production: deployed"
