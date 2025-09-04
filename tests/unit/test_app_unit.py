@@ -4,11 +4,20 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.app import app, main
+from app.metrics import metrics
 
 
 @pytest.fixture
 def client():
     return TestClient(app, raise_server_exceptions=False)
+
+
+@pytest.fixture(autouse=True)
+def reset_metrics():
+    """Reset metrics before each test."""
+    metrics.metrics.clear()
+    yield
+    metrics.metrics.clear()
 
 
 @patch("app.app.pesu_academy.authenticate")

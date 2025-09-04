@@ -96,6 +96,7 @@ The API provides multiple endpoints for authentication, documentation, and monit
 | `/authenticate` | `POST`     | Authenticates a user using their PESU credentials.     |
 | `/health`       | `GET`      | A health check endpoint to monitor the API's status.   |
 | `/readme`       | `GET`      | Redirects to the project's official GitHub repository. |
+| `/metrics`      | `GET`      | Returns current application metrics and counters.      |
 
 ### `/authenticate`
 
@@ -159,6 +160,31 @@ does not take any request parameters.
 ### `/readme`
 
 This endpoint redirects to the project's official GitHub repository. This endpoint does not take any request parameters.
+
+### `/metrics`
+
+This endpoint provides application metrics for monitoring authentication success rates, error counts, and system performance. It's useful for observability and debugging. This endpoint does not take any request parameters.
+
+#### Response Object
+
+| **Field** | **Type**   | **Description**                                                   |
+|-----------|------------|-------------------------------------------------------------------|
+| `status`  | `boolean`  | `true` if metrics retrieved successfully, `false` if there was an error |
+| `message` | `string`   | Success message or error description                              |
+| `timestamp` | `string` | A timezone offset timestamp indicating when metrics were retrieved |
+| `metrics` | `object`   | Dictionary containing all current metric counters                 |
+
+The `metrics` object includes counters for:
+- `auth_success_total` - Successful authentication attempts
+- `auth_failure_total` - Failed authentication attempts
+- `validation_error_total` - Request validation failures
+- `pesu_academy_error_total` - PESU Academy service errors
+- `unhandled_exception_total` - Unexpected application errors
+- `csrf_token_error_total` - CSRF token extraction failures
+- `profile_fetch_error_total` - Profile page fetch failures
+- `profile_parse_error_total` - Profile parsing errors
+- `csrf_token_refresh_success_total` - Successful background CSRF refreshes
+- `csrf_token_refresh_failure_total` - Failed background CSRF refreshes
 
 ### Integrating your application with the PESUAuth API
 

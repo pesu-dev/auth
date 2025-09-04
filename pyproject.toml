@@ -15,6 +15,9 @@ dependencies = [
     "pydantic>=2.6.0",
     "pytz>=2025.2",
     "selectolax>=0.3.30",
+    "ruff>=0.12.7",
+    "python-dotenv>=1.1.1",
+    "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]
@@ -74,3 +77,10 @@ exclude = [
 [tool.ruff.format]
 quote-style = "double"
 docstring-code-format = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "pytest-cov>=6.2.1",
+]
