@@ -15,7 +15,7 @@ Please provide a concise summary of the changes:
 
 > ℹ️ **Fixes / Related Issues**
 > Fixes: #100
-> Related: #656
+> Related: #001
 
 
 ## 🧱 Type of Change
