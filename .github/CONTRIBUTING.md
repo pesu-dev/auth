@@ -58,7 +58,8 @@ The standard workflow for contributing is as follows:
 5. Create a Pull Request (PR) against the repository's `dev` branch (not `main`).
 6. Wait for review and feedback from the maintainers, address any comments or suggestions.
 7. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
-8. After successful testing in staging, changes are promoted from `dev` to `main` for production deployment.
+8. After all pre-commit checks pass, deployment to staging is triggered automatically.
+9. Production deployment is performed manually by authorized maintainers after successful staging validation.
 
 > [!WARNING]
 > Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository. All
@@ -222,9 +223,10 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
     * Link any related issues using `Closes #issue-number`
     * Add screenshots, terminal output, or examples if relevant
 
+After your PR is merged into `dev`, all `pre-commit` checks will run automatically. If they pass, deployment to staging is triggered.
 The maintainers will review your PR, provide feedback, and may request changes. Once approved, your PR will be merged
 into the `dev` branch and deployed to staging for testing. After successful validation, changes will be promoted to
-production.
+production which is manually trigerred by authorized maintainers.
 
 ## ❓ Need Help?
 
