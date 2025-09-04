@@ -68,7 +68,7 @@ Please provide a concise summary of the changes:
 - [ ] Changes are backwards compatible (if applicable)
 - [ ] Feature flags or `.env` vars updated (if applicable)
 - [ ] I've tested across multiple environments (if applicable)
-- [ ] Benchmarks still meet expected performance (`scripts/benchmark_auth.py`)
+- [ ] Benchmarks still meet expected performance (`scripts/benchmark/benchmark_requests.py`)
 
 
 ## 🛠️ Affected API Behaviour
