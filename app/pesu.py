@@ -335,6 +335,6 @@ class PESUAcademy:
 
         logging.info(f"Authentication process for user={username} completed successfully.")
 
-        # Close the client and return the result
+        # Close the client and return the result back
         await client.aclose()
         return result
