@@ -338,8 +338,7 @@ class PESUAcademy:
 
         if len(headers) != len(cells):
             raise KYCASFetchError(
-                f"Mismatch between KYCAS table headers ({len(headers)}) and cells ({len(cells)}) "
-                f"for user={username}.",
+                f"Mismatch between KYCAS table headers ({len(headers)}) and cells ({len(cells)}) for user={username}.",
             )
 
         for header, cell_value in zip(headers, cells):
@@ -440,7 +439,9 @@ class PESUAcademy:
             logging.info(f"KYCAS data requested for user={username}. Fetching KYCAS data...")
             # Fetch the class and section information
             result["know_your_class_and_section"] = await self.get_know_your_class_and_section(
-                client, csrf_token, username,
+                client,
+                csrf_token,
+                username,
             )
             # Filter the fields if field filtering is enabled
             if field_filtering:
