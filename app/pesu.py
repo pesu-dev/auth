@@ -12,6 +12,7 @@ from selectolax.parser import HTMLParser, Node
 from app.exceptions.authentication import (
     AuthenticationError,
     CSRFTokenError,
+    KYCASFetchError,
     ProfileFetchError,
     ProfileParseError,
 )
@@ -46,6 +47,10 @@ class PESUAcademy:
         "phone",
         "campus_code",
         "campus",
+        "class",
+        "cycle",
+        "department",
+        "institute_name",
     ]
 
     PROFILE_PAGE_HEADER_TO_KEY_MAP = {
@@ -56,6 +61,18 @@ class PESUAcademy:
         "Branch": "branch",
         "Semester": "semester",
         "Section": "section",
+    }
+
+    KYCAS_HEADER_TO_KEY_MAP = {
+        "PRN": "prn",
+        "SRN": "srn",
+        "Name": "name",
+        "Class": "class",
+        "Section": "section",
+        "Cycle": "cycle",
+        "Department": "department",
+        "Branch": "branch",
+        "Institute Name": "institute_name",
     }
 
     def __init__(self) -> None:
@@ -254,11 +271,95 @@ class PESUAcademy:
 
         return profile
 
+    async def get_know_your_class_and_section(
+        self,
+        client: httpx.AsyncClient,
+        csrf_token: str,
+        username: str,
+    ) -> dict[str, Any]:
+        """Get the class and section information of the user from the Know Your Class and Section page.
+
+        Args:
+            client (httpx.AsyncClient): The authenticated HTTP client to use for making requests.
+            csrf_token (str): The authenticated CSRF token.
+            username (str): The username of the user, usually their SRN or PRN.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the user's class and section information.
+        """
+        logging.info(f"Fetching class and section data for user={username} from KYCAS page...")
+        kycas_url = "https://www.pesuacademy.com/Academy/a/getStudentClassInfo"
+        kycas_data = {"controllerMode": "370", "actionType": "174", "loginId": username}
+        kycas_headers = {
+            "origin": "https://www.pesuacademy.com",
+            "referer": "https://www.pesuacademy.com/Academy/",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "x-csrf-token": csrf_token,
+            "x-requested-with": "XMLHttpRequest",
+        }
+
+        try:
+            response = await client.post(kycas_url, data=kycas_data, headers=kycas_headers)
+        except Exception:
+            raise KYCASFetchError(
+                f"Failed to send KYCAS request to PESU Academy for user={username}.",
+            )
+
+        if response.status_code != 200:
+            raise KYCASFetchError(
+                f"Failed to fetch KYCAS data from PESU Academy for user={username}. "
+                f"Received status code {response.status_code}.",
+            )
+
+        soup = await asyncio.to_thread(HTMLParser, response.text)
+        kycas: dict[str, Any] = {}
+
+        # Parse the HTML table
+        table = soup.css_first("table")
+        if not table:
+            raise KYCASFetchError(
+                f"Could not find KYCAS table in the response for user={username}.",
+            )
+
+        headers = [th.text(strip=True) for th in table.css("thead th")]
+        if not headers:
+            raise KYCASFetchError(
+                f"Could not find KYCAS table headers in the response for user={username}.",
+            )
+
+        # Find the first data row
+        row = table.css_first("tbody tr")
+        if not row:
+            raise KYCASFetchError(
+                f"Could not find KYCAS data row in the response for user={username}.",
+            )
+
+        cells = [td.text(strip=True) for td in row.css("td")]
+
+        if len(headers) != len(cells):
+            raise KYCASFetchError(
+                f"Mismatch between KYCAS table headers ({len(headers)}) and cells ({len(cells)}) "
+                f"for user={username}.",
+            )
+
+        for header, cell_value in zip(headers, cells):
+            if mapped_key := self.KYCAS_HEADER_TO_KEY_MAP.get(header):
+                kycas[mapped_key] = cell_value
+
+        if not kycas:
+            raise KYCASFetchError(
+                f"No KYCAS data could be extracted for user={username}.",
+            )
+
+        logging.info(f"KYCAS data retrieved for user={username}: {kycas}.")
+        return kycas
+
     async def authenticate(
         self,
         username: str,
         password: str,
         profile: bool = False,
+        know_your_class_and_section: bool = False,
         fields: list[str] | None = None,
     ) -> dict[str, Any]:
         """Authenticate the user with the provided username and password.
@@ -267,6 +368,8 @@ class PESUAcademy:
             username (str): The username of the user, usually their PRN/email/phone number.
             password (str): The password of the user.
             profile (bool, optional): Whether to fetch the profile information or not. Defaults to False.
+            know_your_class_and_section (bool, optional): Whether to fetch the class and section
+                information or not. Defaults to False.
             fields (Optional[list[str]], optional): The fields to fetch from the profile.
             Defaults to None, which means all default fields will be fetched.
 
@@ -331,6 +434,22 @@ class PESUAcademy:
                 result["profile"] = {key: value for key, value in result["profile"].items() if key in fields}
                 logging.info(
                     f"Field filtering enabled. Filtered profile data for user={username}: {result['profile']}",
+                )
+
+        if know_your_class_and_section:
+            logging.info(f"KYCAS data requested for user={username}. Fetching KYCAS data...")
+            # Fetch the class and section information
+            result["know_your_class_and_section"] = await self.get_know_your_class_and_section(
+                client, csrf_token, username,
+            )
+            # Filter the fields if field filtering is enabled
+            if field_filtering:
+                result["know_your_class_and_section"] = {
+                    key: value for key, value in result["know_your_class_and_section"].items() if key in fields
+                }
+                logging.info(
+                    f"Field filtering enabled. Filtered KYCAS data for user={username}: "
+                    f"{result['know_your_class_and_section']}",
                 )
 
         logging.info(f"Authentication process for user={username} completed successfully.")

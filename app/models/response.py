@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import ProfileModel
+from app.models import KYCASModel, ProfileModel
 
 
 class ResponseModel(BaseModel):
@@ -37,4 +37,11 @@ class ResponseModel(BaseModel):
         None,
         title="User Profile Data",
         description="The user's profile data returned only if authentication succeeds and profile data was requested.",
+    )
+
+    know_your_class_and_section: KYCASModel | None = Field(
+        None,
+        title="Know Your Class and Section Data",
+        description="The user's class and section data returned only if authentication succeeds"
+        " and class/section data was requested.",
     )

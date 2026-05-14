@@ -33,6 +33,13 @@ class RequestModel(BaseModel):
         json_schema_extra={"example": True},
     )
 
+    know_your_class_and_section: bool = Field(
+        False,
+        title="Know Your Class and Section Flag",
+        description="Whether to fetch the user's class and section information.",
+        json_schema_extra={"example": True},
+    )
+
     fields: list[Literal[*PESUAcademy.DEFAULT_FIELDS]] | None = Field(
         None,
         title="Profile Fields",
