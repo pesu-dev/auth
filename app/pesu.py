@@ -82,6 +82,76 @@ class PESUAcademy:
         """Initialize the PESUAcademy class."""
         pass
 
+    def _parse_sslc_name(self, res_data: object) -> str | None:
+        """Parse nameAsInSSLC from the ISA marks response JSON."""
+        if not isinstance(res_data, dict):
+            return None
+        for marks in res_data.values():
+            if not isinstance(marks, list):
+                continue
+            for mark in marks:
+                if not isinstance(mark, dict):
+                    continue
+                name_sslc = mark.get("NameAsInSSLC")
+                if name_sslc and name_sslc.strip():
+                    return name_sslc.strip()
+        return None
+
+    async def _fetch_name_as_in_sslc(self, client: httpx.AsyncClient, token: str, user_id: str) -> str | None:
+        """Fetch the official name (nameAsInSSLC) from ISA results."""
+        dispatcher_url = "https://www.pesuacademy.com/MAcademy/mobile/dispatcher"
+        headers = {"mobileappauthenticationtoken": token}
+
+        # 1. Fetch ISA semesters
+        sem_payload = {
+            "action": "6",
+            "mode": "5",
+            "userId": user_id,
+            "randomNum": "0.5",
+            "whichObjectId": "clickHome_footer_myresults",
+            "title": "ISA Results",
+            "serverMode": "0",
+            "redirectValue": "redirect:/a/ad",
+        }
+        try:
+            sem_resp = await client.post(dispatcher_url, data=sem_payload, headers=headers)
+            if sem_resp.status_code != 200:
+                return None
+            sem_data = sem_resp.json()
+            if isinstance(sem_data, str):
+                sem_data = json.loads(sem_data)
+            if not isinstance(sem_data, list) or len(sem_data) == 0:
+                return None
+
+            # Get the first/current semester
+            semester = sem_data[0]
+            batch_class_id = semester.get("BatchClassId")
+            class_batch_section_id = semester.get("ClassBatchSectionId")
+            if batch_class_id is None or class_batch_section_id is None:
+                return None
+
+            # 2. Fetch ISA results for that semester
+            results_payload = {
+                "action": "6",
+                "mode": "9",
+                "userId": user_id,
+                "randomNum": "0.5",
+                "batchClassId": str(batch_class_id),
+                "classBatchSectionId": str(class_batch_section_id),
+                "fetchId": f"{batch_class_id}-{class_batch_section_id}",
+            }
+            res_resp = await client.post(dispatcher_url, data=results_payload, headers=headers)
+            if res_resp.status_code != 200:
+                return None
+            res_data = res_resp.json()
+            if isinstance(res_data, str):
+                res_data = json.loads(res_data)
+
+            return self._parse_sslc_name(res_data)
+        except Exception:
+            pass
+        return None
+
     def _map_data(
         self,
         data: dict[str, Any],
@@ -90,6 +160,7 @@ class PESUAcademy:
         know_your_class_and_section: bool,
         fields: list[str],
         field_filtering: bool,
+        name_sslc: str | None = None,
     ) -> dict[str, Any]:
         """Map the profile and class/section data from the response JSON."""
         prn = data.get("loginId")
@@ -113,9 +184,10 @@ class PESUAcademy:
         result = {"status": True, "message": "Login successful."}
 
         # Fetch the profile information if profile details are requested
+        name = name_sslc or data.get("name")
         if profile:
             profile_dict = {
-                "name": data.get("name"),
+                "name": name,
                 "prn": prn,
                 "srn": srn,
                 "program": program,
@@ -137,7 +209,7 @@ class PESUAcademy:
             kycas_dict = {
                 "prn": prn,
                 "srn": srn,
-                "name": data.get("name"),
+                "name": name,
                 "semester": semester_val,
                 "section": f"Section {data.get('sectionName')}" if data.get("sectionName") else None,
                 "cycle": "NA",
@@ -238,6 +310,12 @@ class PESUAcademy:
             if not profile and not know_your_class_and_section:
                 return {"status": True, "message": "Login successful."}
 
+            token = response.headers.get("mobileappauthenticationtoken") or ""
+            user_id = str(data.get("userId") or "")
+            name_sslc = None
+            if token and user_id:
+                name_sslc = await self._fetch_name_as_in_sslc(client, token, user_id)
+
             # Map the parsed response JSON to return format
             return self._map_data(
                 data=data,
@@ -246,4 +324,5 @@ class PESUAcademy:
                 know_your_class_and_section=know_your_class_and_section,
                 fields=fields,
                 field_filtering=field_filtering,
+                name_sslc=name_sslc,
             )
