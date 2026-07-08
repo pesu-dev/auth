@@ -13,7 +13,6 @@ dependencies = [
     "uvicorn>=0.47.0",
     "httpx>=0.28.1",
     "pydantic>=2.13.4",
-    "selectolax>=0.4.9",
 ]
 
 [dependency-groups]

@@ -1,905 +1,135 @@
 from unittest.mock import AsyncMock, MagicMock, patch
-
 import pytest
+import httpx
 
-from app.exceptions.authentication import (
-    AuthenticationError,
-    CSRFTokenError,
-    KYCASFetchError,
-    ProfileFetchError,
-    ProfileParseError,
-)
+from app.exceptions.authentication import AuthenticationError
 from app.pesu import PESUAcademy
 
 
 @pytest.fixture
 def pesu():
     return PESUAcademy()
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
 @pytest.mark.asyncio
-async def test_get_profile_information_http_error(mock_get, pesu):
-    mock_get.side_effect = Exception("HTTP request failed")
-    with pytest.raises(ProfileFetchError):
-        result = await pesu.get_profile_information(AsyncMock(), "testuser")
-        assert "error" in result
-        assert "Unable to fetch profile data" in result["error"]
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_get_profile_information_non_200_status(mock_get, pesu):
-    mock_response = AsyncMock()
-    mock_response.status_code = 404
-    mock_get.return_value = mock_response
-    with pytest.raises(ProfileFetchError):
-        result = await pesu.get_profile_information(AsyncMock(), "testuser")
-        assert "error" in result
-        assert "Unable to fetch profile data" in result["error"]
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_authenticate_csrf_token_not_found(mock_get, pesu):
-    mock_response = AsyncMock()
-    mock_response.text = "<html><head></head><body>No CSRF token here</body></html>"
-    mock_get.return_value = mock_response
-    with pytest.raises(CSRFTokenError):
-        result = await pesu.authenticate("testuser", "testpass")
-        assert result["status"] is False
-        assert "Unable to fetch csrf token" in result["message"]
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
 @patch("app.pesu.httpx.AsyncClient.post")
-@pytest.mark.asyncio
-async def test_authenticate_post_request_failure(mock_post, mock_get, pesu):
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-    mock_post.side_effect = CSRFTokenError("POST request failed")
-    with pytest.raises(CSRFTokenError):
-        result = await pesu.authenticate("testuser", "testpass")
-        assert result["status"] is False
-        assert "Unable to authenticate" in result["message"]
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
-@patch("app.pesu.httpx.AsyncClient.post")
-@pytest.mark.asyncio
-async def test_authenticate_csrf_token_missing_after_login(mock_post, mock_get, pesu):
-    """Test authenticate when CSRF token is missing after successful login."""
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-    mock_post_response = AsyncMock()
-    mock_post_response.text = "<html><body>Login successful but no CSRF token</body></html>"
-    mock_post.return_value = mock_post_response
-    with pytest.raises(CSRFTokenError):
-        result = await pesu.authenticate("testuser", "testpass")
-        assert result["status"] is True
-        assert result["message"] == "Login successful."
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
-@patch("app.pesu.httpx.AsyncClient.post")
-@patch("app.pesu.PESUAcademy.get_profile_information")
-@pytest.mark.asyncio
-async def test_authenticate_with_profile_field_filtering(
-    mock_get_profile,
-    mock_post,
-    mock_get,
-    pesu,
-):
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-    mock_post_response = AsyncMock()
-    mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    mock_post.return_value = mock_post_response
-    mock_get_profile.return_value = {
-        "name": "Test User",
-        "prn": "PES12345",
-        "email": "test@example.com",
-        "branch": "Computer Science",
-        "campus": "RR",
+async def test_authenticate_success(mock_post, pesu):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "login": "SUCCESS",
+        "userId": "12345",
+        "loginId": "PES1201800001",
+        "srn": "PES1UG19CS001",
+        "name": "John Doe",
+        "phone": "9876543210",
+        "email": "john@example.com",
+        "program": "Bachelor of Technology",
+        "branch": "CSE",
+        "className": "B.Tech-CSE-Sem_4",
+        "sectionName": "A",
+        "batchClass": "B.Tech CSE - 4th Semester"
     }
-    result = await pesu.authenticate("testuser", "testpass", profile=True, fields=["name", "email"])
+    mock_post.return_value = mock_response
+
+    result = await pesu.authenticate("user", "pass", profile=True, know_your_class_and_section=True)
+
+    assert result["status"] is True
+    assert result["message"] == "Login successful."
+    assert "profile" in result
+    assert result["profile"]["name"] == "John Doe"
+    assert result["profile"]["prn"] == "PES1201800001"
+    assert result["profile"]["semester"] == "Sem-4"
+    assert result["profile"]["section"] == "A"
+    assert result["profile"]["campus"] == "RR"
+    assert result["profile"]["campusCode"] == 1
+
+    assert "knowYourClassAndSection" in result
+    assert result["knowYourClassAndSection"]["prn"] == "PES1201800001"
+    assert result["knowYourClassAndSection"]["semester"] == "Sem-4"
+    assert result["knowYourClassAndSection"]["section"] == "Section A"
+
+
+@pytest.mark.asyncio
+@patch("app.pesu.httpx.AsyncClient.post")
+async def test_authenticate_success_no_details(mock_post, pesu):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "login": "SUCCESS",
+        "userId": "12345",
+    }
+    mock_post.return_value = mock_response
+
+    result = await pesu.authenticate("user", "pass", profile=False, know_your_class_and_section=False)
+
+    assert result["status"] is True
+    assert result["message"] == "Login successful."
+    assert "profile" not in result
+    assert "knowYourClassAndSection" not in result
+@pytest.mark.asyncio
+@patch("app.pesu.httpx.AsyncClient.post")
+async def test_authenticate_failed_credentials(mock_post, pesu):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "login": "FAILURE",
+        "errorMessage": "Invalid username or password, or user does not exist"
+    }
+    mock_post.return_value = mock_response
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        await pesu.authenticate("user", "wrongpass")
+    assert "Invalid username or password" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+@patch("app.pesu.httpx.AsyncClient.post")
+async def test_authenticate_connection_error(mock_post, pesu):
+    mock_post.side_effect = httpx.RequestError("Connection timed out")
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        await pesu.authenticate("user", "pass")
+    assert "Connection failed" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+@patch("app.pesu.httpx.AsyncClient.post")
+async def test_authenticate_non_200_status(mock_post, pesu):
+    mock_response = MagicMock()
+    mock_response.status_code = 500
+    mock_post.return_value = mock_response
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        await pesu.authenticate("user", "pass")
+    assert "Server returned status code 500" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+@patch("app.pesu.httpx.AsyncClient.post")
+async def test_authenticate_field_filtering(mock_post, pesu):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "login": "SUCCESS",
+        "userId": "12345",
+        "loginId": "PES1201800001",
+        "srn": "PES1UG19CS001",
+        "name": "John Doe",
+        "phone": "9876543210",
+        "email": "john@example.com",
+        "program": "Bachelor of Technology",
+        "branch": "CSE",
+        "className": "B.Tech-CSE-Sem_4",
+        "sectionName": "A",
+        "batchClass": "B.Tech CSE - 4th Semester"
+    }
+    mock_post.return_value = mock_response
+
+    result = await pesu.authenticate(
+        "user", "pass", profile=True, know_your_class_and_section=True, fields=["name", "email"]
+    )
+
     assert result["status"] is True
     assert "profile" in result
     assert "name" in result["profile"]
     assert "email" in result["profile"]
     assert "prn" not in result["profile"]
-    assert "branch" not in result["profile"]
-    assert "campus" not in result["profile"]
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
-@patch("app.pesu.httpx.AsyncClient.post")
-@patch("app.pesu.PESUAcademy.get_profile_information")
-@pytest.mark.asyncio
-async def test_authenticate_with_profile_no_field_filtering(
-    mock_get_profile,
-    mock_post,
-    mock_get,
-    pesu,
-):
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-    mock_post_response = AsyncMock()
-    mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    mock_post.return_value = mock_post_response
-    mock_get_profile.return_value = dict.fromkeys(PESUAcademy.DEFAULT_FIELDS, "test_value")
-    result = await pesu.authenticate("testuser", "testpass", profile=True, fields=None)
-    assert result["status"] is True
-    for field in PESUAcademy.DEFAULT_FIELDS:
-        assert field in result["profile"]
-        assert result["profile"][field] == "test_value"
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_get_profile_information_profile_parse_error(mock_get, mock_html_parser, pesu):
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    mock_get.return_value = mock_response
-    mock_soup = MagicMock()
-    mock_soup.any_css_matches.return_value = True
-    mock_soup.css.return_value = [MagicMock()] * 3
-    mock_html_parser.return_value = mock_soup
-
-    client = AsyncMock()
-    client.get.return_value = mock_response
-
-    with pytest.raises(ProfileParseError):
-        await pesu.get_profile_information(client, "testuser")
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx.AsyncClient.post")
-@patch("app.pesu.httpx.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_authenticate_login_form_present(mock_get, mock_post, mock_html_parser, pesu):
-    mock_get_response = MagicMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get_response.status_code = 200
-    mock_get.return_value = mock_get_response
-    mock_soup_csrf = MagicMock()
-    mock_soup_csrf.css_first.side_effect = lambda selector: (
-        MagicMock(attributes={"content": "fake-csrf-token"}) if selector == "meta[name='csrf-token']" else None
-    )
-    mock_soup_login = MagicMock()
-    mock_soup_login.css_first.side_effect = lambda selector: (MagicMock() if selector == "div.login-form" else None)
-    mock_html_parser.side_effect = [mock_soup_csrf, mock_soup_login]
-    mock_post_response = MagicMock()
-    mock_post_response.text = "<html><body><div class='login-form'></div></body></html>"
-    mock_post_response.status_code = 200
-    mock_post.return_value = mock_post_response
-    with pytest.raises(AuthenticationError):
-        await pesu.authenticate("testuser", "testpass")
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx.AsyncClient.post")
-@patch("app.pesu.httpx.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_authenticate_csrf_token_missing_after_login_strict(
-    mock_get,
-    mock_post,
-    mock_html_parser,
-    pesu,
-):
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-    mock_post_response = AsyncMock()
-    mock_post_response.text = "<html><body>Login successful but no CSRF token</body></html>"
-    mock_post.return_value = mock_post_response
-    mock_soup = MagicMock()
-
-    def css_first(selector):
-        if selector == "div.login-form":
-            return
-        if selector == "meta[name='csrf-token']":
-            return
-        return
-
-    mock_soup.css_first.side_effect = css_first
-    mock_html_parser.return_value = mock_soup
-    with pytest.raises(CSRFTokenError):
-        await pesu.authenticate("testuser", "testpass")
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_get_profile_information_unknown_campus_code(
-    mock_get,
-    mock_html_parser,
-    pesu,
-    caplog,
-):
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    mock_get.return_value = mock_response
-
-    def make_div(key, value):
-        div = MagicMock()
-        key_label = MagicMock()
-        key_label.text.return_value = key
-        value_label = MagicMock()
-        value_label.text.return_value = value
-
-        def css_first(selector):
-            if selector == "label.lbl-title-light":
-                return key_label
-            if selector == "label.lbl-title-light + label":
-                return value_label
-            return None
-
-        div.css_first.side_effect = css_first
-        return div
-
-    form_group_elems = [
-        make_div("Name", "Test User"),
-        make_div("SRN", "PES1234567"),
-        make_div("PESU Id", "PES3XXXXX"),
-        make_div("Program", "BTech"),
-        make_div("Branch", "Computer Science and Engineering"),
-        make_div("Semester", "6"),
-        make_div("Section", "A"),
-    ]
-
-    mock_soup = MagicMock()
-    mock_container = MagicMock()
-    mock_container.css.return_value = form_group_elems
-
-    email_node = MagicMock()
-    email_node.attributes = {"value": "test@example.com"}
-    phone_node = MagicMock()
-    phone_node.attributes = {"value": "1234567890"}
-
-    def css_first(selector):
-        if selector == "div.elem-info-wrapper":
-            return mock_container
-        if selector == "#updateMail":
-            return email_node
-        if selector == "#updateContact":
-            return phone_node
-        return None
-
-    mock_soup.css_first.side_effect = css_first
-    mock_html_parser.return_value = mock_soup
-
-    client = AsyncMock()
-    client.get.return_value = mock_response
-
-    with caplog.at_level("INFO"):
-        profile = await pesu.get_profile_information(client, "testuser")
-        assert profile["prn"] == "PES3XXXXX"
-        assert profile["name"] == "Test User"
-        assert profile["branch"] == "Computer Science and Engineering"
-        assert profile["email"] == "test@example.com"
-        assert profile["phone"] == "1234567890"
-        assert any(
-            "Unknown campus code: 3 parsed from PRN=PES3XXXXX for user=testuser" in record.message
-            for record in caplog.records
-        )
-        assert any(
-            "Complete profile information retrieved for user=testuser" in record.message for record in caplog.records
-        )
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_get_profile_information_campus_code_rr_ec(mock_get, mock_html_parser, pesu):
-    """Test that PRNs with PES1 and PES2 set the correct campus and campusCode."""
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    mock_get.return_value = mock_response
-
-    def make_div(key, value):
-        div = MagicMock()
-        key_label = MagicMock()
-        key_label.text.return_value = key
-        value_label = MagicMock()
-        value_label.text.return_value = value
-
-        def css_first(selector):
-            if selector == "label.lbl-title-light":
-                return key_label
-            if selector == "label.lbl-title-light + label":
-                return value_label
-            return None
-
-        div.css_first.side_effect = css_first
-        return div
-
-    # Subcase 1: PES1... (RR campus)
-    form_group_elems_rr = [
-        make_div("Name", "Test User"),
-        make_div("SRN", "PES1234567"),
-        make_div("PESU Id", "PES1XXXXX"),
-        make_div("Program", "BTech"),
-        make_div("Branch", "Computer Science and Engineering"),
-        make_div("Semester", "6"),
-        make_div("Section", "A"),
-    ]
-    mock_soup_rr = MagicMock()
-    mock_container_rr = MagicMock()
-    mock_container_rr.css.return_value = form_group_elems_rr
-    mock_soup_rr.css_first.side_effect = (
-        lambda selector: mock_container_rr if selector == "div.elem-info-wrapper" else None
-    )
-    mock_html_parser.return_value = mock_soup_rr
-
-    client = AsyncMock()
-    client.get.return_value = mock_response
-
-    profile_rr = await pesu.get_profile_information(client, "testuser")
-    assert profile_rr["campusCode"] == 1
-    assert profile_rr["campus"] == "RR"
-
-    # Subcase 2: PES2... (EC campus)
-    form_group_elems_ec = [
-        make_div("Name", "Test User"),
-        make_div("SRN", "PES2234567"),
-        make_div("PESU Id", "PES2YYYYY"),
-        make_div("Program", "BTech"),
-        make_div("Branch", "Computer Science and Engineering"),
-        make_div("Semester", "6"),
-        make_div("Section", "A"),
-    ]
-    mock_soup_ec = MagicMock()
-    mock_container_ec = MagicMock()
-    mock_container_ec.css.return_value = form_group_elems_ec
-    mock_soup_ec.css_first.side_effect = (
-        lambda selector: mock_container_ec if selector == "div.elem-info-wrapper" else None
-    )
-    mock_html_parser.return_value = mock_soup_ec
-
-    profile_ec = await pesu.get_profile_information(client, "testuser")
-    assert profile_ec["campusCode"] == 2
-    assert profile_ec["campus"] == "EC"
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_get_profile_information_no_profile_data(mock_get, mock_html_parser, pesu):
-    """Test that ProfileParseError is raised when no profile data is parsed (parsing loop runs but nothing added)."""
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    mock_get.return_value = mock_response
-    mock_soup = MagicMock()
-    mock_soup.any_css_matches.return_value = True
-    mock_soup.css.return_value = [MagicMock(text=MagicMock(return_value="foo bar")) for _ in range(7)]
-    mock_soup.css_first.return_value = None
-    mock_html_parser.return_value = mock_soup
-
-    client = AsyncMock()
-    client.get.return_value = mock_response
-    with pytest.raises(ProfileParseError) as exc_info:
-        await pesu.get_profile_information(client, "testuser")
-    assert "Failed to parse student profile page from PESU Academy for user=testuser."  in str(exc_info.value)
-    assert "The webpage might have changed." in str(exc_info.value)
-
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx.AsyncClient.get")
-@patch("app.pesu.PESUAcademy._extract_and_update_profile", new_callable=MagicMock)
-@pytest.mark.asyncio
-async def test_get_profile_information_empty_profile_triggers_final_parse_error(
-    mock_extract,
-    mock_get,
-    mock_html_parser,
-    pesu,
-):
-    mock_extract.return_value = None
-
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    mock_get.return_value = mock_response
-
-    mock_container = MagicMock()
-    mock_container.css.return_value = [MagicMock() for _ in range(7)]
-    mock_soup = MagicMock()
-    mock_soup.css_first.side_effect = lambda selector: mock_container if selector == "div.elem-info-wrapper" else None
-    mock_html_parser.return_value = mock_soup
-
-    client = AsyncMock()
-    client.get.return_value = mock_response
-
-    with pytest.raises(ProfileParseError) as exc_info:
-        await pesu.get_profile_information(client, "testuser")
-    assert "No profile data could be extracted for user=testuser" in str(exc_info.value)
-
-
-@pytest.mark.asyncio
-async def test_extract_and_update_profile_key_label_missing(pesu):
-    node = MagicMock()
-    node.css_first.return_value = None  # key label missing
-    profile = {}
-    with pytest.raises(ProfileParseError) as exc_info:
-        await pesu._extract_and_update_profile(node, 0, profile)
-    assert "Could not parse key for field at index 0" in str(exc_info.value)
-
-
-@pytest.mark.asyncio
-async def test_extract_and_update_profile_value_label_missing(pesu):
-    node = MagicMock()
-    key_label = MagicMock()
-    key_label.text.return_value = "Name"
-
-    def css_first(selector):
-        if selector == "label.lbl-title-light":
-            return key_label
-        if selector == "label.lbl-title-light + label":
-            return None  # value label missing
-        return None
-
-    node.css_first.side_effect = css_first
-    profile = {}
-    with pytest.raises(ProfileParseError) as exc_info:
-        await pesu._extract_and_update_profile(node, 0, profile)
-    assert "Could not parse value for field at index 0" in str(exc_info.value)
-
-
-@pytest.mark.asyncio
-async def test_extract_and_update_profile_unknown_key(pesu):
-    node = MagicMock()
-    key_label = MagicMock()
-    key_label.text.return_value = "UnknownKey"
-    value_label = MagicMock()
-    value_label.text.return_value = "SomeValue"
-
-    def css_first(selector):
-        if selector == "label.lbl-title-light":
-            return key_label
-        if selector == "label.lbl-title-light + label":
-            return value_label
-        return None
-
-    node.css_first.side_effect = css_first
-    profile = {}
-    with pytest.raises(ProfileParseError) as exc_info:
-        await pesu._extract_and_update_profile(node, 0, profile)
-    assert "Unknown key: 'UnknownKey' in the profile page" in str(exc_info.value)
-
-
-def test_default_fields_is_list():
-    assert isinstance(PESUAcademy.DEFAULT_FIELDS, list)
-    assert "prn" in PESUAcademy.DEFAULT_FIELDS
-    assert "name" in PESUAcademy.DEFAULT_FIELDS
-    assert "srn" in PESUAcademy.DEFAULT_FIELDS
-    assert "program" in PESUAcademy.DEFAULT_FIELDS
-    assert "branch" in PESUAcademy.DEFAULT_FIELDS
-    assert "semester" in PESUAcademy.DEFAULT_FIELDS
-    assert "section" in PESUAcademy.DEFAULT_FIELDS
-    assert "email" in PESUAcademy.DEFAULT_FIELDS
-    assert "phone" in PESUAcademy.DEFAULT_FIELDS
-    assert "campusCode" in PESUAcademy.DEFAULT_FIELDS
-    assert "campus" in PESUAcademy.DEFAULT_FIELDS
-
-@pytest.mark.asyncio
-async def test_get_kycas_http_exception(pesu):
-    """Test that the "Know Your Class and Section" fetch error is raised on request failure."""
-    client = AsyncMock()
-    client.post.side_effect = Exception("Connection error")
-
-    with pytest.raises(KYCASFetchError) as exc_info:
-        await pesu.get_know_your_class_and_section(client, "fake-csrf", "testuser")
-    assert 'Failed to send "Know Your Class and Section" request' in str(exc_info.value)
-
-
-@pytest.mark.asyncio
-async def test_get_kycas_non_200_status(pesu):
-    """Test that the "Know Your Class and Section" fetch error is raised on non-200 responses."""
-    client = AsyncMock()
-    mock_response = MagicMock()
-    mock_response.status_code = 500
-    client.post.return_value = mock_response
-
-    with pytest.raises(KYCASFetchError) as exc_info:
-        await pesu.get_know_your_class_and_section(client, "fake-csrf", "testuser")
-    assert "Received status code 500" in str(exc_info.value)
-
-
-@patch("app.pesu.HTMLParser")
-@pytest.mark.asyncio
-async def test_get_kycas_no_table(mock_html_parser, pesu):
-    """Test that the "Know Your Class and Section" fetch error is raised when no table is found."""
-    client = AsyncMock()
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    client.post.return_value = mock_response
-
-    mock_soup = MagicMock()
-    mock_soup.css_first.return_value = None
-    mock_html_parser.return_value = mock_soup
-
-    with pytest.raises(KYCASFetchError) as exc_info:
-        await pesu.get_know_your_class_and_section(client, "fake-csrf", "testuser")
-    assert 'Could not find "Know Your Class and Section" table' in str(exc_info.value)
-
-
-@patch("app.pesu.HTMLParser")
-@pytest.mark.asyncio
-async def test_get_kycas_no_headers(mock_html_parser, pesu):
-    """Test that the "Know Your Class and Section" fetch error is raised when headers are empty."""
-    client = AsyncMock()
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html><table><thead></thead></table></html>"
-    client.post.return_value = mock_response
-
-    mock_table = MagicMock()
-    mock_table.css.return_value = []
-
-    mock_soup = MagicMock()
-    mock_soup.css_first.return_value = mock_table
-    mock_html_parser.return_value = mock_soup
-
-    with pytest.raises(KYCASFetchError) as exc_info:
-        await pesu.get_know_your_class_and_section(client, "fake-csrf", "testuser")
-    assert 'Could not find "Know Your Class and Section" table headers' in str(exc_info.value)
-
-
-@patch("app.pesu.HTMLParser")
-@pytest.mark.asyncio
-async def test_get_kycas_no_data_row(mock_html_parser, pesu):
-    """Test that the "Know Your Class and Section" fetch error is raised when no row exists."""
-    client = AsyncMock()
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html><table><thead><tr><th>PRN</th></tr></thead><tbody></tbody></table></html>"
-    client.post.return_value = mock_response
-
-    mock_th = MagicMock()
-    mock_th.text.return_value = "PRN"
-
-    mock_table = MagicMock()
-    mock_table.css.return_value = [mock_th]
-    mock_table.css_first.return_value = None
-
-    mock_soup = MagicMock()
-    mock_soup.css_first.return_value = mock_table
-    mock_html_parser.return_value = mock_soup
-
-    with pytest.raises(KYCASFetchError) as exc_info:
-        await pesu.get_know_your_class_and_section(client, "fake-csrf", "testuser")
-    assert 'Could not find "Know Your Class and Section" data row' in str(exc_info.value)
-
-
-@patch("app.pesu.HTMLParser")
-@pytest.mark.asyncio
-async def test_get_kycas_header_cell_mismatch(mock_html_parser, pesu):
-    """Test that the "Know Your Class and Section" fetch error is raised on malformed rows."""
-    client = AsyncMock()
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    client.post.return_value = mock_response
-
-    mock_th1 = MagicMock()
-    mock_th1.text.return_value = "PRN"
-    mock_th2 = MagicMock()
-    mock_th2.text.return_value = "SRN"
-
-    mock_td1 = MagicMock()
-    mock_td1.text.return_value = "PES1201800001"
-
-    mock_row = MagicMock()
-    mock_row.css.return_value = [mock_td1]
-
-    mock_table = MagicMock()
-    mock_table.css.return_value = [mock_th1, mock_th2]
-    mock_table.css_first.return_value = mock_row
-
-    mock_soup = MagicMock()
-    mock_soup.css_first.return_value = mock_table
-    mock_html_parser.return_value = mock_soup
-
-    with pytest.raises(KYCASFetchError) as exc_info:
-        await pesu.get_know_your_class_and_section(client, "fake-csrf", "testuser")
-    assert 'Mismatch between "Know Your Class and Section" table headers' in str(exc_info.value)
-
-
-@patch("app.pesu.HTMLParser")
-@pytest.mark.asyncio
-async def test_get_kycas_no_mapped_keys(mock_html_parser, pesu):
-    """Test that the "Know Your Class and Section" fetch error is raised on unknown headers."""
-    client = AsyncMock()
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    client.post.return_value = mock_response
-
-    mock_th = MagicMock()
-    mock_th.text.return_value = "UnknownHeader"
-
-    mock_td = MagicMock()
-    mock_td.text.return_value = "some_value"
-
-    mock_row = MagicMock()
-    mock_row.css.return_value = [mock_td]
-
-    mock_table = MagicMock()
-    mock_table.css.return_value = [mock_th]
-    mock_table.css_first.return_value = mock_row
-
-    mock_soup = MagicMock()
-    mock_soup.css_first.return_value = mock_table
-    mock_html_parser.return_value = mock_soup
-
-    with pytest.raises(KYCASFetchError) as exc_info:
-        await pesu.get_know_your_class_and_section(client, "fake-csrf", "testuser")
-    assert 'No "Know Your Class and Section" data could be extracted' in str(exc_info.value)
-
-
-@pytest.mark.asyncio
-async def test_get_kycas_success(pesu):
-    """Test the happy path: successfully parsing "Know Your Class and Section" data."""
-    client = AsyncMock()
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = """
-        <table>
-            <thead>
-                <tr>
-                    <th>PRN</th>
-                    <th>SRN</th>
-                    <th>Name</th>
-                    <th>Class</th>
-                    <th>Section</th>
-                    <th>Cycle</th>
-                    <th>Department</th>
-                    <th>Branch</th>
-                    <th>Institute Name</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>PES2202100984</td>
-                    <td>PES2UG21CS310</td>
-                    <td>Test User</td>
-                    <td>Sem-8</td>
-                    <td>Section F</td>
-                    <td>NA</td>
-                    <td>CSE(EC Campus)</td>
-                    <td>CSE</td>
-                    <td>PES University (Electronic City)</td>
-                </tr>
-            </tbody>
-        </table>
-    """
-    client.post.return_value = mock_response
-
-    result = await pesu.get_know_your_class_and_section(client, "fake-csrf", "testuser")
-
-    assert result["prn"] == "PES2202100984"
-    assert result["srn"] == "PES2UG21CS310"
-    assert result["name"] == "Test User"
-    assert result["semester"] == "Sem-8"
-    assert result["section"] == "Section F"
-    assert result["cycle"] == "NA"
-    assert result["department"] == "CSE(EC Campus)"
-    assert result["branch"] == "CSE"
-    assert result["instituteName"] == "PES University (Electronic City)"
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
-@patch("app.pesu.httpx.AsyncClient.post")
-@patch("app.pesu.PESUAcademy.get_know_your_class_and_section")
-@pytest.mark.asyncio
-async def test_authenticate_passes_kycas_flag(mock_get_kycas, mock_post, mock_get, pesu):
-    """Test that authenticate calls get_know_your_class_and_section when the flag is set."""
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-
-    mock_post_response = AsyncMock()
-    mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    mock_post.return_value = mock_post_response
-
-    mock_get_kycas.return_value = {
-        "prn": "PES1201800001",
-        "srn": "PES1UG19CS001",
-        "name": "John Doe",
-        "semester": "Sem-6",
-        "section": "Section A",
-        "cycle": "NA",
-        "department": "CSE(RR Campus)",
-        "branch": "CSE",
-        "instituteName": "PES University",
-    }
-
-    result = await pesu.authenticate("testuser", "testpass", profile=False, know_your_class_and_section=True)
-
-    assert result["status"] is True
-    assert result["knowYourClassAndSection"]["semester"] == "Sem-6"
-    mock_get_kycas.assert_called_once()
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
-@patch("app.pesu.httpx.AsyncClient.post")
-@pytest.mark.asyncio
-async def test_authenticate_success_no_kycas(mock_post, mock_get, pesu):
-    """Test that "Know Your Class and Section" data is NOT returned when not requested."""
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-
-    mock_post_response = AsyncMock()
-    mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    mock_post.return_value = mock_post_response
-
-    result = await pesu.authenticate("user", "pass", know_your_class_and_section=False)
-    assert result["status"] is True
-    assert "knowYourClassAndSection" not in result
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
-@patch("app.pesu.httpx.AsyncClient.post")
-@patch("app.pesu.PESUAcademy.get_know_your_class_and_section")
-@pytest.mark.asyncio
-async def test_authenticate_with_kycas(mock_get_kycas, mock_post, mock_get, pesu):
-    """Test that "Know Your Class and Section" data is returned when requested."""
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-
-    mock_post_response = AsyncMock()
-    mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    mock_post.return_value = mock_post_response
-
-    mock_get_kycas.return_value = {
-        "prn": "PES1201800001",
-        "srn": "PES1UG19CS001",
-        "name": "John Doe",
-        "semester": "Sem-6",
-        "section": "Section A",
-        "cycle": "NA",
-        "department": "CSE(RR Campus)",
-        "branch": "CSE",
-        "instituteName": "PES University",
-    }
-
-    result = await pesu.authenticate("user", "pass", know_your_class_and_section=True)
-
-    assert result["status"] is True
-    assert "knowYourClassAndSection" in result
-    assert result["knowYourClassAndSection"]["prn"] == "PES1201800001"
-    assert result["knowYourClassAndSection"]["instituteName"] == "PES University"
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
-@patch("app.pesu.httpx.AsyncClient.post")
-@patch("app.pesu.PESUAcademy.get_know_your_class_and_section")
-@pytest.mark.asyncio
-async def test_authenticate_with_kycas_field_filtering(mock_get_kycas, mock_post, mock_get, pesu):
-    """Test that "Know Your Class and Section" data is filtered when field filtering is enabled."""
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-
-    mock_post_response = AsyncMock()
-    mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    mock_post.return_value = mock_post_response
-
-    mock_get_kycas.return_value = {
-        "prn": "PES1201800001",
-        "srn": "PES1UG19CS001",
-        "name": "John Doe",
-        "semester": "Sem-6",
-        "section": "Section A",
-        "cycle": "NA",
-        "department": "CSE(RR Campus)",
-        "branch": "CSE",
-        "instituteName": "PES University",
-    }
-
-    result = await pesu.authenticate(
-        "user",
-        "pass",
-        know_your_class_and_section=True,
-        fields=["name", "semester"],
-    )
-
-    assert result["status"] is True
-    kycas = result["knowYourClassAndSection"]
-    assert "name" in kycas
-    assert "semester" in kycas
-    assert "prn" not in kycas
-    assert "branch" not in kycas
-    assert "instituteName" not in kycas
-
-
-@patch("app.pesu.httpx.AsyncClient.get")
-@patch("app.pesu.httpx.AsyncClient.post")
-@patch("app.pesu.PESUAcademy.get_profile_information")
-@patch("app.pesu.PESUAcademy.get_know_your_class_and_section")
-@pytest.mark.asyncio
-async def test_authenticate_with_both_profile_and_kycas(
-    mock_get_kycas, mock_get_profile, mock_post, mock_get, pesu
-):
-    """Test requesting both profile and "Know Your Class and Section" data simultaneously."""
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-
-    mock_post_response = AsyncMock()
-    mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    mock_post.return_value = mock_post_response
-
-    mock_get_profile.return_value = {
-        "name": "John Doe",
-        "prn": "PES1201800001",
-        "email": "john@example.com",
-    }
-    mock_get_kycas.return_value = {
-        "prn": "PES1201800001",
-        "semester": "Sem-6",
-        "section": "Section A",
-    }
-
-    result = await pesu.authenticate(
-        "user", "pass", profile=True, know_your_class_and_section=True
-    )
-
-    assert result["status"] is True
-    assert "profile" in result
-    assert "knowYourClassAndSection" in result
-    assert result["profile"]["name"] == "John Doe"
-    assert result["knowYourClassAndSection"]["semester"] == "Sem-6"
-
-def test_kycas_header_to_key_map_is_dict():
-    """Test that the "Know Your Class and Section" header map has expected keys."""
-    kmap = PESUAcademy.KYCAS_HEADER_TO_KEY_MAP
-    assert isinstance(kmap, dict)
-    assert "PRN" in kmap
-    assert "SRN" in kmap
-    assert "Name" in kmap
-    assert "Class" in kmap
-    assert kmap["Class"] == "semester"
-    assert "Section" in kmap
-    assert "Cycle" in kmap
-    assert "Department" in kmap
-    assert "Branch" in kmap
-    assert "Institute Name" in kmap
-
-
-def test_default_fields_includes_kycas_relevant_fields():
-    """Test that DEFAULT_FIELDS includes fields relevant to "Know Your Class and Section" filtering."""
-    fields = PESUAcademy.DEFAULT_FIELDS
-    assert "semester" in fields
-    assert "cycle" in fields
-    assert "department" in fields
-    assert "instituteName" in fields
-
-
-@pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._fetch_new_client_with_csrf_token")
-async def test_prefetch_client_closes_old_client_on_second_call(mock_fetch, pesu):
-    old_client = AsyncMock()
-    new_client = AsyncMock()
-    mock_fetch.side_effect = [
-        (old_client, "token-1"),
-        (new_client, "token-2"),
-    ]
-
-    await pesu.prefetch_client_with_csrf_token()
-    await pesu.prefetch_client_with_csrf_token()
-
-    old_client.aclose.assert_awaited_once()

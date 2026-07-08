@@ -1,21 +1,15 @@
 """PESUAcademy class that serves as an interface to the PESU Academy website."""
 
-import asyncio
+from __future__ import annotations
+
+import json
 import logging
 import re
-from datetime import datetime
 from typing import Any, Literal, get_args
 
 import httpx
-from selectolax.parser import HTMLParser, Node
 
-from app.exceptions.authentication import (
-    AuthenticationError,
-    CSRFTokenError,
-    KYCASFetchError,
-    ProfileFetchError,
-    ProfileParseError,
-)
+from app.exceptions.authentication import AuthenticationError
 
 ProfileField = Literal[
     "name",
@@ -35,323 +29,128 @@ ProfileField = Literal[
 ]
 
 
+def _get_semester_from_class(class_name: str | None, batch_class: str | None) -> str | None:
+    """Extract semester format (e.g. 'Sem-2') from class name or batch class."""
+    for val in (class_name, batch_class):
+        if not val:
+            continue
+        if m := re.search(r"Sem(?:ester)?[-_ ]?(\d+)", val, re.IGNORECASE):
+            return f"Sem-{m.group(1)}"
+        if m := re.search(r"(\d+)(?:st|nd|rd|th)?[-_ ]?Sem", val, re.IGNORECASE):
+            return f"Sem-{m.group(1)}"
+        if m := re.search(r"\b(\d+)\b", val):
+            return f"Sem-{m.group(1)}"
+    return None
+
+
+PROGRAM_MAPPING = {
+    "B.Tech.": "Bachelor of Technology",
+    "B.Tech": "Bachelor of Technology",
+    "M.Tech.": "Master of Technology",
+    "M.Tech": "Master of Technology",
+    "B.Arch.": "Bachelor of Architecture",
+    "B.Arch": "Bachelor of Architecture",
+    "BBA.": "Bachelor of Business Administration",
+    "BBA": "Bachelor of Business Administration",
+    "MBA.": "Master of Business Administration",
+    "MBA": "Master of Business Administration",
+}
+
+BRANCH_MAPPING = {
+    "Branch:CSE": "Computer Science and Engineering",
+    "CSE": "Computer Science and Engineering",
+    "Branch:ECE": "Electronics and Communication Engineering",
+    "ECE": "Electronics and Communication Engineering",
+    "Branch:EEE": "Electrical and Electronics Engineering",
+    "EEE": "Electrical and Electronics Engineering",
+    "Branch:ME": "Mechanical Engineering",
+    "ME": "Mechanical Engineering",
+    "Branch:BT": "Biotechnology",
+    "BT": "Biotechnology",
+}
+
+
 class PESUAcademy:
     """Class to interact with the PESU Academy server.
 
-    This class provides methods to authenticate users, fetch profile information, and handle CSRF token management.
-
-    Attributes:
-        DEFAULT_FIELDS (list[str]): The default fields to fetch from the profile page.
-        PROFILE_PAGE_HEADER_TO_KEY_MAP (dict[str, str]): A mapping of profile page headers to the corresponding keys
-        in the profile dictionary.
-
-    Methods:
-        prefetch_client_with_csrf_token: Prefetch a new client with an unauthenticated CSRF token.
-        close_client: Close the internal client if it exists.
-        get_profile_information: Get the profile information of the user.
-        authenticate: Authenticate the user with the provided username and password.
+    This class provides methods to authenticate users.
     """
 
     DEFAULT_FIELDS: list[str] = list(get_args(ProfileField))
 
-    PROFILE_PAGE_HEADER_TO_KEY_MAP = {
-        "Name": "name",
-        "PESU Id": "prn",
-        "SRN": "srn",
-        "Program": "program",
-        "Branch": "branch",
-        "Semester": "semester",
-        "Section": "section",
-    }
-
-    KYCAS_HEADER_TO_KEY_MAP = {
-        "PRN": "prn",
-        "SRN": "srn",
-        "Name": "name",
-        "Class": "semester",
-        "Section": "section",
-        "Cycle": "cycle",
-        "Department": "department",
-        "Branch": "branch",
-        "Institute Name": "instituteName",
-    }
-
     def __init__(self) -> None:
         """Initialize the PESUAcademy class."""
-        self._csrf_token: str | None = None
-        self._client: httpx.AsyncClient | None = None
-        self._csrf_lock = asyncio.Lock()
+        pass
 
-    @staticmethod
-    async def _fetch_new_client_with_csrf_token() -> tuple[httpx.AsyncClient, str]:
-        """Initialize a fresh client with an unauthenticated CSRF token from PESU Academy."""
-        logging.info("Fetching a new client with an unauthenticated CSRF token...")
-        # Create a new client
-        client = httpx.AsyncClient(follow_redirects=True, timeout=10.0)
-        # Fetch the CSRF token
-        resp = await client.get("https://www.pesuacademy.com/Academy/")
-        soup = await asyncio.to_thread(HTMLParser, resp.text)
-        if node := soup.css_first("meta[name='csrf-token']"):
-            csrf_token = node.attributes["content"]
-            logging.info(f"Fetched CSRF token: {csrf_token}")
-            return client, csrf_token
-        raise CSRFTokenError("CSRF token not found in the pre-authentication response.")
-
-    async def _prefetch_client_with_csrf_token(self) -> None:
-        """Prefetch a new client with an unauthenticated CSRF token.
-
-        This method is used to prefetch a new client with an unauthenticated CSRF token.
-        It is used to avoid the overhead of fetching a new client with an unauthenticated CSRF token
-        for each request.
-        """
-        logging.info("Prefetching a new client with an unauthenticated CSRF token...")
-        client, token = await self._fetch_new_client_with_csrf_token()
-        async with self._csrf_lock:
-            # Close old cached client (if any) to avoid leaks
-            if self._client is not None:
-                await self._client.aclose()
-            # Store the new cached client/token
-            self._client = client
-            self._csrf_token = token
-        logging.info("Cache refreshed with new unauthenticated CSRF token.")
-
-    async def _get_client_with_csrf_token(self) -> tuple[httpx.AsyncClient, str]:
-        """Get the client with the cached CSRF token.
-
-        This method is used to get the client with the cached CSRF token.
-        It is used to avoid the overhead of fetching a new client with an unauthenticated CSRF token
-        for each request.
-        """
-        async with self._csrf_lock:
-            # If cache is empty (first call), populate it
-            if not (self._client and self._csrf_token):
-                (
-                    self._client,
-                    self._csrf_token,
-                ) = await self._fetch_new_client_with_csrf_token()
-            # Hand out the cached client/token for *this* request
-            client_to_use, token_to_use = self._client, self._csrf_token
-            # Immediately clear the cache so the next caller doesn't reuse this client/token
-            self._client = None
-            self._csrf_token = None
-
-        # Kick off async prefetch for the *next* request (non-blocking)
-        asyncio.create_task(self._prefetch_client_with_csrf_token())
-        # Return a dedicated client/token for this request
-        return client_to_use, token_to_use
-
-    def _extract_and_update_profile(self, node: Node, idx: int, profile: dict) -> None:
-        """Extract the profile data from a node and update the profile dictionary.
-
-        Args:
-            node (Node): Pre-parsed node containing the profile information
-            idx (int): Index of the node
-            profile (dict): The profile dictionary to update in-place
-        """
-        # Use the selector `label.lbl-title-light` to find the key label
-        if not (key_node := node.css_first("label.lbl-title-light")) or not (key := key_node.text(strip=True)):
-            raise ProfileParseError(f"Could not parse key for field at index {idx}.")
-        # Use the adjacent sibling selector `+` to find value label
-        if not (value_node := node.css_first("label.lbl-title-light + label")) or not (
-            value := value_node.text(strip=True)
-        ):
-            raise ProfileParseError(f"Could not parse value for field at index {idx}.")
-        logging.debug(f"Extracted key: '{key}' with value: '{value}' at index {idx}.")
-        # If the key is in the map, add it to the profile
-        if mapped_key := self.PROFILE_PAGE_HEADER_TO_KEY_MAP.get(key):
-            logging.debug(f"Adding key: '{mapped_key}', value: '{value}' to profile...")
-            profile[mapped_key] = value
-        else:
-            raise ProfileParseError(
-                f"Unknown key: '{key}' in the profile page. The webpage might have changed.",
-            )
-
-    async def prefetch_client_with_csrf_token(self) -> None:
-        """Public method to prefetch a new client with an unauthenticated CSRF token.
-
-        This method is used to prefetch a new client with an unauthenticated CSRF token.
-        It is used to avoid the overhead of fetching a new client with an unauthenticated CSRF token
-        for each request.
-        """
-        await self._prefetch_client_with_csrf_token()
-
-    async def close_client(self) -> None:
-        """Public method to close the internal client if it exists.
-
-        This method is used to close the internal client if it exists.
-        It is used to avoid the overhead of closing the client for each request.
-        """
-        if self._client is not None:
-            await self._client.aclose()
-            self._client = None
-
-    async def get_profile_information(
+    def _map_data(
         self,
-        client: httpx.AsyncClient,
+        data: dict[str, Any],
         username: str,
+        profile: bool,
+        know_your_class_and_section: bool,
+        fields: list[str],
+        field_filtering: bool,
     ) -> dict[str, Any]:
-        """Get the profile information of the user.
+        """Map the profile and class/section data from the response JSON."""
+        prn = data.get("loginId")
+        srn = data.get("departmentId") or username
+        campus_code = None
+        campus = None
+        if prn and (campus_code_match := re.match(r"PES(\d)", prn)):
+            campus_code = int(campus_code_match.group(1))
+            if campus_code == 1:
+                campus = "RR"
+            elif campus_code == 2:
+                campus = "EC"
 
-        Args:
-            client (httpx.Client): The HTTP client to use for making requests.
-            username (str): The username of the user, usually their PRN/email/phone number.
+        semester_val = _get_semester_from_class(data.get("className"), data.get("batchClass"))
+        program_raw = data.get("program")
+        program = PROGRAM_MAPPING.get(program_raw, program_raw)
+        branch_raw = data.get("branch")
+        branch = BRANCH_MAPPING.get(branch_raw, branch_raw)
 
-        Returns:
-            dict[str, Any]: A dictionary containing the user's profile information.
-        """
-        # Fetch the profile data from the student profile page
-        logging.info(f"Fetching profile data for user={username} from the student profile page...")
-        profile_url = "https://www.pesuacademy.com/Academy/s/studentProfilePESUAdmin"
-        query = {
-            "menuId": "670",
-            "url": "studentProfilePESUAdmin",
-            "controllerMode": "6414",
-            "actionType": "5",
-            "id": "0",
-            "selectedData": "0",
-            "_": str(int(datetime.now().timestamp() * 1000)),
-        }
-        response = await client.get(profile_url, params=query)
-        # If the status code is not 200, raise an exception because the profile page is not accessible
-        if response.status_code != 200:
-            raise ProfileFetchError(
-                f"Failed to fetch student profile page from PESU Academy for user={username}.",
-            )
-        logging.debug("Student profile page fetched successfully.")
+        # Prepare the authentication result dictionary
+        result = {"status": True, "message": "Login successful."}
 
-        # Parse the response text
-        soup = await asyncio.to_thread(HTMLParser, response.text)
-        # Get the details container and its nodes where the profile information is stored
-        if (
-            not (details_container := soup.css_first("div.elem-info-wrapper"))
-            or not (details_nodes := details_container.css("div.form-group"))
-            or len(details_nodes) < 7
-        ):
-            raise ProfileParseError(
-                f"Failed to parse student profile page from PESU Academy for user={username}."
-                "The webpage might have changed.",
-            )
+        # Fetch the profile information if profile details are requested
+        if profile:
+            profile_dict = {
+                "name": data.get("name"),
+                "prn": prn,
+                "srn": srn,
+                "program": program,
+                "branch": branch,
+                "semester": semester_val,
+                "section": data.get("sectionName"),
+                "email": data.get("email"),
+                "phone": data.get("phone"),
+                "campusCode": campus_code,
+                "campus": campus,
+            }
+            # Filter the fields if field filtering is enabled
+            if field_filtering:
+                profile_dict = {k: v for k, v in profile_dict.items() if k in fields}
+            result["profile"] = profile_dict
 
-        # Extract the profile information from the profile page
-        profile: dict[str, Any] = {}
-        for i in range(7):
-            self._extract_and_update_profile(details_nodes[i], i, profile)
+        # Fetch the "Know Your Class and Section" data if requested
+        if know_your_class_and_section:
+            kycas_dict = {
+                "prn": prn,
+                "srn": srn,
+                "name": data.get("name"),
+                "semester": semester_val,
+                "section": f"Section {data.get('sectionName')}" if data.get("sectionName") else None,
+                "cycle": "NA",
+                "department": data.get("branch"),
+                "branch": data.get("branch"),
+                "instituteName": "PES University",
+            }
+            # Filter the fields if field filtering is enabled
+            if field_filtering:
+                kycas_dict = {k: v for k, v in kycas_dict.items() if k in fields}
+            result["knowYourClassAndSection"] = kycas_dict
 
-        # Get the email and phone number from the profile page
-        if (
-            (email_node := soup.css_first("#updateMail"))
-            and (email_value := email_node.attributes.get("value"))
-            and isinstance(email_value, str)
-        ):
-            profile["email"] = email_value.strip()
-
-        if (
-            (phone_node := soup.css_first("#updateContact"))
-            and (phone_value := phone_node.attributes.get("value"))
-            and isinstance(phone_value, str)
-        ):
-            profile["phone"] = phone_value.strip()
-
-        # If username starts with PES1, then they are from RR campus, else if it is PES2, then EC campus
-        if profile.get("prn") and (campus_code_match := re.match(r"PES(\d)", profile["prn"])):
-            campus_code = campus_code_match.group(1)
-            profile["campusCode"] = int(campus_code)
-            if campus_code == "1":
-                profile["campus"] = "RR"
-            elif campus_code == "2":
-                profile["campus"] = "EC"
-            else:
-                logging.warning(
-                    f"Unknown campus code: {campus_code} parsed from PRN={profile['prn']} for user={username}",
-                )
-
-        # Check if we extracted any profile data
-        if not profile:
-            raise ProfileParseError(f"No profile data could be extracted for user={username}.")
-        logging.info(f"Complete profile information retrieved for user={username}: {profile}.")
-
-        return profile
-
-    async def get_know_your_class_and_section(
-        self,
-        client: httpx.AsyncClient,
-        csrf_token: str,
-        username: str,
-    ) -> dict[str, Any]:
-        """Get the class and section information of the user from the "Know Your Class and Section" endpoint.
-
-        Args:
-            client (httpx.AsyncClient): The authenticated HTTP client to use for making requests.
-            csrf_token (str): The authenticated CSRF token.
-            username (str): The username of the user, usually their SRN or PRN.
-
-        Returns:
-            dict[str, Any]: A dictionary containing the user's class and section information.
-        """
-        logging.info(f'Fetching class and section data for user={username} from "Know Your Class and Section" page...')
-        kycas_url = "https://www.pesuacademy.com/Academy/a/getStudentClassInfo"
-        kycas_data = {"controllerMode": "370", "actionType": "174", "loginId": username}
-        kycas_headers = {
-            "origin": "https://www.pesuacademy.com",
-            "referer": "https://www.pesuacademy.com/Academy/",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "x-csrf-token": csrf_token,
-            "x-requested-with": "XMLHttpRequest",
-        }
-
-        try:
-            response = await client.post(kycas_url, data=kycas_data, headers=kycas_headers)
-        except Exception:
-            raise KYCASFetchError(
-                f'Failed to send "Know Your Class and Section" request to PESU Academy for user={username}.',
-            )
-
-        if response.status_code != 200:
-            raise KYCASFetchError(
-                f'Failed to fetch "Know Your Class and Section" data from PESU Academy for user={username}. '
-                f"Received status code {response.status_code}.",
-            )
-
-        soup = await asyncio.to_thread(HTMLParser, response.text)
-        kycas: dict[str, Any] = {}
-
-        table = soup.css_first("table")
-        if not table:
-            raise KYCASFetchError(
-                f'Could not find "Know Your Class and Section" table in the response for user={username}.',
-            )
-
-        headers = [th.text(strip=True) for th in table.css("thead th")]
-        if not headers:
-            raise KYCASFetchError(
-                f'Could not find "Know Your Class and Section" table headers in the response for user={username}.',
-            )
-
-        row = table.css_first("tbody tr")
-        if not row:
-            raise KYCASFetchError(
-                f'Could not find "Know Your Class and Section" data row in the response for user={username}.',
-            )
-
-        cells = [td.text(strip=True) for td in row.css("td")]
-
-        if len(headers) != len(cells):
-            raise KYCASFetchError(
-                f'Mismatch between "Know Your Class and Section" table headers ({len(headers)}) '
-                f"and cells ({len(cells)}) for user={username}.",
-            )
-
-        for header, cell_value in zip(headers, cells):
-            if mapped_key := self.KYCAS_HEADER_TO_KEY_MAP.get(header):
-                kycas[mapped_key] = cell_value
-
-        if not kycas:
-            raise KYCASFetchError(
-                f'No "Know Your Class and Section" data could be extracted for user={username}.',
-            )
-
-        logging.info(f'"Know Your Class and Section" data retrieved for user={username}: {kycas}.')
-        return kycas
+        return result
 
     async def authenticate(
         self,
@@ -382,82 +181,69 @@ class PESUAcademy:
         field_filtering = fields != self.DEFAULT_FIELDS
 
         logging.info(
-            f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ...",
+            f"Connecting to PESU Academy mobile API with user={username}, profile={profile}, fields={fields} ...",
         )
 
-        # Get a pre-fetched csrf token and client
-        client, csrf_token = await self._get_client_with_csrf_token()
-        logging.debug(f"Using cached CSRF token for user={username}.")
-
-        # Prepare the login data for auth call
-        data = {
-            "_csrf": csrf_token,
+        # Prepare the payload for mobile login API
+        login_url = "https://www.pesuacademy.com/MAcademy/j_spring_security_check"
+        payload = {
             "j_username": username,
             "j_password": password,
+            "j_mobile": "MOBILE",
+            "j_mobileApp": "YES",
+            "j_social": "NO",
+            "j_appId": "1",
+            "action": "0",
+            "mode": "0",
+            "whichObjectId": "loginSubmitButton",
+            "randomNum": 0.5,
         }
 
-        logging.debug("Attempting to authenticate user...")
         # Make a post request to authenticate the user
-        auth_url = "https://www.pesuacademy.com/Academy/j_spring_security_check"
-        response = await client.post(auth_url, data=data)
-        soup = await asyncio.to_thread(HTMLParser, response.text)
-        logging.debug("Authentication response received.")
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+            try:
+                response = await client.post(login_url, data=payload)
+            except Exception as e:
+                raise AuthenticationError(f"Connection failed: {str(e)}")
 
-        # If class login-form is present, login failed
-        if soup.css_first("div.login-form"):
-            # Log the error and return the error message
-            raise AuthenticationError(
-                f"Invalid username or password, or user does not exist for user={username}.",
-            )
-
-        # If the user is successfully authenticated
-        logging.info(f"Login successful for user={username}.")
-        status = True
-        # Get the newly authenticated csrf token
-        if csrf_node := soup.css_first("meta[name='csrf-token']"):
-            csrf_token = csrf_node.attributes.get("content")
-            logging.debug(f"Authenticated CSRF token: {csrf_token}")
-        else:
-            raise CSRFTokenError(
-                f"CSRF token not found in the post-authentication response for user={username}.",
-            )
-
-        result = {"status": status, "message": "Login successful."}
-
-        if profile:
-            logging.info(f"Profile data requested for user={username}. Fetching profile data...")
-            # Fetch the profile information
-            result["profile"] = await self.get_profile_information(client, username)
-            # Filter the fields if field filtering is enabled
-            if field_filtering:
-                result["profile"] = {key: value for key, value in result["profile"].items() if key in fields}
-                logging.info(
-                    f"Field filtering enabled. Filtered profile data for user={username}: {result['profile']}",
+            # Check if the response status code is 200
+            if response.status_code != 200:
+                raise AuthenticationError(
+                    f"Authentication failed: Server returned status code {response.status_code}",
                 )
 
-        if know_your_class_and_section:
-            logging.info(
-                f'"Know Your Class and Section" data requested for user={username}. '
-                'Fetching "Know Your Class and Section" data...',
-            )
-            # Fetch the class and section information
-            result["knowYourClassAndSection"] = await self.get_know_your_class_and_section(
-                client,
-                csrf_token,
-                username,
-            )
-            # Filter the fields if field filtering is enabled
-            if field_filtering:
-                result["knowYourClassAndSection"] = {
-                    key: value for key, value in result["knowYourClassAndSection"].items() if key in fields
-                }
-                logging.info(
-                    f'Field filtering enabled. Filtered "Know Your Class and Section" data for user={username}: '
-                    f"{result['knowYourClassAndSection']}",
+            # Parse the response JSON
+            try:
+                data = response.json()
+            except Exception:
+                raise AuthenticationError("Authentication failed: Invalid JSON response from server")
+
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    raise AuthenticationError("Authentication failed: Invalid nested JSON response")
+
+            # If the response does not indicate success, raise an AuthenticationError
+            if not isinstance(data, dict) or data.get("login") != "SUCCESS":
+                error_msg = data.get("errorMessage") if isinstance(data, dict) else None
+                raise AuthenticationError(
+                    error_msg or f"Invalid username or password, or user does not exist for user={username}."
                 )
 
-        logging.info(f"Authentication process for user={username} completed successfully.")
+            # If the user is successfully authenticated
+            logging.info(f"Login successful for user={username}.")
 
-        # Close the client and return the result
-        await client.aclose()
-        return result
+            # Return early if no profile or class section details are requested
+            if not profile and not know_your_class_and_section:
+                return {"status": True, "message": "Login successful."}
+
+            # Map the parsed response JSON to return format
+            return self._map_data(
+                data=data,
+                username=username,
+                profile=profile,
+                know_your_class_and_section=know_your_class_and_section,
+                fields=fields,
+                field_filtering=field_filtering,
+            )

@@ -34,15 +34,15 @@ pydantic==2.13.4
     #   fastapi
 pydantic-core==2.46.4
     # via pydantic
-selectolax==0.4.9
-    # via pesu-auth (pyproject.toml)
 starlette==1.0.1
     # via fastapi
 typing-extensions==4.15.0
     # via
+    #   anyio
     #   fastapi
     #   pydantic
     #   pydantic-core
+    #   starlette
     #   typing-inspection
 typing-inspection==0.4.2
     # via
