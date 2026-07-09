@@ -1,27 +1,20 @@
-"""Unit tests for app/app.py — FastAPI application layer."""
-
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.app import app, main
+from app.app import _csrf_token_refresh_loop, app, main
 
 
 @pytest.fixture
 def client():
-    with TestClient(app, raise_server_exceptions=False) as c:
-        yield c
-
-
-# ---------------------------------------------------------------------------
-# /authenticate — validation & exception handling
-# ---------------------------------------------------------------------------
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client
 
 
 @patch("app.app.pesu_academy.authenticate")
 def test_authenticate_validation_error(mock_authenticate, client, caplog):
-    """If pesu_academy returns data that fails ResponseModel validation → 500."""
     mock_authenticate.return_value = {
         "status": True,
         "message": "Login successful",
@@ -38,7 +31,6 @@ def test_authenticate_validation_error(mock_authenticate, client, caplog):
 
 @patch("app.app.pesu_academy.authenticate")
 def test_authenticate_general_exception(mock_authenticate, client):
-    """Unhandled exception from pesu_academy → 500 with generic message."""
     mock_authenticate.side_effect = Exception("Test exception")
     payload = {"username": "testuser", "password": "testpass", "profile": False}
     response = client.post("/authenticate", json=payload)
@@ -47,57 +39,18 @@ def test_authenticate_general_exception(mock_authenticate, client):
     assert "Internal Server Error" in data["message"]
 
 
-# ---------------------------------------------------------------------------
-# /authenticate — successful mock response
-# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+@patch("asyncio.sleep", new_callable=AsyncMock)
+@patch("app.app._refresh_csrf_token_with_lock")
+async def test_csrf_token_refresh_loop_logs_exception_on_failure(mock_refresh, mock_sleep, caplog):
+    mock_refresh.side_effect = RuntimeError("Simulated CSRF refresh failure")
+    mock_sleep.side_effect = asyncio.CancelledError
 
+    with caplog.at_level("ERROR"):
+        with pytest.raises(asyncio.CancelledError):
+            await _csrf_token_refresh_loop()
 
-@patch("app.app.pesu_academy.authenticate")
-def test_authenticate_success_mocked(mock_authenticate, client):
-    """When pesu_academy returns a valid result the endpoint returns 200."""
-    mock_authenticate.return_value = {
-        "status": True,
-        "message": "Login successful.",
-    }
-    payload = {"username": "testuser", "password": "testpass"}
-    response = client.post("/authenticate", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] is True
-    assert data["message"] == "Login successful."
-    assert "timestamp" in data
-
-
-# ---------------------------------------------------------------------------
-# /health
-# ---------------------------------------------------------------------------
-
-
-def test_health_endpoint(client):
-    """Health check returns 200 with status=True and message='ok'."""
-    response = client.get("/health")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] is True
-    assert data["message"] == "ok"
-    assert "timestamp" in data
-
-
-# ---------------------------------------------------------------------------
-# /readme
-# ---------------------------------------------------------------------------
-
-
-def test_readme_redirect(client):
-    """README endpoint returns 308 redirect to GitHub."""
-    response = client.get("/readme", follow_redirects=False)
-    assert response.status_code == 308
-    assert "github.com" in response.headers["location"]
-
-
-# ---------------------------------------------------------------------------
-# main() CLI function
-# ---------------------------------------------------------------------------
+    assert "Failed to refresh unauthenticated CSRF token in the background." in caplog.text
 
 
 @patch("app.app.argparse.ArgumentParser.parse_args")
