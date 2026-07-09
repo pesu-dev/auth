@@ -33,11 +33,15 @@ IST = ZoneInfo("Asia/Kolkata")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Lifespan event handler for startup and shutdown events."""
-    # Startup
+    """Lifespan event handler for FastAPI startup and shutdown events.
+
+    This manages resources or sets up logs/connections at application start
+    and performs necessary cleanup upon shutdown.
+    """
+    # Startup logging when application finishes initialization
     logging.info("PESUAuth API startup")
     yield
-    # Shutdown
+    # Shutdown logging when application process is terminating
     logging.info("PESUAuth API shutdown.")
 
 
@@ -62,14 +66,19 @@ app = FastAPI(
         },
     ],
 )
+# Instantiate the PESUAcademy interface wrapper class
 pesu_academy = PESUAcademy()
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """Handler for request validation errors."""
+    """Handler for FastAPI request validation errors (e.g. malformed JSON or missing fields).
+
+    Translates internal validation errors into a clean, client-friendly 400 Bad Request JSON response.
+    """
     logging.exception("Request data could not be validated.")
     errors = exc.errors()
+    # Format and join location/message strings for descriptive validation reports
     message = "; ".join([f"{'.'.join(str(loc) for loc in e['loc'])}: {e['msg']}" for e in errors])
     return JSONResponse(
         status_code=400,
@@ -83,7 +92,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(PESUAcademyError)
 async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSONResponse:
-    """Handler for PESUAcademy specific errors."""
+    """Handler for PESUAcademy specific custom exceptions (e.g. authentication failures).
+
+    Catches errors thrown within pesu.py and structures them into responses with corresponding status codes.
+    """
     logging.exception(f"PESUAcademyError: {exc.message}")
     return JSONResponse(
         status_code=exc.status_code,
@@ -97,7 +109,10 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Handler for unhandled exceptions."""
+    """Global handler for catching unexpected unhandled runtime exceptions.
+
+    Prevents leaking raw stack traces to clients, returning a standard 500 Internal Server Error.
+    """
     logging.exception("Unhandled exception occurred.")
     return JSONResponse(
         status_code=500,
@@ -116,7 +131,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     tags=["Monitoring"],
 )
 async def health() -> JSONResponse:
-    """Health check endpoint."""
+    """Health check endpoint.
+
+    Used by monitoring agents or load-balancers to verify that the service is running.
+    """
     logging.debug("Health check requested.")
     return JSONResponse(
         status_code=200,
@@ -136,7 +154,10 @@ async def health() -> JSONResponse:
     tags=["Documentation"],
 )
 async def readme() -> RedirectResponse:
-    """Redirect to the PESUAuth GitHub repository."""
+    """Redirect to the PESUAuth GitHub repository.
+
+    Convenience endpoint that points to documentation repository on GitHub.
+    """
     return RedirectResponse("https://github.com/pesu-dev/auth", status_code=308)
 
 
@@ -158,14 +179,14 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
     - fields (List[str], optional): Specific profile fields to include in the response.
     """
     current_time = datetime.datetime.now(IST)
-    # Input has already been validated by the RequestModel
+    # Extract the payload variables validated by Pydantic's RequestModel
     username = payload.username
     password = payload.password
     profile = payload.profile
     know_your_class_and_section = payload.know_your_class_and_section
     fields = payload.fields
 
-    # Authenticate the user
+    # Begin authentication request call through the PESUAcademy API interface
     authentication_result = {"timestamp": current_time}
     logging.info(f"Authenticating user={username} with PESU Academy...")
     authentication_result.update(
@@ -178,7 +199,7 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
         ),
     )
 
-    # Validate the response
+    # Validate response structure using the ResponseModel schema
     try:
         authentication_result = ResponseModel.model_validate(authentication_result)
         logging.info(f"Returning auth result for user={username}: {authentication_result}")
@@ -197,7 +218,7 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
 
 
 def main() -> None:
-    """Main function to run the FastAPI application with command line arguments."""
+    """Main entrypoint function to parse CLI flags and run the FastAPI application."""
     # Set up argument parser for command line arguments
     parser = argparse.ArgumentParser(
         description="PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy.",
@@ -221,7 +242,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Set up logging configuration
+    # Configure logging levels and outputs based on debug flag settings
     logging_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(
         level=logging_level,
@@ -229,7 +250,7 @@ def main() -> None:
         filemode="w",
     )
 
-    # Run the app
+    # Launch application using Uvicorn web server
     uvicorn.run("app.app:app", host=args.host, port=args.port, reload=args.debug)
 
 

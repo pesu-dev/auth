@@ -11,6 +11,7 @@ import httpx
 
 from app.exceptions.authentication import AuthenticationError
 
+# used to to generate list of default field names
 ProfileField = Literal[
     "name",
     "prn",
@@ -28,6 +29,15 @@ ProfileField = Literal[
     "instituteName",
 ]
 
+"""
+Extract semester format (e.g. 'Sem-2') from class name or batch class.
+Tries two possible source strings (class_name, then batch_class) and attempts
+three regex patterns in order of specificity:
+    1.Matches things like "Semester-3" or "Sem3" → extracts 3.
+    2.Matches things like "3rd-Sem" → extracts 3.
+    3.Falls back to just grabbing any standalone number in the string.
+"""
+
 
 def _get_semester_from_class(class_name: str | None, batch_class: str | None) -> str | None:
     """Extract semester format (e.g. 'Sem-2') from class name or batch class."""
@@ -43,6 +53,9 @@ def _get_semester_from_class(class_name: str | None, batch_class: str | None) ->
     return None
 
 
+"""
+PESU mobile api only returns B.Tech and and just CSE/ECE/EEE so to fix it we use this mapping.
+"""
 PROGRAM_MAPPING = {
     "B.Tech.": "Bachelor of Technology",
     "B.Tech": "Bachelor of Technology",
@@ -83,12 +96,18 @@ class PESUAcademy:
         pass
 
     def _parse_sslc_name(self, res_data: object) -> str | None:
-        """Parse nameAsInSSLC from the ISA marks response JSON."""
+        """Parse nameAsInSSLC from the ISA marks response JSON.
+
+        The response JSON has a structure where grades/marks are keyed by semester or test numbers.
+        This parses through the lists inside to extract the student's official name.
+        """
         if not isinstance(res_data, dict):
             return None
+        # Iterate over all marks data in the JSON response dictionary
         for marks in res_data.values():
             if not isinstance(marks, list):
                 continue
+            # Look for the 'NameAsInSSLC' field inside individual subject marks dictionaries
             for mark in marks:
                 if not isinstance(mark, dict):
                     continue
@@ -98,11 +117,18 @@ class PESUAcademy:
         return None
 
     async def _fetch_name_as_in_sslc(self, client: httpx.AsyncClient, token: str, user_id: str) -> str | None:
-        """Fetch the official name (nameAsInSSLC) from ISA results."""
+        """Fetch the official name (nameAsInSSLC) from ISA results.
+
+        The mobile API does not return the full official name in the primary login response.
+        Instead, we perform a multi-step query flow:
+        1. Fetch the user's ISA semesters/classes.
+        2. Retrieve the first/current semester's batch and section identifiers.
+        3. Query the detailed ISA results for that semester which includes the student's name.
+        """
         dispatcher_url = "https://www.pesuacademy.com/MAcademy/mobile/dispatcher"
         headers = {"mobileappauthenticationtoken": token}
 
-        # 1. Fetch ISA semesters
+        # Step 1. Fetch academic semesters listing under ISA results
         sem_payload = {
             "action": "6",
             "mode": "5",
@@ -123,14 +149,14 @@ class PESUAcademy:
             if not isinstance(sem_data, list) or len(sem_data) == 0:
                 return None
 
-            # Get the first/current semester
+            # Get the first/current semester info to retrieve active IDs
             semester = sem_data[0]
             batch_class_id = semester.get("BatchClassId")
             class_batch_section_id = semester.get("ClassBatchSectionId")
             if batch_class_id is None or class_batch_section_id is None:
                 return None
 
-            # 2. Fetch ISA results for that semester
+            # Step 2. Fetch specific ISA results list for that semester/class ID
             results_payload = {
                 "action": "6",
                 "mode": "9",
@@ -147,10 +173,51 @@ class PESUAcademy:
             if isinstance(res_data, str):
                 res_data = json.loads(res_data)
 
+            # Step 3. Extract official name from the ISA results
             return self._parse_sslc_name(res_data)
         except Exception:
+            # Silently fallback if any network/parsing issue occurs during name resolution
             pass
         return None
+
+    """
+    Example of actual raw JSON response returned by the PESU Academy mobile login API:
+    {
+      "userId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "userRoleId": "3",
+      "login": "SUCCESS",
+      "errorMessage": null,
+      "name": "John Doe",
+      "photo": "data:image/jpeg;base64,...",
+      "phone": "98X6X4X210",
+      "emergencyPhone": null,
+      "email": "johndoe@example.com",
+      "menuItems": null,
+      "cResults": null,
+      "results": null,
+      "serverMode": 0,
+      "redirectValue": "redirect:/a/ad",
+      "timeRemaining": null,
+      "status": 105,
+      "testStatus": 0,
+      "scheduledQuizTests": null,
+      "mobileAppTokenError": "SUCCESS",
+      "program": "B.Tech.",
+      "branch": "Branch:CSE",
+      "className": "Sem-2, Section A",
+      "batchClass": "3290",
+      "classBatchSection": "8648",
+      "sectionName": "Section A",
+      "programId": 1,
+      "classId": 2,
+      "loginId": "PES1201800001",
+      "departmentId": "PES1UG19CS001",
+      "usertype": "2",
+      "instId": 6,
+      "instIdNull": false,
+      "userParentList": [ ... ]
+    }
+    """
 
     def _map_data(
         self,
@@ -162,11 +229,20 @@ class PESUAcademy:
         field_filtering: bool,
         name_sslc: str | None = None,
     ) -> dict[str, Any]:
-        """Map the profile and class/section data from the response JSON."""
+        """Map the profile and class/section data from the response JSON.
+
+        Transforms the raw JSON structure returned by the PESU Mobile API
+        into the unified model schema used by the application, including:
+        - Mapping branch/program codes using PROGRAM_MAPPING and BRANCH_MAPPING.
+        - Resolving campus information based on the PRN campus code prefix.
+        - Filtering fields if custom fields selection is specified.
+        """
         prn = data.get("loginId")
         srn = data.get("departmentId") or username
         campus_code = None
         campus = None
+
+        # Deduce campus code and campus name prefix from PRN (e.g. PES1... or PES2...)
         if prn and (campus_code_match := re.match(r"PES(\d)", prn)):
             campus_code = int(campus_code_match.group(1))
             if campus_code == 1:
@@ -174,16 +250,17 @@ class PESUAcademy:
             elif campus_code == 2:
                 campus = "EC"
 
+        # Extract and normalize semester structure
         semester_val = _get_semester_from_class(data.get("className"), data.get("batchClass"))
         program_raw = data.get("program")
         program = PROGRAM_MAPPING.get(program_raw, program_raw)
         branch_raw = data.get("branch")
         branch = BRANCH_MAPPING.get(branch_raw, branch_raw)
 
-        # Prepare the authentication result dictionary
+        # Prepare base authentication response structure
         result = {"status": True, "message": "Login successful."}
 
-        # Fetch the profile information if profile details are requested
+        # Build and map profile information block if requested
         name = name_sslc or data.get("name")
         if profile:
             profile_dict = {
@@ -199,12 +276,12 @@ class PESUAcademy:
                 "campusCode": campus_code,
                 "campus": campus,
             }
-            # Filter the fields if field filtering is enabled
+            # Filter profile dictionary keys if field filtering is active
             if field_filtering:
                 profile_dict = {k: v for k, v in profile_dict.items() if k in fields}
             result["profile"] = profile_dict
 
-        # Fetch the "Know Your Class and Section" data if requested
+        # Build and map Class and Section block if requested
         if know_your_class_and_section:
             kycas_dict = {
                 "prn": prn,
@@ -217,7 +294,7 @@ class PESUAcademy:
                 "branch": data.get("branch"),
                 "instituteName": "PES University",
             }
-            # Filter the fields if field filtering is enabled
+            # Filter class and section dictionary keys if field filtering is active
             if field_filtering:
                 kycas_dict = {k: v for k, v in kycas_dict.items() if k in fields}
             result["knowYourClassAndSection"] = kycas_dict
