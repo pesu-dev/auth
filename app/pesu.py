@@ -114,7 +114,7 @@ class PESUAcademy:
         pass
 
     """
-    Example of raw JSON response returned by the PESU Academy dispatcher profile API (action=27, mode=1):
+    Raw JSON response format
     {
         "MESSAGE": "SUCCESS_Record found Successfully",
         "STUDENT_PHOTO": {

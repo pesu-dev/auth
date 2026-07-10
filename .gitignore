@@ -16,5 +16,4 @@ bruno.json
 .uv/
 .ruff_cache/
 *.csv
-.DS_Store
 *.png

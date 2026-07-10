@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import datetime
 import logging
-import os
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 from typing import TYPE_CHECKING
@@ -92,10 +91,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(PESUAcademyError)
 async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSONResponse:
-    """Handler for PESUAcademy specific custom exceptions (e.g. authentication failures).
-
-    Catches errors thrown within pesu.py and structures them into responses with corresponding status codes.
-    """
+    """Handler for PESUAcademy specific errors."""
     logging.exception(f"PESUAcademyError: {exc.message}")
     return JSONResponse(
         status_code=exc.status_code,
@@ -109,10 +105,7 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Global handler for catching unexpected unhandled runtime exceptions.
-
-    Prevents leaking raw stack traces to clients, returning a standard 500 Internal Server Error.
-    """
+    """Handler for unhandled exceptions."""
     logging.exception("Unhandled exception occurred.")
     return JSONResponse(
         status_code=500,
@@ -131,10 +124,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     tags=["Monitoring"],
 )
 async def health() -> JSONResponse:
-    """Health check endpoint.
-
-    Used by monitoring agents or load-balancers to verify that the service is running.
-    """
+    """Health check endpoint."""
     logging.debug("Health check requested.")
     return JSONResponse(
         status_code=200,
@@ -154,10 +144,7 @@ async def health() -> JSONResponse:
     tags=["Documentation"],
 )
 async def readme() -> RedirectResponse:
-    """Redirect to the PESUAuth GitHub repository.
-
-    Convenience endpoint that points to documentation repository on GitHub.
-    """
+    """Redirect to the PESUAuth GitHub repository."""
     return RedirectResponse("https://github.com/pesu-dev/auth", status_code=308)
 
 
@@ -218,7 +205,7 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
 
 
 def main() -> None:
-    """Main entrypoint function to parse CLI flags and run the FastAPI application."""
+    """Main function to run the FastAPI application with command line arguments."""
     # Set up argument parser for command line arguments
     parser = argparse.ArgumentParser(
         description="PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy.",
@@ -232,7 +219,7 @@ def main() -> None:
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.environ.get("PORT", 5000)),
+        default=5000,
         help="Port to run the FastAPI application on. Default is 5000",
     )
     parser.add_argument(
@@ -242,7 +229,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Configure logging levels and outputs based on debug flag settings
+    # Setup logging configuration
     logging_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(
         level=logging_level,
