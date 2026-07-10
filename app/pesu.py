@@ -1,4 +1,4 @@
-"""PESUAcademy class that serves as an interface to the PESU Academy website."""
+"""PESUAcademy class that serves as an interface to the PESU Academy Mobile API."""
 
 from __future__ import annotations
 
@@ -67,6 +67,14 @@ PROGRAM_MAPPING = {
     "BBA": "Bachelor of Business Administration",
     "MBA.": "Master of Business Administration",
     "MBA": "Master of Business Administration",
+    "BCA": "Bachelor of Computer Applications",
+    "BCA.": "Bachelor of Computer Applications",
+    "B.Com": "Bachelor of Commerce",
+    "B.Com.": "Bachelor of Commerce",
+    "MCA": "Master of Computer Applications",
+    "MCA.": "Master of Computer Applications",
+    "B.DES": "Bachelor of Design",
+    "B.DES.": "Bachelor of Design",
 }
 
 BRANCH_MAPPING = {
@@ -80,6 +88,16 @@ BRANCH_MAPPING = {
     "ME": "Mechanical Engineering",
     "Branch:BT": "Biotechnology",
     "BT": "Biotechnology",
+    "Branch:CSE(AI-ML)": "Computer Science and Engineering (AI&ML)",
+    "CSE(AI-ML)": "Computer Science and Engineering (AI&ML)",
+    "Branch:CSE (AI&ML)": "Computer Science and Engineering (AI&ML)",
+    "CSE (AI&ML)": "Computer Science and Engineering (AI&ML)",
+    "Branch:AIML": "Computer Science and Engineering (AI&ML)",
+    "AIML": "Computer Science and Engineering (AI&ML)",
+    "Branch:CE": "Civil Engineering",
+    "CE": "Civil Engineering",
+    "Branch:CV": "Civil Engineering",
+    "CV": "Civil Engineering",
 }
 
 
@@ -95,131 +113,87 @@ class PESUAcademy:
         """Initialize the PESUAcademy class."""
         pass
 
-    def _parse_sslc_name(self, res_data: object) -> str | None:
-        """Parse nameAsInSSLC from the ISA marks response JSON.
+    """
+    Example of raw JSON response returned by the PESU Academy dispatcher profile API (action=27, mode=1):
+    {
+        "MESSAGE": "SUCCESS_Record found Successfully",
+        "STUDENT_PHOTO": {
+            "userId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "loginId": "PES2UG25CS026",
+            "status": "A",
+            "gender": "Male",
+            "email": "student@example.com",
+            "mobile": "9876543210",
+            "firstName": "JOHN",
+            "nameAsInSSLC": "JOHN DOE",
+            "programId": 1,
+            "branchId": 32,
+            "instituteName": "PES University"
+        }
+    }
+    """
 
-        The response JSON has a structure where grades/marks are keyed by semester or test numbers.
-        This parses through the lists inside to extract the student's official name.
-        """
-        if not isinstance(res_data, dict):
-            return None
-        # Iterate over all marks data in the JSON response dictionary
-        for marks in res_data.values():
-            if not isinstance(marks, list):
-                continue
-            # Look for the 'NameAsInSSLC' field inside individual subject marks dictionaries
-            for mark in marks:
-                if not isinstance(mark, dict):
-                    continue
-                name_sslc = mark.get("NameAsInSSLC")
-                if name_sslc and name_sslc.strip():
-                    return name_sslc.strip()
-        return None
+    async def _fetch_profile_details(
+        self, client: httpx.AsyncClient, token: str, bearer_token: str, user_id: str
+    ) -> dict[str, Any] | None:
+        """Fetch the profile details from the dispatcher endpoint.
 
-    async def _fetch_name_as_in_sslc(self, client: httpx.AsyncClient, token: str, user_id: str) -> str | None:
-        """Fetch the official name (nameAsInSSLC) from ISA results.
-
-        The mobile API does not return the full official name in the primary login response.
-        Instead, we perform a multi-step query flow:
-        1. Fetch the user's ISA semesters/classes.
-        2. Retrieve the first/current semester's batch and section identifiers.
-        3. Query the detailed ISA results for that semester which includes the student's name.
+        This returns the actual name (nameAsInSSLC) and the correct PRN (loginId)
+        which are accurate compared to the general login response.
         """
         dispatcher_url = "https://www.pesuacademy.com/MAcademy/mobile/dispatcher"
-        headers = {"mobileappauthenticationtoken": token}
-
-        # Step 1. Fetch academic semesters listing under ISA results
-        sem_payload = {
-            "action": "6",
-            "mode": "5",
-            "userId": user_id,
-            "randomNum": "0.5",
-            "whichObjectId": "clickHome_footer_myresults",
-            "title": "ISA Results",
-            "serverMode": "0",
-            "redirectValue": "redirect:/a/ad",
+        headers = {
+            "mobileappauthenticationtoken": token,
+            "authorization": f"Bearer {bearer_token}",
         }
+        files = {
+            "action": (None, "27"),
+            "mode": (None, "1"),
+            "userId": (None, user_id),
+            "searchUserId": (None, user_id),
+        }
+
         try:
-            sem_resp = await client.post(dispatcher_url, data=sem_payload, headers=headers)
-            if sem_resp.status_code != 200:
+            resp = await client.post(dispatcher_url, headers=headers, files=files)
+            if resp.status_code != 200:
                 return None
-            sem_data = sem_resp.json()
-            if isinstance(sem_data, str):
-                sem_data = json.loads(sem_data)
-            if not isinstance(sem_data, list) or len(sem_data) == 0:
-                return None
+            data = resp.json()
+            if isinstance(data, str):
+                data = json.loads(data)
 
-            # Get the first/current semester info to retrieve active IDs
-            semester = sem_data[0]
-            batch_class_id = semester.get("BatchClassId")
-            class_batch_section_id = semester.get("ClassBatchSectionId")
-            if batch_class_id is None or class_batch_section_id is None:
-                return None
-
-            # Step 2. Fetch specific ISA results list for that semester/class ID
-            results_payload = {
-                "action": "6",
-                "mode": "9",
-                "userId": user_id,
-                "randomNum": "0.5",
-                "batchClassId": str(batch_class_id),
-                "classBatchSectionId": str(class_batch_section_id),
-                "fetchId": f"{batch_class_id}-{class_batch_section_id}",
-            }
-            res_resp = await client.post(dispatcher_url, data=results_payload, headers=headers)
-            if res_resp.status_code != 200:
-                return None
-            res_data = res_resp.json()
-            if isinstance(res_data, str):
-                res_data = json.loads(res_data)
-
-            # Step 3. Extract official name from the ISA results
-            return self._parse_sslc_name(res_data)
+            msg = data.get("MESSAGE")
+            if msg and "SUCCESS" in msg:
+                return data.get("STUDENT_PHOTO", {})
         except Exception:
-            # Silently fallback if any network/parsing issue occurs during name resolution
+            # Silently fallback if any network/parsing issue occurs during profile resolution
             pass
         return None
 
     """
     Example of actual raw JSON response returned by the PESU Academy mobile login API:
     {
-      "userId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-      "userRoleId": "3",
-      "login": "SUCCESS",
-      "errorMessage": null,
-      "name": "John Doe",
-      "photo": "data:image/jpeg;base64,...",
-      "phone": "98X6X4X210",
-      "emergencyPhone": null,
-      "email": "johndoe@example.com",
-      "menuItems": null,
-      "cResults": null,
-      "results": null,
-      "serverMode": 0,
-      "redirectValue": "redirect:/a/ad",
-      "timeRemaining": null,
-      "status": 105,
-      "testStatus": 0,
-      "scheduledQuizTests": null,
-      "mobileAppTokenError": "SUCCESS",
-      "program": "B.Tech.",
-      "branch": "Branch:CSE",
-      "className": "Sem-2, Section A",
-      "batchClass": "3290",
-      "classBatchSection": "8648",
-      "sectionName": "Section A",
-      "programId": 1,
-      "classId": 2,
-      "loginId": "PES1201800001",
-      "departmentId": "PES1UG19CS001",
-      "usertype": "2",
-      "instId": 6,
-      "instIdNull": false,
-      "userParentList": [ ... ]
+      "accessToken": "eyJhbGciOiJSUzI1NiJ9...",
+      "mobileJsonObject": {
+        "userId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        "userRoleId": "3",
+        "login": "SUCCESS",
+        "errorMessage": null,
+        "name": "JOHN DOE",
+        "photo": "data:image/jpeg;base64,...",
+        "phone": "9876543210",
+        "email": "student@example.com",
+        "program": "B.Tech.",
+        "branch": "Branch:CSE",
+        "className": "Sem-2, Section A",
+        "sectionName": "Section A",
+        "loginId": "PES2202501872",
+        "departmentId": "0",
+        "usertype": "2"
+      }
     }
     """
 
-    def _map_data(
+    def _map_data(  # noqa: C901
         self,
         data: dict[str, Any],
         username: str,
@@ -227,18 +201,32 @@ class PESUAcademy:
         know_your_class_and_section: bool,
         fields: list[str],
         field_filtering: bool,
-        name_sslc: str | None = None,
+        profile_details: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Map the profile and class/section data from the response JSON.
+        """Map the disparate data from both mobile endpoints into a single unified profile schema.
 
-        Transforms the raw JSON structure returned by the PESU Mobile API
-        into the unified model schema used by the application, including:
-        - Mapping branch/program codes using PROGRAM_MAPPING and BRANCH_MAPPING.
-        - Resolving campus information based on the PRN campus code prefix.
-        - Filtering fields if custom fields selection is specified.
+        The PESU Mobile API is fragmented. The initial login response returns a mix of
+        basic details, while the dispatcher endpoint provides the actual official records.
+        This method merges those two sources (represented by `data` and `profile_details`)
+        into the clean, structured format expected by the frontend clients.
+
+        Key transformations include:
+        - Resolving the true PRN (Application Number) and SRN (University Roll Number),
+          which are returned ambiguously by the backend.
+        - Translating raw program/branch codes (e.g., "Branch:CSE(AI-ML)") into readable strings
+          ("Computer Science and Engineering (AI&ML)") using internal mappings.
+        - Deduce campus information (RR vs EC) dynamically based on the prefix of the PRN.
+        - Selectively returning only the fields requested by the client if `field_filtering` is enabled.
         """
+        # --- PRN and SRN Resolution ---
+        # The new mobile API endpoints are notoriously confusing with identifiers:
+        # 1. The login endpoint (`data`) returns the Application Number (PRN) under the
+        #    key `loginId` (e.g., PES2202501872).
+        # 2. The dispatcher endpoint (`profile_details`) returns the actual University SRN
+        #    under the exact same `loginId` key (e.g., PES2UG25CS026).
+        # We must carefully map these to our explicit `prn` and `srn` keys to prevent downstream bugs.
         prn = data.get("loginId")
-        srn = data.get("departmentId") or username
+        srn = (profile_details.get("loginId") if profile_details else None) or data.get("departmentId") or username
         campus_code = None
         campus = None
 
@@ -261,7 +249,7 @@ class PESUAcademy:
         result = {"status": True, "message": "Login successful."}
 
         # Build and map profile information block if requested
-        name = name_sslc or data.get("name")
+        name = (profile_details.get("nameAsInSSLC") if profile_details else None) or data.get("name")
         if profile:
             profile_dict = {
                 "name": name,
@@ -271,8 +259,8 @@ class PESUAcademy:
                 "branch": branch,
                 "semester": semester_val,
                 "section": data.get("sectionName"),
-                "email": data.get("email"),
-                "phone": data.get("phone"),
+                "email": (profile_details.get("email") if profile_details else None) or data.get("email"),
+                "phone": (profile_details.get("mobile") if profile_details else None) or data.get("phone"),
                 "campusCode": campus_code,
                 "campus": campus,
             }
@@ -283,16 +271,33 @@ class PESUAcademy:
 
         # Build and map Class and Section block if requested
         if know_your_class_and_section:
+            # Deduce missing information originally provided by the web scraping API
+            kycas_branch = data.get("branch", "").replace("Branch:", "")
+            kycas_inst = "PES University (Electronic City)" if campus == "EC" else "PES University (Ring Road Campus)"
+
+            kycas_cycle = "NA"
+            kycas_dept = branch
+            if semester_val in ("Sem-1", "Sem-2"):
+                kycas_dept = f"S & H - PESU ({campus} Campus)"
+                section_letter = str(data.get("sectionName", "")).replace("Section ", "").strip()
+
+                if section_letter:
+                    is_a_to_n = section_letter[0].upper() <= "N"
+                    if semester_val == "Sem-1":
+                        kycas_cycle = "Chemistry Cycle" if is_a_to_n else "Physics Cycle"
+                    else:  # Sem-2
+                        kycas_cycle = "Physics Cycle" if is_a_to_n else "Chemistry Cycle"
+
             kycas_dict = {
                 "prn": prn,
                 "srn": srn,
                 "name": name,
                 "semester": semester_val,
-                "section": f"Section {data.get('sectionName')}" if data.get("sectionName") else None,
-                "cycle": "NA",
-                "department": data.get("branch"),
-                "branch": data.get("branch"),
-                "instituteName": "PES University",
+                "section": data.get("sectionName"),
+                "cycle": kycas_cycle,
+                "department": kycas_dept,
+                "branch": kycas_branch,
+                "instituteName": kycas_inst,
             }
             # Filter class and section dictionary keys if field filtering is active
             if field_filtering:
@@ -334,24 +339,18 @@ class PESUAcademy:
         )
 
         # Prepare the payload for mobile login API
-        login_url = "https://www.pesuacademy.com/MAcademy/j_spring_security_check"
-        payload = {
-            "j_username": username,
-            "j_password": password,
-            "j_mobile": "MOBILE",
-            "j_mobileApp": "YES",
-            "j_social": "NO",
-            "j_appId": "1",
-            "action": "0",
-            "mode": "0",
-            "whichObjectId": "loginSubmitButton",
-            "randomNum": 0.5,
+        login_url = "https://www.pesuacademy.com/MAcademy/mobile/mobilelogin/auth"
+        files = {
+            "userName": (None, username),
+            "password": (None, password),
+            "j_appId": (None, "YES"),
+            "instId": (None, "1,6,7,14"),
         }
 
         # Make a post request to authenticate the user
         async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
             try:
-                response = await client.post(login_url, data=payload)
+                response = await client.post(login_url, files=files)
             except Exception as e:
                 raise AuthenticationError(f"Connection failed: {str(e)}")
 
@@ -373,9 +372,11 @@ class PESUAcademy:
                 except Exception:
                     raise AuthenticationError("Authentication failed: Invalid nested JSON response")
 
-            # If the response does not indicate success, raise an AuthenticationError
-            if not isinstance(data, dict) or data.get("login") != "SUCCESS":
-                error_msg = data.get("errorMessage") if isinstance(data, dict) else None
+            # Validate the mobileJsonObject structure
+            mobile_obj = data.get("mobileJsonObject") if isinstance(data, dict) else None
+
+            if not isinstance(mobile_obj, dict) or mobile_obj.get("login") != "SUCCESS":
+                error_msg = mobile_obj.get("errorMessage") if isinstance(mobile_obj, dict) else None
                 raise AuthenticationError(
                     error_msg or f"Invalid username or password, or user does not exist for user={username}."
                 )
@@ -388,18 +389,20 @@ class PESUAcademy:
                 return {"status": True, "message": "Login successful."}
 
             token = response.headers.get("mobileappauthenticationtoken") or ""
-            user_id = str(data.get("userId") or "")
-            name_sslc = None
-            if token and user_id:
-                name_sslc = await self._fetch_name_as_in_sslc(client, token, user_id)
+            bearer_token = data.get("accessToken") or mobile_obj.get("accessToken") or ""
+            user_id = str(mobile_obj.get("userId") or "")
+
+            profile_details = None
+            if token and user_id and bearer_token:
+                profile_details = await self._fetch_profile_details(client, token, bearer_token, user_id)
 
             # Map the parsed response JSON to return format
             return self._map_data(
-                data=data,
+                data=mobile_obj,
                 username=username,
                 profile=profile,
                 know_your_class_and_section=know_your_class_and_section,
                 fields=fields,
                 field_filtering=field_filtering,
-                name_sslc=name_sslc,
+                profile_details=profile_details,
             )
