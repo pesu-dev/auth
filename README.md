@@ -167,7 +167,8 @@ does not take any request parameters.
 ### `/metrics`
 
 This endpoint exposes counters describing the traffic this process has served and the work it did to serve it. It takes
-no request parameters other than the format selector below.
+no request parameters other than the format selector below. It is open by default and can be put behind a bearer token
+— see [Protecting the endpoint](#protecting-the-endpoint).
 
 #### Query Parameters
 
@@ -553,7 +554,8 @@ expect. Set the `METRICS_TOKEN` environment variable on the server to require a 
 instead:
 
 ```bash
-docker run --name pesu-auth -d -p 5000:5000 -e METRICS_TOKEN=<token> pesu-auth
+TOKEN=$(openssl rand -hex 32)   # keep it: whatever scrapes the endpoint needs the same value
+docker run --name pesu-auth -d -p 5000:5000 -e METRICS_TOKEN="$TOKEN" pesu-auth
 ```
 
 With it set, a request must carry that token or the endpoint answers `401` with
