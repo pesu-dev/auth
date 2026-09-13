@@ -9,10 +9,13 @@ same class of silent, environment-dependent breakage as the ".env vanished" case
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 
 from app.app import app
 from app.exceptions.authentication import AuthenticationError
+from app.exceptions.metrics import MetricsAuthorizationError
+from app.metrics.auth import _configured_token, require_metrics_token
 from app.metrics.collector import MetricsCollector
 
 TOKEN = "test-metrics-token"
@@ -102,17 +105,66 @@ def test_health_is_not_protected(protected):
     assert protected.get("/health").status_code == 200
 
 
-def test_an_empty_environment_variable_counts_as_unset(monkeypatch):
-    """A variable declared but left blank must not lock everyone out of the endpoint."""
-    monkeypatch.setenv("METRICS_TOKEN", "")
-    import importlib
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [(None, None), ("", None), ("   ", "   "), ("a-token", "a-token")],
+)
+def test_reading_the_token_from_the_environment(monkeypatch, value, expected):
+    """A variable declared but left blank means "no token", not "the empty token".
 
-    import app.metrics.auth as metrics_auth
+    Tested through the reader rather than by reloading the module: a reload mutates the module
+    dict in place, which would leave the new value in force for every test that follows it.
+    """
+    if value is None:
+        monkeypatch.delenv("METRICS_TOKEN", raising=False)
+    else:
+        monkeypatch.setenv("METRICS_TOKEN", value)
+    assert _configured_token() == expected
 
-    importlib.reload(metrics_auth)
-    assert metrics_auth.METRICS_TOKEN is None
-    monkeypatch.delenv("METRICS_TOKEN")
-    importlib.reload(metrics_auth)
+
+#: Header values are passed as **bytes** in the non-ASCII tests below. httpx refuses to encode a
+#: non-ASCII str header value, so a str would fail in the client and never reach the app -- but
+#: curl and any other raw client send those bytes happily, which is how this reached a real server.
+@pytest.mark.parametrize(
+    "credential",
+    [b"\xc3\xbc", b"t\xc3\xb6k\xc3\xa9n", b"\xc3\xa9" * 200, b"\xff\xfe", b"\x80"],
+)
+def test_a_non_ascii_credential_is_rejected_not_a_server_error(protected, credential):
+    """`secrets.compare_digest` raises TypeError on a str holding any non-ASCII character.
+
+    Comparing the presented credential as a str let any caller turn this 401 into a **500** with a
+    logged traceback, and put the result in `failures_total{fault="server"}` -- the one metric
+    worth alerting on. Against a str comparison every case here is a 500.
+    """
+    response = protected.get("/metrics", headers={b"Authorization": b"Bearer " + credential})
+    assert response.status_code == 401
+    assert response.json()["message"] == "Invalid or missing metrics token."
+
+
+def test_a_non_ascii_token_actually_works(client, monkeypatch):
+    """A token is compared byte for byte, so an operator is not silently locked out by an umlaut.
+
+    Against a str comparison this was worse than a rejection: *every* request 500ed, the correct
+    one included, leaving the endpoint unreachable with only a traceback to explain why.
+    """
+    monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", "tökén-höchst")
+    correct = "tökén-höchst".encode()  # what a client actually puts on the wire
+    assert client.get("/metrics", headers={b"Authorization": b"Bearer " + correct}).status_code == 200
+    assert client.get("/metrics", headers={b"Authorization": b"Bearer t\xc3\xb6k\xc3\xa9n"}).status_code == 401
+
+
+@pytest.mark.parametrize("credential", ["ü", "tökén", "\udcff", "é" * 500])
+@pytest.mark.asyncio
+async def test_the_dependency_itself_never_raises_typeerror(monkeypatch, credential):
+    """Pinned one level below the HTTP layer, where the TypeError actually happened.
+
+    Includes a lone surrogate, which no HTTP client would send but which `.encode("utf-8")` would
+    choke on -- the reason the comparison encodes latin-1 rather than UTF-8 on this side.
+    """
+    monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", TOKEN)
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=credential)
+    with pytest.raises(MetricsAuthorizationError):
+        await require_metrics_token(credentials)
 
 
 def test_other_errors_carry_no_stray_headers(client):

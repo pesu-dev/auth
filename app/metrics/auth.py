@@ -16,10 +16,20 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.exceptions.metrics import MetricsAuthorizationError
 
+
+def _configured_token() -> str | None:
+    """Read the configured metrics token from the environment.
+
+    Returns:
+        str | None: The token, or None when it is unset or blank -- a variable declared and left
+            empty means "no token", not "the empty token".
+    """
+    return os.environ.get("METRICS_TOKEN") or None
+
+
 # Read once at import, so whether this process enforces a token is fixed for its lifetime and
-# cannot start or stop halfway through. An empty value counts as unset, which is what an
-# environment variable declared but left blank looks like.
-METRICS_TOKEN: str | None = os.environ.get("METRICS_TOKEN") or None
+# cannot start or stop halfway through.
+METRICS_TOKEN: str | None = _configured_token()
 
 # auto_error=False so this never raises by itself: every failure path -- no header, no scheme, no
 # credentials, or a scheme that is not Bearer -- returns None, and the 401 is raised below as a
@@ -55,6 +65,22 @@ async def require_metrics_token(
     if expected is None:
         return
     # compare_digest, not ==, so a wrong token cannot be recovered a character at a time from how
-    # long the comparison took
-    if credentials is None or not secrets.compare_digest(credentials.credentials, expected):
+    # long the comparison took.
+    #
+    # Compared as bytes, not str: compare_digest *raises TypeError* on a str holding any non-ASCII
+    # character, so `Authorization: Bearer ü` would turn this 401 into a 500 with a logged
+    # traceback -- something any caller could do at will, and it would land in
+    # failures_total{fault="server"}, which is the one metric worth alerting on. A non-ASCII
+    # METRICS_TOKEN was worse still: every request 500ed, including the correct one.
+    #
+    # The two codecs are not interchangeable. A header value reaches us already latin-1 decoded,
+    # per the HTTP spec and every ASGI server, so encoding it back through latin-1 recovers the
+    # exact bytes the client sent; the configured token comes from the environment as UTF-8, with
+    # surrogates standing in for any byte sequence that was not valid UTF-8. Encoding each back the
+    # way it arrived makes the comparison byte-exact, so a non-ASCII token works rather than
+    # silently never matching.
+    if credentials is None or not secrets.compare_digest(
+        credentials.credentials.encode("latin-1", "replace"),
+        expected.encode("utf-8", "surrogateescape"),
+    ):
         raise MetricsAuthorizationError
