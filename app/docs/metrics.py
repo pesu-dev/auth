@@ -175,6 +175,23 @@ metrics_docs = ApiDocs(
                 }
             },
         },
+        401: {
+            "description": (
+                "The server has `METRICS_TOKEN` set and the request did not present it. The "
+                "response carries `WWW-Authenticate: Bearer`. While `METRICS_TOKEN` is unset this "
+                "cannot occur and the endpoint needs no credentials."
+            ),
+            "model": ResponseModel,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": False,
+                        "message": "Invalid or missing metrics token.",
+                        "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                    }
+                }
+            },
+        },
         500: _INTERNAL_SERVER_ERROR,
     },
 )
