@@ -553,9 +553,15 @@ expect. Set the `METRICS_TOKEN` environment variable on the server to require a 
 instead:
 
 ```bash
-TOKEN=$(openssl rand -hex 32)   # keep it: whatever scrapes the endpoint needs the same value
-docker run --name pesu-auth -d -p 5000:5000 -e METRICS_TOKEN="$TOKEN" pesu-auth
+# Deployed: an environment variable on the service
+docker run --name pesu-auth -d -p 5000:5000 -e METRICS_TOKEN=<token> pesu-auth
+
+# Running from source: pass it to the process
+METRICS_TOKEN=<token> uv run python -m app.app
 ```
+
+`.env` is read by the test suite, never by the application, so a token there does not protect a
+running server.
 
 With it set, a request must carry that token or the endpoint answers `401` with
 `WWW-Authenticate: Bearer` and the same error body as every other failure. Both formats are
