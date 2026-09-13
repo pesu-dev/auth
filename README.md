@@ -546,6 +546,55 @@ which is `null` rather than absent when nothing has been recorded yet, so the sh
 
 </details>
 
+#### Protecting the endpoint
+
+`/metrics` is **open by default**, which is what a local run and the Docker instructions above
+expect. Set the `METRICS_TOKEN` environment variable on the server to require a bearer token
+instead:
+
+```bash
+docker run --name pesu-auth -d -p 5000:5000 -e METRICS_TOKEN=<token> pesu-auth
+```
+
+With it set, a request must carry that token or the endpoint answers `401` with
+`WWW-Authenticate: Bearer` and the same error body as every other failure. Both formats are
+covered, so `?fmt=json` is not a way around it.
+
+```bash
+curl http://localhost:5000/metrics                                   # 401
+curl -H "Authorization: Bearer <token>" http://localhost:5000/metrics  # 200
+```
+
+The variable is read once at startup, so changing it needs a restart. Leaving it blank counts as
+unset. No other endpoint is affected — `/health` in particular stays open, since uptime monitors
+and the hosting platform's own health check send no credentials.
+
+#### Scraping the endpoint
+
+The default format is the Prometheus text exposition format precisely so that a scraper pointed at
+this path needs no configuration. Any Prometheus-compatible collector works:
+
+```yaml
+scrape_configs:
+  - job_name: pesu-auth
+    metrics_path: /metrics
+    scheme: https
+    static_configs:
+      - targets: [ "pesu-auth.onrender.com" ]
+    authorization:
+      credentials: <token>   # omit when METRICS_TOKEN is unset
+```
+
+Grafana Cloud can also scrape it with no collector to host, through its **Metrics Endpoint**
+integration (Connections → Metrics Endpoint → Configuration → new scrape job). It requires the
+endpoint to be behind authentication, which is what `METRICS_TOKEN` is for — paste the token
+without the `Bearer ` prefix. Two things are worth knowing before pointing anything at it:
+
+- Counters are per-process and **reset on restart**. `rate()` handles that, and
+  `pesu_auth_process_start_time_seconds` makes the restart itself visible.
+- A scrape is a request, so it appears in the metrics it collects. Subtract
+  `pesu_auth_route_requests_total{route="/metrics"}` for traffic without it.
+
 ### `/readme`
 
 This endpoint redirects to the project's official GitHub repository. This endpoint does not take any request parameters.
