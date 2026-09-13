@@ -184,6 +184,15 @@ curl http://localhost:5000/metrics                  # Prometheus text, for a scr
 curl http://localhost:5000/metrics?fmt=json | jq    # the same numbers, for a human
 ```
 
+#### Responses
+
+| **Code** | **When**                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------ |
+| `200`    | The counters, in the format named by `fmt`                                                 |
+| `400`    | `fmt` was something other than `prometheus` or `json`                                      |
+| `401`    | A token is configured and the request did not carry it. Carries `WWW-Authenticate: Bearer` |
+| `500`    | An unexpected failure, rendered by the catch-all handler like on any other endpoint        |
+
 #### How collection works
 
 Everything is counted **in this process, in memory**. There is no database and no external dependency, and the counters
@@ -548,9 +557,14 @@ which is `null` rather than absent when nothing has been recorded yet, so the sh
 
 #### Protecting the endpoint
 
-`/metrics` is **open by default**, which is what a local run and the Docker instructions above
-expect. Set the `METRICS_TOKEN` environment variable on the server to require a bearer token
-instead:
+`/metrics` is **open unless a token is configured**, through the `METRICS_TOKEN` environment
+variable.
+
+| `METRICS_TOKEN` | Behaviour of `/metrics`                                                |
+| --------------- | ---------------------------------------------------------------------- |
+| unset           | Open. A credential sent anyway is **ignored, not rejected**            |
+| blank           | Same as unset — an empty value means "no token", not "the empty token" |
+| set             | Every request must carry that token, in both formats                   |
 
 ```bash
 # Deployed: an environment variable on the service
@@ -563,18 +577,19 @@ METRICS_TOKEN=<token> uv run python -m app.app
 `.env` is read by the test suite, never by the application, so a token there does not protect a
 running server.
 
-With it set, a request must carry that token or the endpoint answers `401` with
-`WWW-Authenticate: Bearer` and the same error body as every other failure. Both formats are
-covered, so `?fmt=json` is not a way around it.
+A rejection carries `WWW-Authenticate: Bearer` and the same error body as every other failure.
 
 ```bash
 curl http://localhost:5000/metrics                                   # 401
 curl -H "Authorization: Bearer <token>" http://localhost:5000/metrics  # 200
 ```
 
-The variable is read once at startup, so changing it needs a restart. Leaving it blank counts as
-unset. No other endpoint is affected — `/health` in particular stays open, since uptime monitors
-and the hosting platform's own health check send no credentials.
+The interactive docs at `/` carry an **Authorize** button for it. Paste the token there with no
+`Bearer ` prefix; Swagger adds that itself.
+
+The variable is read once at startup, so changing it needs a restart. No other endpoint is
+affected — `/health` in particular stays open, since uptime monitors and the hosting platform's own
+health check send no credentials.
 
 #### Scraping the endpoint
 
