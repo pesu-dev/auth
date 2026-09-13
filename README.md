@@ -188,8 +188,7 @@ curl http://localhost:5000/metrics?fmt=json | jq    # the same numbers, for a hu
 
 Everything is counted **in this process, in memory**. There is no database and no external dependency, and the counters
 **reset to zero when the process restarts** — which on the hosted environments is often. `processStartTimeSeconds` is
-exposed so a dashboard can tell a restart apart from a drop in traffic; in PromQL, `rate()` already handles counter
-resets, and `pesu_auth_process_start_time_seconds` makes the restart itself visible.
+exposed so a dashboard can tell a restart apart from a drop in traffic.
 
 Collection happens at three layers, and which layer records what is deliberate:
 
@@ -586,16 +585,6 @@ scrape_configs:
     authorization:
       credentials: <token>   # omit when METRICS_TOKEN is unset
 ```
-
-Grafana Cloud can also scrape it with no collector to host, through its **Metrics Endpoint**
-integration (Connections → Metrics Endpoint → Configuration → new scrape job). It requires the
-endpoint to be behind authentication, which is what `METRICS_TOKEN` is for — paste the token
-without the `Bearer ` prefix. Two things are worth knowing before pointing anything at it:
-
-- Counters are per-process and **reset on restart**. `rate()` handles that, and
-  `pesu_auth_process_start_time_seconds` makes the restart itself visible.
-- A scrape is a request, so it appears in the metrics it collects. Subtract
-  `pesu_auth_route_requests_total{route="/metrics"}` for traffic without it.
 
 ### `/readme`
 
