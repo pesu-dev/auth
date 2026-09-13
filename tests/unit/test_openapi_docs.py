@@ -140,6 +140,31 @@ def test_the_metrics_format_enum_is_documented(schema):
     assert sorted(values) == ["json", "prometheus"]
 
 
+def test_the_metrics_token_scheme_is_documented(schema):
+    """Swagger's Authorize button is how a reader discovers the endpoint can be protected."""
+    scheme = schema["components"]["securitySchemes"]["MetricsToken"]
+    assert scheme["type"] == "http"
+    assert scheme["scheme"] == "bearer"
+    assert "METRICS_TOKEN" in scheme["description"]
+
+
+def test_only_metrics_requires_the_token(schema):
+    """/health must stay open: Render's own health check and the uptime monitors send no token."""
+    secured = {path for path, _, operation in _operations(schema) if operation.get("security")}
+    assert secured == {"/metrics"}
+    assert schema["paths"]["/metrics"]["get"]["security"] == [{"MetricsToken": []}]
+
+
+def test_the_documented_metrics_401_matches_a_real_response(client, schema, monkeypatch):
+    """The 401 body a scraper gets must be the one Swagger shows."""
+    documented = schema["paths"]["/metrics"]["get"]["responses"]["401"]["content"]["application/json"]["example"]
+    monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", "some-token")
+    response = client.get("/metrics")
+    assert response.status_code == 401
+    assert response.json()["message"] == documented["message"]
+    assert set(response.json()) == set(documented)
+
+
 def test_the_documented_400_matches_a_real_response(client, schema):
     """The example a reader copies must be the body they will actually receive."""
     documented = schema["paths"]["/metrics"]["get"]["responses"]["400"]["content"]["application/json"]["example"]

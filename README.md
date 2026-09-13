@@ -167,7 +167,8 @@ does not take any request parameters.
 ### `/metrics`
 
 This endpoint exposes counters describing the traffic this process has served and the work it did to serve it. It takes
-no request parameters other than the format selector below.
+no request parameters other than the format selector below. It is open by default and can be put behind a bearer token
+— see [Protecting the endpoint](#protecting-the-endpoint).
 
 #### Query Parameters
 
@@ -187,8 +188,7 @@ curl http://localhost:5000/metrics?fmt=json | jq    # the same numbers, for a hu
 
 Everything is counted **in this process, in memory**. There is no database and no external dependency, and the counters
 **reset to zero when the process restarts** — which on the hosted environments is often. `processStartTimeSeconds` is
-exposed so a dashboard can tell a restart apart from a drop in traffic; in PromQL, `rate()` already handles counter
-resets, and `pesu_auth_process_start_time_seconds` makes the restart itself visible.
+exposed so a dashboard can tell a restart apart from a drop in traffic.
 
 Collection happens at three layers, and which layer records what is deliberate:
 
@@ -545,6 +545,46 @@ which is `null` rather than absent when nothing has been recorded yet, so the sh
 ```
 
 </details>
+
+#### Protecting the endpoint
+
+`/metrics` is **open by default**, which is what a local run and the Docker instructions above
+expect. Set the `METRICS_TOKEN` environment variable on the server to require a bearer token
+instead:
+
+```bash
+TOKEN=$(openssl rand -hex 32)   # keep it: whatever scrapes the endpoint needs the same value
+docker run --name pesu-auth -d -p 5000:5000 -e METRICS_TOKEN="$TOKEN" pesu-auth
+```
+
+With it set, a request must carry that token or the endpoint answers `401` with
+`WWW-Authenticate: Bearer` and the same error body as every other failure. Both formats are
+covered, so `?fmt=json` is not a way around it.
+
+```bash
+curl http://localhost:5000/metrics                                   # 401
+curl -H "Authorization: Bearer <token>" http://localhost:5000/metrics  # 200
+```
+
+The variable is read once at startup, so changing it needs a restart. Leaving it blank counts as
+unset. No other endpoint is affected — `/health` in particular stays open, since uptime monitors
+and the hosting platform's own health check send no credentials.
+
+#### Scraping the endpoint
+
+The default format is the Prometheus text exposition format precisely so that a scraper pointed at
+this path needs no configuration. Any Prometheus-compatible collector works:
+
+```yaml
+scrape_configs:
+  - job_name: pesu-auth
+    metrics_path: /metrics
+    scheme: https
+    static_configs:
+      - targets: [ "pesu-auth.onrender.com" ]
+    authorization:
+      credentials: <token>   # omit when METRICS_TOKEN is unset
+```
 
 ### `/readme`
 

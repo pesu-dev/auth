@@ -89,9 +89,9 @@ def make_request(
                 follow_redirects=True,
             )
     elapsed_time = time.time() - start_time
-    # Not every route answers with JSON: /readme is a 308 to GitHub, and /metrics is Prometheus
-    # text. An unconditional .json() crashes the sequential runner outright and, in the parallel
-    # runner, is swallowed as a failed request -- which silently skews the numbers being measured.
+    # Not every route answers with JSON: /readme is a 308 to GitHub. An unconditional .json()
+    # crashes the sequential runner outright and, in the parallel runner, is swallowed as a failed
+    # request -- which silently skews the numbers being measured.
     try:
         body = response.json()
     except ValueError:

@@ -254,8 +254,8 @@ class MetricsCollector:
         self._start_time = self._clock()
         self._values: defaultdict[str, dict[LabelKey, float]] = defaultdict(dict)
         # Seed the unlabelled series so a freshly started process still exposes them. Without this
-        # a Grafana panel has no series at all until the first request, and rate() over a series
-        # that springs into existence mid-window reads as a spike.
+        # there is no series at all until the first request, and a rate over a series that springs
+        # into existence mid-window reads as a spike.
         for family in FAMILIES:
             if family.labels:
                 continue

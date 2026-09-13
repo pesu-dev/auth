@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 
@@ -27,6 +27,7 @@ from pydantic import ValidationError
 
 from app.docs import authenticate_docs, health_docs, metrics_docs, readme_docs
 from app.exceptions.base import PESUAcademyError
+from app.metrics.auth import require_metrics_token
 from app.metrics.collector import (
     AUTHENTICATION_REQUESTS,
     AUTHENTICATION_RESULTS,
@@ -223,6 +224,7 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
             "message": exc.message,
             "timestamp": datetime.datetime.now(IST).isoformat(),
         },
+        headers=exc.headers,
     )
 
 
@@ -267,6 +269,9 @@ async def health() -> JSONResponse:
     response_model=None,
     responses=metrics_docs.response_examples,
     tags=["Monitoring"],
+    # Enforced only when METRICS_TOKEN is set in the environment; open otherwise, which is what
+    # every existing caller and the local Docker instructions expect.
+    dependencies=[Depends(require_metrics_token)],
 )
 async def metrics_endpoint(fmt: MetricsFormat = MetricsFormat.PROMETHEUS) -> Response:
     """Expose the collected metrics.
