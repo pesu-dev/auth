@@ -17,9 +17,15 @@ returns the user's profile information. No personal data is stored.
 ## PESUAuth LIVE Deployment
 
 - You can access the PESUAuth API endpoints [here](https://pesu-auth.onrender.com/).
-- You can view the health status of the API on the [PESUAuth Health Dashboard](https://xzlk85cp.status.cron-job.org/).
+- You can view the health status of the API on the health check pages for
+  [production](https://xzlk85cp.status.cron-job.org) and [staging](https://6ns95sgb.status.cron-job.org).
+- You can view detailed metrics and KPIs for both environments on the
+  [PESUAuth metrics dashboard](https://loyalplateau1250.grafana.net/public-dashboards/bd1df85e9420490f88978906b0d9fbdf),
+  built from the counters that [`/metrics`](#metrics) exposes.
 
 #### API Status
+
+**Production**
 
 ![Cron job status](https://api.cron-job.org/jobs/4424640/69701a6f8df1d307/status-7.svg)\
 ![Cron job status](https://api.cron-job.org/jobs/6338038/9feb0f217be714ec/status-7.svg)\
