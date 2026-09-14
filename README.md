@@ -25,12 +25,16 @@ returns the user's profile information. No personal data is stored.
 
 #### API Status
 
-**Production**
+Seven days of history per check, from [cron-job.org](https://cron-job.org).
 
-![Cron job status](https://api.cron-job.org/jobs/4424640/69701a6f8df1d307/status-7.svg)\
-![Cron job status](https://api.cron-job.org/jobs/6338038/9feb0f217be714ec/status-7.svg)\
-![Cron job status](https://api.cron-job.org/jobs/5672615/1d744f1dc18fb505/status-7.svg)\
-![Cron job status](https://api.cron-job.org/jobs/4424663/d5a30351867acec9/status-7.svg)
+| **Check**                        | **Production**                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Docs                             | ![Docs](https://api.cron-job.org/jobs/4424640/69701a6f8df1d307/status-7.svg)                        |
+| Health                           | ![Health](https://api.cron-job.org/jobs/6338038/9feb0f217be714ec/status-7.svg)                      |
+| Authentication                   | ![Authentication](https://api.cron-job.org/jobs/5672615/1d744f1dc18fb505/status-7.svg)              |
+| Authentication with Profile Data | ![Authentication with profile](https://api.cron-job.org/jobs/4424663/d5a30351867acec9/status-7.svg) |
+
+[![Grafana](https://img.shields.io/badge/Grafana-metrics%20%26%20KPIs-F46800?logo=grafana&logoColor=white)](https://loyalplateau1250.grafana.net/public-dashboards/bd1df85e9420490f88978906b0d9fbdf)
 
 > [!NOTE]
 > All timestamps are in UTC.
