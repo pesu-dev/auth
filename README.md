@@ -16,8 +16,8 @@ returns the user's profile information. No personal data is stored.
 
 ## PESUAuth LIVE Deployment
 
-[![Production API version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpesu-auth.onrender.com%2Fopenapi.json&query=%24.info.version&label=production&color=blue&prefix=v&cacheSeconds=600)](https://pesu-auth.onrender.com/)
-[![Staging API version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpesu-auth-dev.onrender.com%2Fopenapi.json&query=%24.info.version&label=staging&color=orange&prefix=v&cacheSeconds=600)](https://pesu-auth-dev.onrender.com/)
+[![Production API version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpesu-auth.onrender.com%2Fopenapi.json&query=%24.info.version&label=production&color=blue&prefix=v&cacheSeconds=120)](https://pesu-auth.onrender.com/)
+[![Staging API version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpesu-auth-dev.onrender.com%2Fopenapi.json&query=%24.info.version&label=staging&color=orange&prefix=v&cacheSeconds=120)](https://pesu-auth-dev.onrender.com/)
 
 - You can access the PESUAuth API endpoints [here](https://pesu-auth.onrender.com/).
 - You can view the health status of the API on the health check pages for
