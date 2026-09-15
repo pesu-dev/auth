@@ -35,7 +35,7 @@ returns the user's profile information. No personal data is stored.
 | Staging         | Health                           | ![Health](https://api.cron-job.org/jobs/6382168/e38759ed59c0d9c1/status-7.svg)                                                                                                                       |
 | Staging         | Authentication                   | ![Authentication](https://api.cron-job.org/jobs/6382175/226ee5764400bf01/status-7.svg)                                                                                                               |
 | Staging         | Authentication with Profile Data | ![Authentication with profile](https://api.cron-job.org/jobs/6382173/5cff341ab10ab962/status-7.svg)                                                                                                  |
-| Both            | Detailed metrics and KPIs        | [![Grafana](https://img.shields.io/badge/Grafana-metrics%20%26%20KPIs-F46800?logo=grafana&logoColor=white)](https://loyalplateau1250.grafana.net/public-dashboards/bd1df85e9420490f88978906b0d9fbdf) |
+|                 | Detailed metrics and KPIs        | [![Grafana](https://img.shields.io/badge/Grafana-metrics%20%26%20KPIs-F46800?logo=grafana&logoColor=white)](https://loyalplateau1250.grafana.net/public-dashboards/bd1df85e9420490f88978906b0d9fbdf) |
 
 > [!NOTE]
 > All timestamps are in UTC.
@@ -130,6 +130,19 @@ object, with the user's profile information if requested.
 | `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information                                                            |
 | `fields`      | Yes          | `list[str]` | `None`      | Which fields to fetch from the profile information. If not provided, all fields will be fetched |
 
+#### Responses
+
+| **Code** | **When**                                                                          |
+| -------- | --------------------------------------------------------------------------------- |
+| `200`    | The credentials are valid. `profile` is included if it was requested              |
+| `400`    | The request body failed validation — a missing field, or an unknown profile field |
+| `401`    | Invalid username or password, or the user does not exist                          |
+| `422`    | PESU Academy's profile page could not be parsed, which means their page changed   |
+| `500`    | An unexpected failure, rendered by the catch-all handler                          |
+| `502`    | PESU Academy could not be reached, or did not answer with what was expected       |
+
+Every non-`200` carries the same `{status, message, timestamp}` body, with `status` set to `false`.
+
 #### Response Object
 
 On authentication, it returns the following parameters in a JSON object. If the authentication was successful and
@@ -163,6 +176,8 @@ If the authentication fails, this field will not be present in the response.
 | `campus`     | Abbreviation of the user's campus name                 |
 
 ### `/health`
+
+Answers `200` whenever the process is serving; a `500` would come from the catch-all handler, as on any other endpoint.
 
 This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks. This endpoint
 does not take any request parameters.
@@ -620,7 +635,7 @@ scrape_configs:
 
 ### `/readme`
 
-This endpoint redirects to the project's official GitHub repository. This endpoint does not take any request parameters.
+This endpoint redirects to the project's official GitHub repository with a `308`, and takes no request parameters. A `500` would come from the catch-all handler, as on any other endpoint.
 
 ### Integrating your application with the PESUAuth API
 
@@ -662,7 +677,7 @@ print(response.json())
     "campus": "RR"
   },
   "message": "Login successful.",
-  "timestamp": "2024-07-28 22:30:10.103368+05:30"
+  "timestamp": "2024-07-28T22:30:10.103368+05:30"
 }
 ```
 
@@ -679,13 +694,13 @@ curl -X POST http://localhost:5000/authenticate \
 }'
 ```
 
-#### Response
+##### Response
 
 ```json
 {
   "status": true,
   "message": "Login successful.",
-  "timestamp": "2024-07-28 22:30:10.103368+05:30"
+  "timestamp": "2024-07-28T22:30:10.103368+05:30"
 }
 ```
 
