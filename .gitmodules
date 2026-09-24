@@ -1,0 +1,3 @@
+[submodule ".agents/pesu-skills"]
+	path = .agents/pesu-skills
+	url = https://github.com/pesu-dev/skills.git

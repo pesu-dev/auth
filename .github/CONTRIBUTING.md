@@ -13,6 +13,7 @@ your development environment and contributing to the project.
   - [Setting Up Your Environment](#setting-up-your-environment)
   - [Set Up Environment Variables](#set-up-environment-variables)
   - [Pre-commit Hooks](#pre-commit-hooks)
+- [🤖 Coding Agents](#-coding-agents)
 - [🧰 Running the Application](#-running-the-application)
 - [🧪 Testing and Code Quality](#-testing-and-code-quality)
   - [Pre-commit Hooks](#pre-commit-hooks-1)
@@ -52,7 +53,8 @@ We maintain two deployment environments:
 
 The standard workflow for contributing is as follows:
 
-1. Fork the repository on GitHub and clone it to your local machine.
+1. Fork the repository on GitHub and clone it to your local machine with `--recurse-submodules` (see
+   [Coding Agents](#-coding-agents)).
 1. Create a new branch for your feature or bug fix.
 1. Make your changes and commit them with clear, descriptive messages.
 1. Push your branch to your fork on GitHub.
@@ -115,6 +117,28 @@ your code. Install the pre-commit hooks by running:
 ```bash
 pre-commit install
 ```
+
+## 🤖 Coding Agents
+
+This repository is set up for coding agents (Codex, Claude Code, Copilot, Cursor, Gemini and
+others). Their instructions, skills and roles come from
+[pesu-dev/skills](https://github.com/pesu-dev/skills), mounted as a git submodule at
+`.agents/pesu-skills`. `AGENTS.md`, `.agents/skills` and `.claude/skills` are links into it.
+
+Clone with the submodule, or the links point at nothing and agents see no instructions:
+
+```bash
+git clone --recurse-submodules https://github.com/<your-username>/auth.git
+# already cloned without it:
+git submodule update --init
+```
+
+On Windows, turn on Developer Mode and run `git config --global core.symlinks true` before cloning,
+so the links are checked out as links.
+
+Do not edit `AGENTS.md`, `.agents/` or `.claude/skills` here: open a pull request against
+pesu-dev/skills instead. Dependabot opens a pull request here to update the submodule when that
+repository changes.
 
 ## 🧰 Running the Application
 

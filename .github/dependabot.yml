@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # Agent instructions and skills live in pesu-dev/skills, mounted at .agents/pesu-skills. This
+  # opens a pull request against dev whenever that repository's main moves.
+  - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: daily
+    target-branch: dev
+    commit-message:
+      prefix: chore

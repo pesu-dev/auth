@@ -8,8 +8,12 @@ on:
       - reopened
 
 jobs:
-  # Every pull request must raise the project version, so that what is deployed is identifiable
+  # Every pull request must raise the project version, so that what is deployed is identifiable.
+  # Dependabot's pull requests only bump the pesu-dev/skills submodule, which changes nothing that is
+  # deployed, and Dependabot cannot bump the version itself; the job is skipped for them, which
+  # still satisfies the required check.
   version-bumped:
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

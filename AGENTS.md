@@ -1,0 +1,1 @@
+.agents/pesu-skills/auth/AGENTS.md
