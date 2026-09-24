@@ -72,7 +72,12 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 line-length = 120
 target-version = "py314"
 exclude = [
-    "tests/"
+    "tests/",
+    # Agent instructions and skills from the pesu-dev/skills submodule, which lints them itself.
+    # CI checks out without submodules, so these are dangling links there and ruff would fail to read them.
+    "AGENTS.md",
+    ".agents/",
+    ".claude/",
 ]
 
 [tool.ruff.format]
