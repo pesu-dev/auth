@@ -1,1 +1,1 @@
-.agents/pesu-skills/auth/AGENTS.md
+.agents/pesudev-skills/auth/AGENTS.md
