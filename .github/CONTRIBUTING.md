@@ -123,7 +123,8 @@ pre-commit install
 This repository is set up for coding agents (Codex, Claude Code, Copilot, Cursor, Gemini and
 others). Their instructions, skills and roles come from
 [pesu-dev/skills](https://github.com/pesu-dev/skills), mounted as a git submodule at
-`.agents/pesudev-skills`. `AGENTS.md`, `.agents/skills` and `.claude/skills` are links into it.
+`.agents/pesudev-skills`. `AGENTS.md` and `.agents/skills` are links into it: the two provider-neutral
+locations agents read.
 
 Clone with the submodule, or the links point at nothing and agents see no instructions:
 
@@ -136,7 +137,7 @@ git submodule update --init
 On Windows, turn on Developer Mode and run `git config --global core.symlinks true` before cloning,
 so the links are checked out as links.
 
-Do not edit `AGENTS.md`, `.agents/` or `.claude/skills` here: open a pull request against
+Do not edit `AGENTS.md` or `.agents/` here: open a pull request against
 pesu-dev/skills instead. Dependabot opens a pull request here to update the submodule when that
 repository changes.
 
