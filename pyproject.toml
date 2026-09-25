@@ -77,7 +77,6 @@ exclude = [
     # CI checks out without submodules, so these are dangling links there and ruff would fail to read them.
     "AGENTS.md",
     ".agents/",
-    ".claude/",
 ]
 
 [tool.ruff.format]
