@@ -13,6 +13,7 @@ jobs:
       SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
       TARGET_REPO: ${{ github.repository }}
       TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
+      PR_AUTHOR: ${{ github.event.pull_request.user.login }}
 
     steps:
       - name: Print PR source info
@@ -26,8 +27,12 @@ jobs:
 
       - name: Validate PR origin and target branch
         run: |
-          # PRs must come from a fork
-          if [ "$SOURCE_REPO" = "$TARGET_REPO" ]; then
+          # PRs must come from a fork. The one exception is Dependabot, which can only open pull
+          # requests from branches in this repository; it bumps the pesu-dev/skills submodule.
+          if [ "$SOURCE_REPO" = "$TARGET_REPO" ] && [ "$PR_AUTHOR" = "dependabot[bot]" ] \
+            && [[ "$SOURCE_BRANCH" == dependabot/* ]]; then
+            echo "ℹ️ Dependabot pull request from this repository: fork requirement waived."
+          elif [ "$SOURCE_REPO" = "$TARGET_REPO" ]; then
             echo "❌ PR must come from a fork."
             exit 1
           fi
