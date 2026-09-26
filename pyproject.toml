@@ -1,6 +1,6 @@
 [project]
 name = "pesu-auth"
-version = "4.10.0"
+version = "4.11.0"
 description = "A simple API to authenticate PESU credentials using PESU Academy."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -74,7 +74,8 @@ target-version = "py314"
 exclude = [
     "tests/",
     # Agent instructions and skills from the pesu-dev/skills submodule, which lints them itself.
-    # CI checks out without submodules, so these are dangling links there and ruff would fail to read them.
+    # The Lint workflow checks out without submodules, so these are dangling links there and ruff would
+    # fail to read them.
     "AGENTS.md",
     ".agents/",
 ]

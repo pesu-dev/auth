@@ -1,0 +1,37 @@
+name: Copilot Setup Steps
+
+# The environment GitHub Copilot's cloud agent starts in. Copilot runs the job named
+# copilot-setup-steps before it begins work; the triggers below only validate this file in CI.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    # No TEST_* secrets: live tests share one PESU session, so they stay with humans and CI
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # AGENTS.md, the skills and the role files the custom agents point at live in the
+          # pesu-dev/skills submodule
+          submodules: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync --all-groups
