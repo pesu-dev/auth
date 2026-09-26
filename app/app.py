@@ -39,7 +39,7 @@ from app.metrics.collector import (
 )
 from app.metrics.middleware import record_request_metrics
 from app.metrics.prometheus import PROMETHEUS_CONTENT_TYPE, MetricsFormat, render_prometheus
-from app.models import MetricsModel, RequestModel, ResponseModel
+from app.models import HealthModel, MetricsModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -245,6 +245,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 @app.get(
     "/health",
+    response_model=HealthModel,
     response_class=JSONResponse,
     responses=health_docs.response_examples,
     tags=["Monitoring"],
@@ -252,13 +253,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 async def health() -> JSONResponse:
     """Health check endpoint."""
     logging.debug("Health check requested.")
+    response = HealthModel(
+        status=True,
+        message="ok",
+        timestamp=datetime.datetime.now(IST),
+    )
     return JSONResponse(
         status_code=200,
-        content={
-            "status": True,
-            "message": "ok",
-            "timestamp": datetime.datetime.now(IST).isoformat(),
-        },
+        content=response.model_dump(by_alias=True),
     )
 
 

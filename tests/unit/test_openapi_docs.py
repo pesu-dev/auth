@@ -13,9 +13,9 @@ from fastapi.testclient import TestClient
 
 from app.app import app
 from app.exceptions.authentication import AuthenticationError
-from app.models import MetricsModel, RequestModel, ResponseModel
+from app.models import HealthModel, MetricsModel, RequestModel, ResponseModel
 
-MODELS = {"ResponseModel": ResponseModel, "MetricsModel": MetricsModel}
+MODELS = {"ResponseModel": ResponseModel, "MetricsModel": MetricsModel, "HealthModel": HealthModel}
 
 
 @pytest.fixture(scope="module")
@@ -219,7 +219,7 @@ def test_the_schema_is_built_once_and_cached():
     app.openapi_schema = None
 
 
-def test_a_real_response_can_be_parsed_with_the_published_model(client):
+def test_a_real_health_response_can_be_parsed_with_the_published_model(client):
     """The published schema has to be usable by a client, which is the point of publishing it.
 
     A real response carries `timestamp` as an ISO string. If the model could only be validated in
@@ -227,12 +227,12 @@ def test_a_real_response_can_be_parsed_with_the_published_model(client):
     be unable to use it.
     """
     body = client.get("/health").json()
-    assert ResponseModel.model_validate(body).status is True
-    assert ResponseModel.model_validate_json(json.dumps(body)).status is True
+    assert HealthModel.model_validate(body).status is True
+    assert HealthModel.model_validate_json(json.dumps(body)).status is True
 
 
-def test_the_model_still_rejects_a_wrong_type_elsewhere(client):
+def test_the_health_model_still_rejects_a_wrong_type_elsewhere(client):
     """Relaxing `timestamp` must not have relaxed the model as a whole."""
     body = client.get("/health").json()
     with pytest.raises(Exception, match="status"):
-        ResponseModel.model_validate({**body, "status": "not-a-bool"})
+        HealthModel.model_validate({**body, "status": "not-a-bool"})
