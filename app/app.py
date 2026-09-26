@@ -260,7 +260,7 @@ async def health() -> JSONResponse:
     )
     return JSONResponse(
         status_code=200,
-        content=response.model_dump(by_alias=True),
+        content=response.model_dump(mode="json", by_alias=True),
     )
 
 
