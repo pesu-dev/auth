@@ -187,11 +187,14 @@ does not take any request parameters.
 
 #### Response Object
 
-| **Field**   | **Type**   | **Description**                                                     |
-| ----------- | ---------- | ------------------------------------------------------------------- |
-| `status`    | `boolean`  | `true` if healthy, `false` if there was an error                    |
-| `message`   | `str`      | "ok" if healthy, error message otherwise                            |
-| `timestamp` | `datetime` | A timezone offset timestamp indicating the time of the health check |
+| **Field**     | **Type**   | **Description**                                                                                          |
+| ------------- | ---------- | -------------------------------------------------------------------------------------------------------- |
+| `status`      | `boolean`  | `true` if healthy, `false` if there was an error                                                         |
+| `message`     | `str`      | "ok" if healthy, error message otherwise                                                                 |
+| `timestamp`   | `datetime` | A timezone offset timestamp indicating the time of the health check                                      |
+| `version`     | `str`      | The running pesu-auth package version                                                                    |
+| `environment` | `str`      | `development`, `staging`, or `production`, from `PESU_AUTH_ENVIRONMENT` (defaults to `development`)      |
+| `checks`      | `object`   | Informational readiness flags. `csrfCacheReady` can briefly be `false` after a login; `status` stays `true` |
 
 ### `/metrics`
 
@@ -585,6 +588,10 @@ which is `null` rather than absent when nothing has been recorded yet, so the sh
 </details>
 
 #### Protecting the endpoint
+
+`PESU_AUTH_ENVIRONMENT` selects how `/health` labels this process. Allowed values are
+`development`, `staging`, and `production`. When the variable is unset the process reports
+`development`. Any other value is a startup error so a typo cannot silently mislabel a deploy.
 
 `/metrics` is **open unless a token is configured**, through the `METRICS_TOKEN` environment
 variable.

@@ -6,9 +6,10 @@ import argparse
 import asyncio
 import datetime
 import logging
+import os
 from contextlib import asynccontextmanager
 from importlib.metadata import version
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from zoneinfo import ZoneInfo
 
 import uvicorn
@@ -39,10 +40,40 @@ from app.metrics.collector import (
 )
 from app.metrics.middleware import record_request_metrics
 from app.metrics.prometheus import PROMETHEUS_CONTENT_TYPE, MetricsFormat, render_prometheus
-from app.models import MetricsModel, RequestModel, ResponseModel
+from app.models import HealthChecksModel, HealthModel, MetricsModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
 IST = ZoneInfo("Asia/Kolkata")
+
+EnvironmentName = Literal["development", "staging", "production"]
+ALLOWED_ENVIRONMENTS: frozenset[str] = frozenset({"development", "staging", "production"})
+
+
+def resolve_environment(value: str | None = None) -> EnvironmentName:
+    """Read and validate PESU_AUTH_ENVIRONMENT.
+
+    Args:
+        value (str | None): An explicit value to validate. When omitted, the process
+            environment is read. An unset or empty value defaults to ``development``.
+
+    Returns:
+        EnvironmentName: One of ``development``, ``staging``, or ``production``.
+
+    Raises:
+        ValueError: If the value is set to anything other than the three allowed names.
+    """
+    raw = os.getenv("PESU_AUTH_ENVIRONMENT") if value is None else value
+    if raw is None or raw == "":
+        return "development"
+    if raw not in ALLOWED_ENVIRONMENTS:
+        allowed = ", ".join(sorted(ALLOWED_ENVIRONMENTS))
+        raise ValueError(
+            f"PESU_AUTH_ENVIRONMENT must be one of {allowed}; got {raw!r}."
+        )
+    return raw  # type: ignore[return-value]
+
+
+APP_ENVIRONMENT = resolve_environment()
 CSRF_TOKEN_REFRESH_INTERVAL_SECONDS = 45 * 60
 # Validation failures are labelled by field, so the label set has to be closed against a caller who
 # can put anything in the request body
@@ -85,11 +116,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Start the periodic CSRF token refresh background task
     refresh_task = asyncio.create_task(_csrf_token_refresh_loop())
+    app.state.csrf_refresh_task = refresh_task
+    app.state.environment = APP_ENVIRONMENT
     logging.info("Started the unauthenticated CSRF token refresh background task.")
 
     yield
 
     # Shutdown
+    refresh_task = getattr(app.state, "csrf_refresh_task", refresh_task)
     refresh_task.cancel()
     try:
         await refresh_task
@@ -252,14 +286,21 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 async def health() -> JSONResponse:
     """Health check endpoint."""
     logging.debug("Health check requested.")
-    return JSONResponse(
-        status_code=200,
-        content={
-            "status": True,
-            "message": "ok",
-            "timestamp": datetime.datetime.now(IST).isoformat(),
-        },
+    refresh_task = getattr(app.state, "csrf_refresh_task", None)
+    payload = HealthModel(
+        status=True,
+        message="ok",
+        timestamp=datetime.datetime.now(IST),
+        version=version("pesu-auth"),
+        environment=getattr(app.state, "environment", APP_ENVIRONMENT),
+        checks=HealthChecksModel(
+            csrf_cache_ready=pesu_academy.is_csrf_cache_ready(),
+            csrf_refresh_task_running=refresh_task is not None and not refresh_task.done(),
+        ),
     )
+    content = payload.model_dump(by_alias=True)
+    content["timestamp"] = payload.timestamp.isoformat()
+    return JSONResponse(status_code=200, content=content)
 
 
 @app.get(

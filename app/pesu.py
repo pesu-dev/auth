@@ -148,6 +148,7 @@ class PESUAcademy:
         in the profile dictionary.
 
     Methods:
+        is_csrf_cache_ready: Return whether an unauthenticated CSRF token is cached right now.
         prefetch_client_with_csrf_token: Prefetch a new client with an unauthenticated CSRF token.
         close_client: Close the cached client and stop any prefetch still in flight.
         get_profile_information: Get the profile information of the user.
@@ -180,6 +181,14 @@ class PESUAcademy:
         # Strong references to in-flight prefetch tasks, so they cannot be garbage collected
         # mid-flight. See https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self._prefetch_tasks: set[asyncio.Task[None]] = set()
+
+    def is_csrf_cache_ready(self) -> bool:
+        """Return whether an unauthenticated CSRF token is cached right now.
+
+        A login consumes the cached token, so this can briefly be False even when the
+        refresh machinery is healthy.
+        """
+        return self._client is not None and self._csrf_token is not None
 
     async def _fetch_new_client_with_csrf_token(self) -> tuple[httpx2.AsyncClient, str]:
         """Initialize a fresh client with an unauthenticated CSRF token from PESU Academy."""

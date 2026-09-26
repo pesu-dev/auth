@@ -339,6 +339,9 @@ def test_integration_health_check(client):
     data = response.json()
     assert data["status"] == True
     assert data["message"] == "ok"
+    assert "version" in data
+    assert "environment" in data
+    assert "checks" in data
 
 
 def test_integration_not_found(client):
