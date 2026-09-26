@@ -26,9 +26,21 @@ repos:
       - id: mdformat
         additional_dependencies:
           - mdformat-gfm
+          # Without it the YAML frontmatter of the Copilot custom agents in .github/agents/ is
+          # rewritten as Markdown, and Copilot stops recognising them
+          - mdformat-frontmatter
 
   - repo: local
     hooks:
+      # .github/agents/ is generated from the roles in the pesu-dev/skills submodule. A submodule bump
+      # changes no tracked Markdown file, so this runs on every commit rather than on matching files.
+      - id: sync-agents
+        name: Check Copilot custom agents match the roles
+        entry: python scripts/sync_agents.py --check
+        language: system
+        pass_filenames: false
+        always_run: true
+
       - id: pytest
         name: Run Pytest
         entry: python scripts/run_tests.py

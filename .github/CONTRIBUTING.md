@@ -141,6 +141,24 @@ Do not edit `AGENTS.md` or `.agents/` here: open a pull request against
 pesu-dev/skills instead. Dependabot opens a pull request here to update the submodule when that
 repository changes.
 
+In GitHub Copilot, each role (planner, implementer, reviewer and so on) is also a custom agent you
+can pick from the agent picker or assign an issue to. They live in `.github/agents/`, which is
+generated from the roles in the submodule: do not edit it by hand. When a submodule update adds,
+removes or changes a role's frontmatter, the `sync-agents` pre-commit hook fails until you
+regenerate them and commit the result:
+
+```bash
+uv run python scripts/sync_agents.py
+```
+
+Dependabot's submodule pull requests cannot do that themselves. If one fails `sync-agents`, open a
+pull request from your fork that bumps the submodule to the same commit and regenerates the agents
+(with the usual version bump); Dependabot then closes its own.
+
+To hand an issue to Copilot's cloud agent, assign it on **your fork**, not here: the agent opens its
+pull request in the repository it runs in, and pull requests to pesu-dev/auth must come from a fork.
+Open the pull request from your fork to `dev` yourself once Copilot's is ready.
+
 ## 🧰 Running the Application
 
 You can run the application using the same instructions as in the [README.md](../README.md) file. To ensure parity with
