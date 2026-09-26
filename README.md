@@ -128,7 +128,7 @@ object, with the user's profile information if requested.
 
 | **Parameter** | **Optional** | **Type**    | **Default** | **Description**                                                                                 |
 | ------------- | ------------ | ----------- | ----------- | ----------------------------------------------------------------------------------------------- |
-| `username`    | No           | `str`       |             | The user's SRN or PRN                                                                           |
+| `username`    | No           | `str`       |             | The user's SRN, PRN, email address, or phone number                                             |
 | `password`    | No           | `str`       |             | The user's password                                                                             |
 | `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information                                                            |
 | `fields`      | Yes          | `list[str]` | `None`      | Which fields to fetch from the profile information. If not provided, all fields will be fetched |
