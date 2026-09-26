@@ -337,8 +337,14 @@ def test_integration_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == True
+    assert set(data) == {"status", "message", "timestamp", "version", "environment", "checks"}
+    assert data["status"] is True
     assert data["message"] == "ok"
+    assert isinstance(data["version"], str) and data["version"]
+    assert isinstance(data["environment"], str) and data["environment"]
+    assert set(data["checks"]) == {"csrfCacheReady", "csrfRefreshTaskRunning"}
+    assert isinstance(data["checks"]["csrfCacheReady"], bool)
+    assert isinstance(data["checks"]["csrfRefreshTaskRunning"], bool)
 
 
 def test_integration_not_found(client):

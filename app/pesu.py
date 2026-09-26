@@ -349,6 +349,11 @@ class PESUAcademy:
                 self._client = None
                 self._csrf_token = None
 
+    async def is_csrf_cache_ready(self) -> bool:
+        """Report whether a cached unauthenticated CSRF client/token pair is available."""
+        async with self._csrf_lock:
+            return self._client is not None and self._csrf_token is not None
+
     async def get_profile_information(
         self,
         client: httpx2.AsyncClient,

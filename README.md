@@ -189,9 +189,12 @@ does not take any request parameters.
 
 | **Field**   | **Type**   | **Description**                                                     |
 | ----------- | ---------- | ------------------------------------------------------------------- |
-| `status`    | `boolean`  | `true` if healthy, `false` if there was an error                    |
-| `message`   | `str`      | "ok" if healthy, error message otherwise                            |
-| `timestamp` | `datetime` | A timezone offset timestamp indicating the time of the health check |
+| `status`      | `boolean`  | `true` if healthy, `false` if there was an error                    |
+| `message`     | `str`      | "ok" if healthy, error message otherwise                            |
+| `timestamp`   | `datetime` | A timezone offset timestamp indicating the time of the health check |
+| `version`     | `str`      | Current running version of `pesu-auth`                              |
+| `environment` | `str`      | Deployment environment (`development`, `staging`, `production`)     |
+| `checks`      | `object`   | Internal readiness checks (CSRF cache readiness and refresh task)   |
 
 ### `/metrics`
 
