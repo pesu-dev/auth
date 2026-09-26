@@ -1,17 +1,27 @@
 """Custom docs for the /health PESUAuth endpoint."""
 
 from app.docs.base import ApiDocs
-from app.models import HealthModel
+from app.models import HealthModel, ResponseModel
 
 health_docs = ApiDocs(
     request_examples={},
     response_examples={
         200: {
             "description": "Successful Health Check.",
-            "model": HealthModel,
+            "model": ResponseModel,
             "content": {
                 "application/json": {
-                    "example": {"status": True, "message": "ok", "timestamp": "2024-07-28T22:30:10.103368+05:30"}
+                    "example": {
+                        "status": True,
+                        "message": "ok",
+                        "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                        "version": "1.2.3",
+                        "environment": "staging",
+                        "checks": {
+                            "csrfCacheReady": True,
+                            "csrfRefreshTaskRunning": True,
+                        },
+                    }
                 }
             },
         },

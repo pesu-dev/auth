@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import datetime
 import logging
+import os
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
@@ -43,10 +44,28 @@ from app.models import HealthModel, MetricsModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
 IST = ZoneInfo("Asia/Kolkata")
+APP_VERSION = version("pesu-auth")
 CSRF_TOKEN_REFRESH_INTERVAL_SECONDS = 45 * 60
 # Validation failures are labelled by field, so the label set has to be closed against a caller who
 # can put anything in the request body
 KNOWN_REQUEST_FIELDS = frozenset({"username", "password", "profile", "fields", "fmt", "body"})
+
+
+csrf_refresh_task: asyncio.Task[None] | None = None
+
+
+def _health_environment() -> str:
+    """Infer deployment environment from runtime configuration."""
+    explicit_environment = os.getenv("PESU_AUTH_ENVIRONMENT")
+    if explicit_environment:
+        return explicit_environment
+
+    service_name = os.getenv("RENDER_SERVICE_NAME", "")
+    if service_name.endswith("-dev"):
+        return "staging"
+    if service_name:
+        return "production"
+    return "development"
 
 
 async def _refresh_csrf_token() -> None:
@@ -75,6 +94,8 @@ async def _csrf_token_refresh_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Lifespan event handler for startup and shutdown events."""
+    global csrf_refresh_task
+
     # Startup
     metrics.increment(LIFESPAN_EVENTS, event="startup")
     logging.info("PESUAuth API startup")
@@ -84,19 +105,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
 
     # Start the periodic CSRF token refresh background task
-    refresh_task = asyncio.create_task(_csrf_token_refresh_loop())
+    csrf_refresh_task = asyncio.create_task(_csrf_token_refresh_loop())
     logging.info("Started the unauthenticated CSRF token refresh background task.")
 
     yield
 
     # Shutdown
-    refresh_task.cancel()
+    if csrf_refresh_task is not None:
+        csrf_refresh_task.cancel()
     try:
-        await refresh_task
+        if csrf_refresh_task is not None:
+            await csrf_refresh_task
     except asyncio.CancelledError:
         logging.debug("Unauthenticated CSRF token refresh background task cancelled.")
     except Exception:
         logging.exception("Failed to cancel unauthenticated CSRF token refresh background task.")
+
+    csrf_refresh_task = None
 
     await pesu_academy.close_client()
     metrics.increment(LIFESPAN_EVENTS, event="shutdown")
@@ -106,7 +131,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="PESUAuth API",
     description="A simple and lightweight API to authenticate PESU credentials using PESU Academy",
-    version=version("pesu-auth"),
+    version=APP_VERSION,
     docs_url="/",
     lifespan=lifespan,
     openapi_tags=[
@@ -257,6 +282,12 @@ async def health() -> JSONResponse:
         status=True,
         message="ok",
         timestamp=datetime.datetime.now(IST),
+        version=APP_VERSION,
+        environment=_health_environment(),
+        checks={
+            "csrfCacheReady": await pesu_academy.is_csrf_cache_ready(),
+            "csrfRefreshTaskRunning": csrf_refresh_task is not None and not csrf_refresh_task.done(),
+        },
     )
     return JSONResponse(
         status_code=200,

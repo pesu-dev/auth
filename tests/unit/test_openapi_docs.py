@@ -188,6 +188,9 @@ def test_the_documented_health_200_matches_a_real_response(client, schema):
     actual = client.get("/health").json()
     assert set(actual) == set(documented)
     assert actual["message"] == documented["message"]
+    assert isinstance(actual["version"], str) and actual["version"]
+    assert isinstance(actual["environment"], str) and actual["environment"]
+    assert set(actual["checks"]) == set(documented["checks"])
 
 
 def test_the_documented_prometheus_example_looks_like_the_real_payload(client, schema):
