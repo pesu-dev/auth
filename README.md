@@ -183,8 +183,7 @@ If the authentication fails, this field will not be present in the response.
 Answers `200` whenever the process is serving; a `500` would come from the catch-all handler, as on any other endpoint.
 
 This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks. This endpoint
-does not take any request parameters. The response contract remains backward-compatible with existing monitors and continues
-to include `status`, `message`, and `timestamp`.
+does not take any request parameters.
 
 #### Response Object
 
