@@ -1,6 +1,10 @@
 <!--
-Set the PR title like this: `#IssueNumber` - [Pull Request Description]
+Set the PR title using Conventional Commits, for example:
+  feat: add X
+  fix: correct Y
+  docs: update Z
 
+Link the issue in the description with `Closes #N` (not in the title).
 Then delete this comment.
 -->
 
@@ -13,7 +17,7 @@ Please provide a concise summary of the changes:
 - Any relevant motivation, background, or context?
 
 > ℹ️ **Fixes / Related Issues**
-> Fixes: #100
+> Closes #100
 > Related: #001
 
 ## 🧱 Type of Change
@@ -52,7 +56,9 @@ Please provide a concise summary of the changes:
 
 > *Please indicate the work items you have carried out. Completing all the relevant items on this list is mandatory. Anything left unchecked will be assumed to be non-relevant*
 
-- [ ] My code follows the [CONTRIBUTING.md](https://github.com/pesu-dev/auth/blob/main/.github/CONTRIBUTING.md) guidelines
+- [ ] My code follows the [CONTRIBUTING.md](https://github.com/pesu-dev/auth/blob/dev/.github/CONTRIBUTING.md) guidelines
+- [ ] I was assigned to the linked issue before starting
+- [ ] I bumped the minor version in `pyproject.toml` and ran `uv lock`
 - [ ] I've performed a self-review of my changes
 - [ ] I've added/updated necessary comments and docstrings
 - [ ] I've updated relevant docs (README or endpoint docs)

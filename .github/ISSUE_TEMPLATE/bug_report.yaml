@@ -26,7 +26,7 @@ body:
       label: 📋 Steps to Reproduce
       description: Provide a clear set of steps to reproduce the issue.
       placeholder: |
-        1. Start the API with `scripts/run_tests.py`
+        1. Start the API with `uv run python -m app.app`
         2. Make a POST request to `/authenticate` with `username=X` and `password=Y`
         3. Observe the 500 error and traceback
     validations:
@@ -94,7 +94,7 @@ body:
         - /health
         - RequestModel or ResponseModel
         - Profile scraping (`app/pesu.py`)
-        - HTML rendering (`app/util.py`)
+        - /metrics
         - CI / pre-commit
         - Other
     validations:
