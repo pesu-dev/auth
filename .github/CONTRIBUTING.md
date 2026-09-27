@@ -46,8 +46,8 @@ without affecting the main codebase until your changes are ready to be merged.
 
 We maintain two deployment environments:
 
-- **Staging**: https://pesu-auth-dev.onrender.com - [Status Page](https://6ns95sgb.status.cron-job.org/)
-- **Production**: https://pesu-auth.onrender.com - [Status Page](https://xzlk85cp.status.cron-job.org/)
+- **Staging**: https://pesuauth-dev.onrender.com - [Status Page](https://6ns95sgb.status.cron-job.org/)
+- **Production**: https://pesuauth.onrender.com - [Status Page](https://xzlk85cp.status.cron-job.org/)
 
 ### 🔄 Development Workflow
 
