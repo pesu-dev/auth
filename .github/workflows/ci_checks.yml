@@ -135,7 +135,7 @@ jobs:
   version_check:
     name: Version check
     needs: [pr_source_checker]
-    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -144,10 +144,27 @@ jobs:
           fetch-depth: 0
 
       - name: Verify project version was bumped
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA=$(jq -r '.pull_request.base.sha' "$GITHUB_EVENT_PATH")
+            BASE_REF=$(jq -r '.pull_request.base.ref' "$GITHUB_EVENT_PATH")
+          elif [ "${{ github.event_name }}" = "merge_group" ]; then
+            BASE_SHA=$(jq -r '.merge_group.base_sha' "$GITHUB_EVENT_PATH")
+            BASE_REF=$(jq -r '.merge_group.base_ref' "$GITHUB_EVENT_PATH")
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            BASE_SHA=$(jq -r '.before // empty' "$GITHUB_EVENT_PATH")
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA=$(git rev-parse HEAD~1)
+            fi
+            BASE_REF="${{ github.ref_name }}"
+          else
+            echo "Non-version-checked event: ${{ github.event_name }}"
+            exit 0
+          fi
+
+          echo "Comparing against $BASE_REF ($BASE_SHA)..."
           git show "$BASE_SHA:pyproject.toml" > /tmp/base_pyproject.toml
           git show "$BASE_SHA:uv.lock" > /tmp/base_uv.lock
           python3 .github/scripts/check_version_bump.py \

@@ -24,8 +24,11 @@ FROM python:3.14-slim-bookworm
 WORKDIR /pesu-auth
 
 ARG GIT_SHA=unknown
-LABEL org.opencontainers.image.revision=${GIT_SHA} \
-      org.opencontainers.image.source="https://github.com/pesu-dev/auth"
+LABEL org.opencontainers.image.title="pesu-auth" \
+      org.opencontainers.image.description="A simple API to authenticate PESU credentials using PESU Academy" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/pesu-dev/auth" \
+      org.opencontainers.image.revision=${GIT_SHA}
 
 # Create an unprivileged non-root user and group
 RUN groupadd -g 10001 app && \
