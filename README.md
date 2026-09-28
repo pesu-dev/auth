@@ -2,7 +2,7 @@
 
 [![CI Checks](https://img.shields.io/github/actions/workflow/status/pesu-dev/auth/ci_checks.yml?branch=dev&label=CI%20Checks)](https://github.com/pesu-dev/auth/actions/workflows/ci_checks.yml)
 [![Deploy to Production](https://github.com/pesu-dev/auth/actions/workflows/deploy_prod.yml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/deploy_prod.yml)
-[![GHCR Image](https://img.shields.io/badge/GHCR-Docker%20Image-2496ED?logo=docker&logoColor=white)](https://github.com/pesu-dev/auth/pkgs/container/auth)
+[![GHCR Image](https://img.shields.io/badge/GHCR-Docker%20Image-2496ED?logo=docker&logoColor=white)](https://github.com/pesu-dev/auth/pkgs/container/pesu-auth)
 
 [![Docker Automated build](https://img.shields.io/docker/automated/pesudev/pesu-auth?logo=docker)](https://hub.docker.com/r/pesudev/pesu-auth/builds)
 [![Docker Image Version (tag)](https://img.shields.io/docker/v/pesudev/pesu-auth/latest?logo=docker&label=build%20commit)](https://hub.docker.com/r/pesudev/pesu-auth/tags)

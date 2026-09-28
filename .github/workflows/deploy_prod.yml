@@ -8,7 +8,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE: ghcr.io/${{ github.repository }}
+  IMAGE: ghcr.io/${{ github.repository_owner }}/pesu-auth
 
 concurrency:
   group: deploy_production
@@ -80,6 +80,7 @@ jobs:
     uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
     with:
       ref: dev
+      image_name: pesu-auth
       image_tag: ${{ needs.resolve_version.outputs.version_tag }}
       push: true
     secrets:
@@ -123,7 +124,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          REPO_NAME="pesu-auth"
           DOCKERHUB_IMAGE="${DOCKER_USER}/${REPO_NAME}"
           docker buildx imagetools create \
             --prefer-index=false \
@@ -136,6 +137,6 @@ jobs:
     uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
     with:
       environment: production
-      image_url: ghcr.io/${{ github.repository }}:${{ needs.resolve_version.outputs.version_tag }}
+      image_url: ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ needs.resolve_version.outputs.version_tag }}
       wait_for_completion: true
     secrets: inherit

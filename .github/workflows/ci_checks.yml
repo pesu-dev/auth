@@ -128,6 +128,7 @@ jobs:
     if: github.event_name == 'pull_request'
     uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
     with:
+      image_name: pesu-auth
       image_tag: ${{ github.event.pull_request.head.sha }}
       push: false
 
