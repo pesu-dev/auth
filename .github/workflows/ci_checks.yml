@@ -45,16 +45,14 @@ jobs:
           echo "  - Target repo: $TARGET_REPO"
           echo "  - Target branch: $TARGET_BRANCH"
 
-          if [ "$SOURCE_REPO" = "$TARGET_REPO" ] && [ "$PR_AUTHOR" = "dependabot[bot]" ] \
-            && [[ "$SOURCE_BRANCH" == dependabot/* ]]; then
-            echo "ℹ️ Dependabot pull request from this repository: fork requirement waived."
-          elif [ "$SOURCE_REPO" = "$TARGET_REPO" ]; then
-            echo "❌ PR must come from a fork."
-            exit 1
+          if [ "$SOURCE_REPO" = "$TARGET_REPO" ]; then
+            echo "ℹ️ Pull request originates from this repository ($SOURCE_REPO)."
+          else
+            echo "ℹ️ Pull request originates from fork ($SOURCE_REPO)."
           fi
 
           if [ "$SOURCE_BRANCH" = "main" ]; then
-            echo "❌ PR cannot come from the 'main' branch of a fork."
+            echo "❌ PR cannot come from the 'main' branch."
             exit 1
           fi
 
