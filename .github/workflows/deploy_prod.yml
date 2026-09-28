@@ -18,7 +18,6 @@ jobs:
   resolve_version:
     name: Resolve version tag
     runs-on: ubuntu-latest
-    if: ${{ !vars.PROD_DEPLOYMENT_ALLOWED_USERS || contains(fromJson(vars.PROD_DEPLOYMENT_ALLOWED_USERS), github.actor) }}
     outputs:
       version: ${{ steps.version_info.outputs.version }}
       version_tag: ${{ steps.version_info.outputs.version_tag }}
