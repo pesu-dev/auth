@@ -176,7 +176,6 @@ jobs:
   container_checks:
     name: Container security & smoke test
     needs: [pr_source_checker]
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
