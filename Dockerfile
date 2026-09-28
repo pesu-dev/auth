@@ -24,7 +24,8 @@ FROM python:3.14-slim-bookworm
 WORKDIR /pesu-auth
 
 ARG GIT_SHA=unknown
-LABEL org.opencontainers.image.revision=${GIT_SHA}
+LABEL org.opencontainers.image.revision=${GIT_SHA} \
+      org.opencontainers.image.source="https://github.com/pesu-dev/auth"
 
 # Create an unprivileged non-root user and group
 RUN groupadd -g 10001 app && \
@@ -34,7 +35,8 @@ RUN groupadd -g 10001 app && \
 COPY --from=builder /pesu-auth/.venv /pesu-auth/.venv
 COPY --from=builder /pesu-auth/app ./app
 
-ENV PATH="/pesu-auth/.venv/bin:$PATH"
+ENV PATH="/pesu-auth/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
 
 USER 10001:10001
 

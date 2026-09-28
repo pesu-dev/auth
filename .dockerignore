@@ -1,0 +1,36 @@
+# Version control
+.git
+.gitignore
+
+# CI / project meta and agent materials
+.github/
+.agents/
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local secrets (provided at runtime, never baked into the image)
+**/.env*
+
+# Tests, benchmarks, and runner scripts
+tests/
+benchmark/
+scripts/
+
+# Editor / OS artifacts
+.vscode/
+.idea/
+.DS_Store
