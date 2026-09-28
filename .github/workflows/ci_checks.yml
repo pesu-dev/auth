@@ -155,7 +155,7 @@ jobs:
             BASE_REF=$(jq -r '.merge_group.base_ref' "$GITHUB_EVENT_PATH")
           elif [ "${{ github.event_name }}" = "push" ]; then
             BASE_SHA=$(jq -r '.before // empty' "$GITHUB_EVENT_PATH")
-            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BASE_SHA}:pyproject.toml" 2>/dev/null; then
               BASE_SHA=$(git rev-parse HEAD~1)
             fi
             BASE_REF="${{ github.ref_name }}"
