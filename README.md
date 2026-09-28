@@ -1,9 +1,8 @@
 # pesu-auth
 
-[![Docker Image Build](https://github.com/pesu-dev/auth/actions/workflows/docker.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/docker.yml)
-[![Pre-Commit Checks](https://github.com/pesu-dev/auth/actions/workflows/pre-commit.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/pre-commit.yaml)
-[![Lint](https://github.com/pesu-dev/auth/actions/workflows/lint.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/lint.yaml)
-[![Deploy](https://github.com/pesu-dev/auth/actions/workflows/deploy-prod.yaml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/deploy-prod.yaml)
+[![CI Checks](https://img.shields.io/github/actions/workflow/status/pesu-dev/auth/ci_checks.yml?branch=dev&label=CI%20Checks)](https://github.com/pesu-dev/auth/actions/workflows/ci_checks.yml)
+[![Deploy to Production](https://github.com/pesu-dev/auth/actions/workflows/deploy_prod.yml/badge.svg)](https://github.com/pesu-dev/auth/actions/workflows/deploy_prod.yml)
+[![GHCR Image](https://img.shields.io/badge/GHCR-Docker%20Image-2496ED?logo=docker&logoColor=white)](https://github.com/pesu-dev/auth/pkgs/container/pesu-auth)
 
 [![Docker Automated build](https://img.shields.io/docker/automated/pesudev/pesu-auth?logo=docker)](https://hub.docker.com/r/pesudev/pesu-auth/builds)
 [![Docker Image Version (tag)](https://img.shields.io/docker/v/pesudev/pesu-auth/latest?logo=docker&label=build%20commit)](https://hub.docker.com/r/pesudev/pesu-auth/tags)
@@ -57,6 +56,9 @@ Running the PESUAuth API locally is simple. Clone the repository and follow the 
 
 This is the easiest and recommended way to run the API locally. Ensure you have Docker installed on your system. Run the
 following commands to start the API.
+
+> [!NOTE]
+> For security, the container runs as an unprivileged user (`UID 10001:10001`) with read-only application files.
 
 1. Build the Docker image either from the source code or pull the pre-built image from Docker Hub.
 

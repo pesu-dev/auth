@@ -31,7 +31,7 @@ Please provide a concise summary of the changes:
 - [ ] 🕵️ Debug/logging enhancement – Adds or improves logging/debug support
 - [ ] 🔧 Developer tooling – Scripts, benchmarks, local testing improvements
 - [ ] 🔒 Security fix – Addresses auth/session/data validation vulnerabilities
-- [ ] 🧰 Dependency update – Updates libraries in `requirements.txt`, `pyproject.toml`
+- [ ] 🧰 Dependency update – Updates libraries in `pyproject.toml`, `uv.lock`
 
 ## 🧪 How Has This Been Tested?
 
@@ -82,8 +82,8 @@ Please provide a concise summary of the changes:
 ### 🐳 DevOps & Config
 
 - [ ] `Dockerfile` – Changes to base image or build process
-- [ ] `.github/workflows/*.yaml` – CI/CD pipeline or deployment updates
-- [ ] `pyproject.toml` / `requirements.txt` – Dependency version changes
+- [ ] `.github/workflows/*.yml` – CI/CD pipeline or deployment updates
+- [ ] `pyproject.toml` / `uv.lock` – Dependency version changes
 - [ ] `.pre-commit-config.yaml` – Linting or formatting hook changes
 
 ### 📊 Benchmarks & Analysis

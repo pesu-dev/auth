@@ -1,0 +1,142 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/pesu-auth
+
+concurrency:
+  group: deploy_production
+  cancel-in-progress: false
+
+jobs:
+  sync_dev_to_main:
+    name: Sync dev branch to main
+    runs-on: ubuntu-latest
+    if: ${{ !vars.PROD_DEPLOYMENT_ALLOWED_USERS || contains(fromJson(vars.PROD_DEPLOYMENT_ALLOWED_USERS), github.actor) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch all branches
+        run: |
+          git fetch origin dev
+          git fetch origin main
+
+      - name: Checkout main branch
+        run: git checkout main
+
+      - name: Merge dev into main
+        run: |
+          git merge --ff-only origin/dev || {
+            echo "❌ Fast-forward merge failed. Manual conflict resolution required."
+            echo "Please ensure dev branch is ahead of main with no conflicts."
+            exit 1
+          }
+
+      - name: Push updated main branch
+        run: git push origin main
+
+  resolve_version:
+    name: Resolve version tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version_info.outputs.version }}
+      version_tag: ${{ steps.version_info.outputs.version_tag }}
+      commit_sha: ${{ steps.version_info.outputs.commit_sha }}
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v7
+        with:
+          ref: dev
+
+      - name: Resolve project version
+        id: version_info
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          COMMIT_SHA=$(git rev-parse HEAD)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: ${VERSION} (tag: v${VERSION})"
+
+  build_and_push_image:
+    name: Build and push production image
+    needs: [resolve_version]
+    uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
+    with:
+      ref: dev
+      image_name: pesu-auth
+      image_tag: ${{ needs.resolve_version.outputs.version_tag }}
+      push: true
+    secrets:
+      docker_username: ${{ secrets.DOCKER_USERNAME }}
+      docker_password: ${{ secrets.DOCKER_PASSWORD }}
+
+  tag_prod_and_latest:
+    name: Tag image as prod and latest
+    needs: [resolve_version, build_and_push_image]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    env:
+      VERSION_TAG: ${{ needs.resolve_version.outputs.version_tag }}
+      DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
+    steps:
+      - name: GHCR login
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retag GHCR image as latest and prod
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --prefer-index=false \
+            --tag "${IMAGE}:latest" \
+            "${IMAGE}:${VERSION_TAG}"
+
+          docker buildx imagetools create \
+            --prefer-index=false \
+            --tag "${IMAGE}:prod" \
+            "${IMAGE}:${VERSION_TAG}"
+
+      - name: Retag Docker Hub image as latest
+        if: env.DOCKER_USER != '' && env.DOCKER_PASS != ''
+        run: |
+          set -euo pipefail
+          echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+          REPO_NAME="pesu-auth"
+          DOCKERHUB_IMAGE="${DOCKER_USER}/${REPO_NAME}"
+          docker buildx imagetools create \
+            --prefer-index=false \
+            --tag "${DOCKERHUB_IMAGE}:latest" \
+            "${DOCKERHUB_IMAGE}:${VERSION_TAG}"
+
+  deploy_prod:
+    name: Deploy to Render Production
+    needs: [sync_dev_to_main, resolve_version, tag_prod_and_latest]
+    uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
+    with:
+      environment: production
+      image_url: ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ needs.resolve_version.outputs.version_tag }}
+      wait_for_completion: true
+    secrets: inherit
