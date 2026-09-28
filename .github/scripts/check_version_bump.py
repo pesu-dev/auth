@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that a pull request raises the project version and keeps uv.lock in step.
 
-Used by .github/workflows/version-check.yaml. Compares the ``project.version`` in the base
+Used by .github/workflows/ci_checks.yml. Compares the ``project.version`` in the base
 branch's pyproject.toml against the pull request's, and requires the latter to be strictly
 greater. Also checks that uv.lock records the same version, since bumping pyproject.toml without
 re-running ``uv lock`` leaves the lockfile stale.

@@ -176,7 +176,7 @@ The following checks are enforced:
 
 - ✅ `ruff` for linting and formatting (with auto-fix)
 - ✅ `mdformat` to format Markdown files (with GFM support)
-- ✅ `end-of-file-fixer`, `trailing-whitespace`, `check-yaml`, `check-toml`, `requirements-txt-fixer`, `check-added-large-files` for formatting
+- ✅ `end-of-file-fixer`, `trailing-whitespace`, `check-yaml`, `check-toml`, `check-added-large-files` for formatting
 - ✅ `name-tests-test` to enforce test naming conventions
 - ✅ `debug-statements` to prevent committed `print()` or `pdb`
 - ✅ A local `pytest` hook that runs the full test suite

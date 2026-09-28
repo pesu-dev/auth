@@ -8,7 +8,7 @@
 
 ## Project Configuration
 pyproject.toml @aditeyabaral
-requirements.txt @aditeyabaral
+uv.lock @aditeyabaral
 .pre-commit-config.yaml @aditeyabaral
 .env.example @aditeyabaral
 
