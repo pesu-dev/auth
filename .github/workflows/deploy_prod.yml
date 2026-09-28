@@ -18,6 +18,7 @@ jobs:
   resolve_version:
     name: Resolve version tag
     runs-on: ubuntu-latest
+    if: ${{ !vars.PROD_DEPLOYMENT_ALLOWED_USERS || contains(fromJson(vars.PROD_DEPLOYMENT_ALLOWED_USERS), github.actor) }}
     outputs:
       version: ${{ steps.version_info.outputs.version }}
       version_tag: ${{ steps.version_info.outputs.version_tag }}
@@ -37,7 +38,7 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "version_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
           echo "commit_sha=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "Resolved version: ${VERSION} (tag: v${VERSION})"
+          echo "Resolved version: ${VERSION} (tag: v${VERSION}) at ${COMMIT_SHA}"
 
   await_approval:
     name: Approve ${{ needs.resolve_version.outputs.version_tag }}
@@ -49,63 +50,13 @@ jobs:
         run: |
           echo "✅ Approved ${{ needs.resolve_version.outputs.version_tag }} (commit ${{ needs.resolve_version.outputs.commit_sha }}) for production deployment."
 
-  sync_dev_to_main:
-    name: Sync dev branch to main
-    needs: [await_approval]
-    runs-on: ubuntu-latest
-    if: ${{ !vars.PROD_DEPLOYMENT_ALLOWED_USERS || contains(fromJson(vars.PROD_DEPLOYMENT_ALLOWED_USERS), github.actor) }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Fetch all branches
-        run: |
-          git fetch origin dev
-          git fetch origin main
-
-      - name: Checkout main branch
-        run: git checkout main
-
-      - name: Merge dev into main
-        run: |
-          git merge --ff-only origin/dev || {
-            echo "❌ Fast-forward merge failed. Manual conflict resolution required."
-            echo "Please ensure dev branch is ahead of main with no conflicts."
-            exit 1
-          }
-
-      - name: Push updated main branch
-        run: git push origin main
-
-  build_and_push_image:
-    name: Build and push production image
-    needs: [resolve_version, await_approval]
-    uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
-    with:
-      ref: dev
-      image_name: pesu-auth
-      image_tag: ${{ needs.resolve_version.outputs.version_tag }}
-      platforms: linux/amd64,linux/arm64
-      push: true
-    secrets:
-      docker_username: ${{ secrets.DOCKER_USERNAME }}
-      docker_password: ${{ secrets.DOCKER_PASSWORD }}
-
   deploy_prod:
     name: Deploy to Render Production
-    needs: [sync_dev_to_main, resolve_version, build_and_push_image]
+    needs: [resolve_version, await_approval]
     uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
     with:
       environment: production
-      image_url: ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ needs.resolve_version.outputs.version_tag }}
+      image_url: ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ needs.resolve_version.outputs.commit_sha }}
       wait_for_completion: true
     secrets: inherit
 
@@ -128,19 +79,41 @@ jobs:
       - name: Fail the workflow
         run: exit 1
 
-  tag_prod_and_latest:
-    name: Tag image as prod and latest
-    needs: [resolve_version, build_and_push_image, deploy_prod]
+  release:
+    name: Create release, sync main, and retag
+    needs: [resolve_version, deploy_prod]
     if: needs.deploy_prod.result == 'success'
     runs-on: ubuntu-latest
     permissions:
+      contents: write
       packages: write
-      contents: read
     env:
-      VERSION_TAG: ${{ needs.resolve_version.outputs.version_tag }}
+      TARGET_SHA: ${{ needs.resolve_version.outputs.commit_sha }}
+      TAG: ${{ needs.resolve_version.outputs.version_tag }}
       DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync dev branch to main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin dev main --prune
+          git checkout main
+          git merge --ff-only origin/dev || {
+            echo "❌ Fast-forward merge failed. Manual conflict resolution required."
+            echo "Please ensure dev branch is ahead of main with no conflicts."
+            exit 1
+          }
+          git push origin main
+
       - name: GHCR login
         uses: docker/login-action@v4
         with:
@@ -148,62 +121,45 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Retag GHCR image as latest and prod
+      - name: Retag GHCR image as version, latest, and prod
         run: |
           set -euo pipefail
           docker buildx imagetools create \
             --prefer-index=false \
+            --tag "${IMAGE}:${TAG}" \
+            "${IMAGE}:${TARGET_SHA}"
+
+          docker buildx imagetools create \
+            --prefer-index=false \
             --tag "${IMAGE}:latest" \
-            "${IMAGE}:${VERSION_TAG}"
+            "${IMAGE}:${TARGET_SHA}"
 
           docker buildx imagetools create \
             --prefer-index=false \
             --tag "${IMAGE}:prod" \
-            "${IMAGE}:${VERSION_TAG}"
+            "${IMAGE}:${TARGET_SHA}"
 
-      - name: Retag Docker Hub image as latest and prod
+      - name: Retag Docker Hub image as version, latest, and prod
         if: env.DOCKER_USER != '' && env.DOCKER_PASS != ''
         run: |
           set -euo pipefail
           echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-          REPO_NAME="pesu-auth"
-          DOCKERHUB_IMAGE="${DOCKER_USER}/${REPO_NAME}"
+          DOCKERHUB_IMAGE="${DOCKER_USER}/pesu-auth"
+
+          docker buildx imagetools create \
+            --prefer-index=false \
+            --tag "${DOCKERHUB_IMAGE}:${TAG}" \
+            "${IMAGE}:${TARGET_SHA}"
+
           docker buildx imagetools create \
             --prefer-index=false \
             --tag "${DOCKERHUB_IMAGE}:latest" \
-            "${DOCKERHUB_IMAGE}:${VERSION_TAG}"
+            "${IMAGE}:${TARGET_SHA}"
 
           docker buildx imagetools create \
             --prefer-index=false \
             --tag "${DOCKERHUB_IMAGE}:prod" \
-            "${DOCKERHUB_IMAGE}:${VERSION_TAG}"
-
-  release:
-    name: Create release and tag
-    needs: [sync_dev_to_main, resolve_version, deploy_prod, tag_prod_and_latest]
-    if: needs.deploy_prod.result == 'success'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      TARGET_SHA: ${{ needs.resolve_version.outputs.commit_sha }}
-      TAG: ${{ needs.resolve_version.outputs.version_tag }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - name: Checkout target SHA
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ env.TARGET_SHA }}
-          fetch-depth: 0
-
-      - name: Confirm target SHA is on origin/dev
-        run: |
-          set -euo pipefail
-          git fetch origin dev --prune
-          if ! git merge-base --is-ancestor "${TARGET_SHA}" origin/dev; then
-            echo "Target SHA ${TARGET_SHA} is no longer on origin/dev."
-            exit 1
-          fi
+            "${IMAGE}:${TARGET_SHA}"
 
       - name: Create git tag and GitHub Release if needed
         run: |
