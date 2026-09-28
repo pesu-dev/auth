@@ -15,8 +15,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  resolve_version:
+    name: Resolve version tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version_info.outputs.version }}
+      version_tag: ${{ steps.version_info.outputs.version_tag }}
+      commit_sha: ${{ steps.version_info.outputs.commit_sha }}
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v7
+        with:
+          ref: dev
+
+      - name: Resolve project version
+        id: version_info
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          COMMIT_SHA=$(git rev-parse HEAD)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: ${VERSION} (tag: v${VERSION})"
+
+  await_approval:
+    name: Approve ${{ needs.resolve_version.outputs.version_tag }}
+    needs: [resolve_version]
+    runs-on: ubuntu-latest
+    environment: promote-gate
+    steps:
+      - name: Production promotion approved
+        run: |
+          echo "✅ Approved ${{ needs.resolve_version.outputs.version_tag }} (commit ${{ needs.resolve_version.outputs.commit_sha }}) for production deployment."
+
   sync_dev_to_main:
     name: Sync dev branch to main
+    needs: [await_approval]
     runs-on: ubuntu-latest
     if: ${{ !vars.PROD_DEPLOYMENT_ALLOWED_USERS || contains(fromJson(vars.PROD_DEPLOYMENT_ALLOWED_USERS), github.actor) }}
     steps:
@@ -50,33 +85,9 @@ jobs:
       - name: Push updated main branch
         run: git push origin main
 
-  resolve_version:
-    name: Resolve version tag
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version_info.outputs.version }}
-      version_tag: ${{ steps.version_info.outputs.version_tag }}
-      commit_sha: ${{ steps.version_info.outputs.commit_sha }}
-    steps:
-      - name: Checkout dev branch
-        uses: actions/checkout@v7
-        with:
-          ref: dev
-
-      - name: Resolve project version
-        id: version_info
-        run: |
-          set -euo pipefail
-          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-          COMMIT_SHA=$(git rev-parse HEAD)
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "version_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "commit_sha=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "Resolved version: ${VERSION} (tag: v${VERSION})"
-
   build_and_push_image:
     name: Build and push production image
-    needs: [resolve_version]
+    needs: [resolve_version, await_approval]
     uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
     with:
       ref: dev
