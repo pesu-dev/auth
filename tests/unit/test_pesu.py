@@ -286,6 +286,8 @@ async def test_get_profile_information_unknown_campus_code(
         assert profile["branch"] == "Computer Science and Engineering"
         assert profile["email"] == "test@example.com"
         assert profile["phone"] == "1234567890"
+        assert "campusCode" not in profile
+        assert "campus" not in profile
         assert any(
             "Unknown campus code: 3 parsed from PRN=PES3XXXXX for user=testuser" in record.message
             for record in caplog.records
