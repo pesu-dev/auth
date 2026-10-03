@@ -107,6 +107,12 @@ dependencies.
    uv run python -m app.app
    ```
 
+   You can set the port with `PORT` or `--port`. `--port` takes priority; otherwise, the default is `5000`.
+
+   ```bash
+   PORT=8080 uv run python -m app.app
+   ```
+
 1. Access the API as previously mentioned on `http://localhost:5000/`
 
 ## How to use the PESUAuth API
