@@ -248,7 +248,7 @@ async def test_get_profile_information_unknown_campus_code(
     form_group_elems = [
         make_div("Name", "Test User"),
         make_div("SRN", "PES1234567"),
-        make_div("PESU Id", "PES3XXXXX"),
+        make_div("PESU Id", "PES4XXXXX"),
         make_div("Program", "BTech"),
         make_div("Branch", "Computer Science and Engineering"),
         make_div("Semester", "6"),
@@ -281,7 +281,7 @@ async def test_get_profile_information_unknown_campus_code(
 
     with caplog.at_level("INFO"):
         profile = await pesu.get_profile_information(client, "testuser")
-        assert profile["prn"] == "PES3XXXXX"
+        assert profile["prn"] == "PES4XXXXX"
         assert profile["name"] == "Test User"
         assert profile["branch"] == "Computer Science and Engineering"
         assert profile["email"] == "test@example.com"
@@ -289,7 +289,7 @@ async def test_get_profile_information_unknown_campus_code(
         assert "campusCode" not in profile
         assert "campus" not in profile
         assert any(
-            "Unknown campus code: 3 parsed from PRN=PES3XXXXX for user=testuser" in record.message
+            "Unknown campus code: 4 parsed from PRN=PES4XXXXX for user=testuser" in record.message
             for record in caplog.records
         )
         assert any(
