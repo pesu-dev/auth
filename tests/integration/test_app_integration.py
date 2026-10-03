@@ -53,7 +53,9 @@ def live_contract():
             )
         except FailureGroup as failures:
             titles = ", ".join(sorted({failure.title for failure in failures.exceptions}))
-            pytest.fail(f"Real /authenticate response violates OpenAPI: {titles}", pytrace=False)
+            raise pytest.fail.Exception(
+                f"Real /authenticate response violates OpenAPI: {titles}", pytrace=False
+            ) from None
 
     return validate
 

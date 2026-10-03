@@ -112,8 +112,9 @@ dependencies.
 ## How to use the PESUAuth API
 
 The offline test suite includes deterministic OpenAPI fuzz tests; pre-commit and CI also run URL
-pytest and CLI checks against a mocked local target. Existing `.env`-driven integration tests check
-real authentication responses against OpenAPI. See
+pytest and CLI checks against a mocked local target. A bounded `.env`-driven Schemathesis run uses
+actual credentials and the real PESU backend; existing integration tests also check real
+authentication responses against OpenAPI. See
 [Contributing: OpenAPI fuzz tests](.github/CONTRIBUTING.md#openapi-fuzz-tests) for local pytest,
 CLI, and CI report instructions.
 

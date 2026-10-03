@@ -216,7 +216,7 @@ uv run pytest --cov
 
 ### Tests that need credentials
 
-Eleven tests are marked `secret_required` and log in to PESU Academy for real. They need the
+Twelve tests are marked `secret_required` and use the real PESU Academy backend. They need the
 `TEST_*` variables in your `.env`; without them `scripts/run_tests.py` deselects those tests, warns
 that it has done so, and still enforces the coverage gate on the rest.
 
@@ -226,9 +226,29 @@ flight -- including CI. A second login is rejected and shows up as a puzzling `4
 The six existing live `/authenticate` integration tests also validate real responses against
 OpenAPI using the same four Schemathesis checks as the offline fuzz suite. They use `.env` test
 credentials and expected profile data without adding upstream requests or changing the eleven
-credential-dependent tests. Sanitization stays enabled; failures report check titles without
-credential-bearing reproduction commands or real profile contents. Arbitrary generated inputs
-remain confined to the mocked offline target.
+original credential-dependent tests. A new live Schemathesis test adds a bounded generated run
+using the real account. Sanitization stays enabled; failures report check titles without
+credential-bearing reproduction commands or real profile contents. Arbitrary credential fuzzing
+and broad negative-input generation remain confined to the mocked offline target.
+
+Run the generated live test on its own with:
+
+```bash
+uv run pytest tests/integration/test_api_fuzz_live.py -v
+```
+
+This `@schema.parametrize()` test generates up to six positive `/authenticate` request bodies
+from the real app's OpenAPI schema, varying profile and field selections. It sends the actual
+`TEST_EMAIL` and `TEST_PASSWORD` from `.env` at the HTTP boundary and uses the real PESU backend,
+with no PESU mocks. Real credentials never enter the generated Schemathesis `Case`; response
+validation uses an empty case, keeps sanitization enabled, and suppresses exception context.
+Failures show safe check titles or status codes without private request or profile data.
+
+The live run uses seed `218`, no example database or timing deadline, and only the generation
+phase. Examples, boundary coverage, probes, and shrinking are disabled to limit upstream traffic.
+It skips when the account credentials are absent. Run it serially without `-n`, and never alongside
+another live test run. The canonical test runner and its pre-commit hook include it when `.env`
+credentials are available; fork CI skips it and still runs the offline suite.
 
 In CI, pull requests come from forks, and GitHub withholds secrets from fork pull requests. So
 *Pre-Commit Checks* runs the reduced suite on every pull request -- it says so in the run's summary
@@ -248,7 +268,7 @@ uv run pytest tests/unit/test_api_fuzz.py -q
 PESU_AUTH_FUZZ_EXAMPLES=500 uv run pytest tests/unit/test_api_fuzz.py -q
 ```
 
-Both paths use seed `218`, disable persistent Hypothesis example replay and timing deadlines, and
+Both offline paths use seed `218`, disable persistent Hypothesis example replay and timing deadlines, and
 retain shrinking. Request examples and boundary coverage run in addition to fuzz examples.
 
 Run URL pytest and CLI checks together with automatic server startup, readiness checks, and cleanup:
