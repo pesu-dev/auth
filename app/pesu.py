@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Literal, get_args
 import httpx2
 from selectolax.parser import HTMLParser, Node
 
+from app.constants import CAMPUS_NAMES
 from app.exceptions.authentication import (
     AuthenticationError,
     CSRFTokenError,
@@ -423,10 +424,8 @@ class PESUAcademy:
         if profile.get("prn") and (campus_code_match := re.match(r"PES(\d)", profile["prn"])):
             campus_code = campus_code_match.group(1)
             profile["campusCode"] = int(campus_code)
-            if campus_code == "1":
-                profile["campus"] = "RR"
-            elif campus_code == "2":
-                profile["campus"] = "EC"
+            if campus_name := CAMPUS_NAMES.get(campus_code):
+                profile["campus"] = campus_name
             else:
                 # Not fatal -- the profile is returned without a campus name -- but it means the PRN
                 # format has changed, which nothing else would surface.
