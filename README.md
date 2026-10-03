@@ -107,7 +107,7 @@ dependencies.
    uv run python -m app.app
    ```
 
-   You can set the port with `PORT` or `--port`. `--port` takes priority; otherwise, the default is `5000`.
+   You can set the port with `--port` or `PORT`. The priority order is `--port`, then `PORT`, then the default of `5000`.
 
    ```bash
    PORT=8080 uv run python -m app.app
