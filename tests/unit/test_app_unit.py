@@ -6,7 +6,9 @@ from fastapi.testclient import TestClient
 
 from app.exceptions.authentication import AuthenticationError, CSRFTokenError
 
-from app.app import _csrf_token_refresh_loop, _refresh_csrf_token, app, main
+from app.app import _build_arg_parser, _csrf_token_refresh_loop, _refresh_csrf_token, app, main
+
+import logging
 
 
 @pytest.fixture
@@ -133,7 +135,10 @@ def test_main_function_default_args(mock_run, mock_logging, mock_parse_args):
 
     main()
 
-    mock_logging.assert_called_once()
+    mock_logging.assert_called_once_with(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s",
+    )
     mock_run.assert_called_once_with("app.app:app", host="0.0.0.0", port=5000, reload=False)
 
 
@@ -149,9 +154,43 @@ def test_main_function_debug_mode(mock_run, mock_logging, mock_parse_args):
 
     main()
 
-    mock_logging.assert_called_once()
+    mock_logging.assert_called_once_with(
+        level=logging.DEBUG,
+        format="%(asctime)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s",
+    )
     mock_run.assert_called_once_with("app.app:app", host="127.0.0.1", port=8000, reload=True)
 
+def test_parser_default_port(monkeypatch):
+    monkeypatch.delenv("PORT",raising=False)
+
+    parser = _build_arg_parser()
+    args = parser.parse_args([])
+
+    assert args.port == 5000
+
+def test_parser_port_from_env(monkeypatch):
+    monkeypatch.setenv("PORT", "8080")
+
+    parser = _build_arg_parser()
+    args = parser.parse_args([])
+
+    assert args.port == 8080
+
+def test_parser_cli_port_overrides_env(monkeypatch):
+    monkeypatch.setenv("PORT", "8080")
+
+    parser = _build_arg_parser()
+    args = parser.parse_args(["--port", "9000"])
+
+    assert args.port == 9000
+
+def test_parser_invalid_port(monkeypatch):
+    monkeypatch.setenv("PORT", "abc")
+
+    parser = _build_arg_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
 
 @pytest.mark.asyncio
 @patch("app.app.pesu_academy.prefetch_client_with_csrf_token", new_callable=AsyncMock)

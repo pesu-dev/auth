@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import datetime
 import logging
+import os
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
@@ -376,8 +377,7 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
         )
 
 
-def main() -> None:
-    """Main function to run the FastAPI application with command line arguments."""
+def _build_arg_parser() -> argparse.ArgumentParser:
     # Set up argument parser for command line arguments
     parser = argparse.ArgumentParser(
         description="PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy.",
@@ -391,14 +391,24 @@ def main() -> None:
     parser.add_argument(
         "--port",
         type=int,
-        default=5000,
-        help="Port to run the FastAPI application on. Default is 5000",
+        default=os.environ.get("PORT", "5000"),
+        help=(
+            "Port to run the FastAPI application on. Can also be set with the "
+            " PORT environment variable. Default is 5000."
+        ),
     )
     parser.add_argument(
         "--debug",
         action="store_true",
         help="Run the application in debug mode with detailed logging.",
     )
+
+    return parser
+
+
+def main() -> None:
+    """Main function to run the FastAPI application with command line arguments."""
+    parser = _build_arg_parser()
     args = parser.parse_args()
 
     # Set up logging configuration
@@ -406,7 +416,6 @@ def main() -> None:
     logging.basicConfig(
         level=logging_level,
         format="%(asctime)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s",
-        filemode="w",
     )
 
     # Run the app

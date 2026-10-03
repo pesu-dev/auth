@@ -23,6 +23,8 @@ FROM python:3.14-slim-bookworm
 
 WORKDIR /pesu-auth
 
+EXPOSE 5000
+
 ARG GIT_SHA=unknown
 LABEL org.opencontainers.image.title="pesu-auth" \
       org.opencontainers.image.description="A simple API to authenticate PESU credentials using PESU Academy" \
