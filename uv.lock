@@ -938,7 +938,7 @@ wheels = [
 
 [[package]]
 name = "pesu-auth"
-version = "4.15.5"
+version = "4.16.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
