@@ -422,7 +422,7 @@ class PESUAcademy:
         # If username starts with PES1, then they are from RR campus, else if it is PES2, then EC campus
         if profile.get("prn") and (campus_code_match := re.match(r"PES(\d)", profile["prn"])):
             campus_code = campus_code_match.group(1)
-            campus_names = {"1": "RR", "2": "EC", "3": "HN"}
+            campus_names = {"1": "RR", "2": "EC"}
             if campus_code in campus_names:
                 profile["campusCode"] = int(campus_code)
                 profile["campus"] = campus_names[campus_code]
