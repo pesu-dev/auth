@@ -8,10 +8,11 @@ readme_docs = ApiDocs(
     response_examples={
         308: {
             "description": "Redirect to the PESUAuth GitHub repository.",
-            "content": {
-                "text/html": {
+            "headers": {
+                "Location": {
+                    "description": "The PESUAuth GitHub repository URL.",
                     "schema": {"type": "string"},
-                    "example": '<html><head><title>Redirecting...</title></head><body><a href="https://github.com/pesu-dev/auth">Redirect</a></body></html>',
+                    "example": "https://github.com/pesu-dev/auth",
                 }
             },
         },

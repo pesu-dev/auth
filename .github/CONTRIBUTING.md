@@ -20,6 +20,7 @@ your development environment and contributing to the project.
   - [Linting & Formatting](#linting--formatting)
 - [🧪 Running Tests](#-running-tests)
   - [Tests that need credentials](#tests-that-need-credentials)
+  - [OpenAPI fuzz tests](#openapi-fuzz-tests)
   - [Benchmark output](#benchmark-output)
   - [Writing Tests](#writing-tests)
 - [🚀 Submitting Changes](#-submitting-changes)
@@ -180,6 +181,7 @@ The following checks are enforced:
 - ✅ `name-tests-test` to enforce test naming conventions
 - ✅ `debug-statements` to prevent committed `print()` or `pdb`
 - ✅ A local `pytest` hook that runs the full test suite
+- ✅ An always-run `openapi-fuzz` hook that runs URL-based pytest and CLI checks against the mocked local target
 
 > [!WARNING]
 > You will not be able to commit code that fails these checks.
@@ -214,17 +216,173 @@ uv run pytest --cov
 
 ### Tests that need credentials
 
-Eleven tests are marked `secret_required` and log in to PESU Academy for real. They need the
+Twelve tests are marked `secret_required` and use the real PESU Academy backend. They need the
 `TEST_*` variables in your `.env`; without them `scripts/run_tests.py` deselects those tests, warns
 that it has done so, and still enforces the coverage gate on the rest.
 
 The test account allows **one active session**, so never run the live tests while another run is in
 flight -- including CI. A second login is rejected and shows up as a puzzling `401`.
 
+The six existing live `/authenticate` integration tests also validate real responses against
+OpenAPI using the same four Schemathesis checks as the offline fuzz suite. They use `.env` test
+credentials and expected profile data without adding upstream requests or changing the eleven
+original credential-dependent tests. A new live Schemathesis test adds a bounded generated run
+using the real account. Sanitization stays enabled; failures report check titles without
+credential-bearing reproduction commands or real profile contents. Arbitrary credential fuzzing
+and broad negative-input generation remain confined to the mocked offline target.
+
+Run the generated live test on its own with:
+
+```bash
+uv run pytest tests/integration/test_api_fuzz_live.py -v
+```
+
+This `@schema.parametrize()` test generates up to six positive `/authenticate` request bodies
+from the real app's OpenAPI schema, varying profile and field selections. It sends the actual
+`TEST_EMAIL` and `TEST_PASSWORD` from `.env` at the HTTP boundary and uses the real PESU backend,
+with no PESU mocks. Real credentials never enter the generated Schemathesis `Case`; response
+validation uses an empty case, keeps sanitization enabled, and suppresses exception context.
+Failures show safe check titles or status codes without private request or profile data.
+
+The live run uses seed `218`, no example database or timing deadline, and only the generation
+phase. Examples, boundary coverage, probes, and shrinking are disabled to limit upstream traffic.
+It skips when the account credentials are absent. Run it serially without `-n`, and never alongside
+another live test run. The canonical test runner and its pre-commit hook include it when `.env`
+credentials are available; fork CI skips it and still runs the offline suite.
+
 In CI, pull requests come from forks, and GitHub withholds secrets from fork pull requests. So
 *Pre-Commit Checks* runs the reduced suite on every pull request -- it says so in the run's summary
 -- and the live tests only run once the change reaches `dev`. Run them locally before you open a
 pull request; CI will not cover them for you.
+
+### OpenAPI fuzz tests
+
+Schemathesis generates positive and negative requests for all four documented operations and checks
+for server errors, documented status codes, matching content types, and response bodies that match
+OpenAPI. The normal offline suite uses the real ASGI app with mocked PESU Academy calls; it requires
+no running server or credentials. Run it separately with:
+
+```bash
+uv run pytest tests/unit/test_api_fuzz.py -q
+# Increase the default 200 fuzz examples per operation for a deeper local run:
+PESU_AUTH_FUZZ_EXAMPLES=500 uv run pytest tests/unit/test_api_fuzz.py -q
+```
+
+Both offline paths use seed `218`, disable persistent Hypothesis example replay and timing deadlines, and
+retain shrinking. Request examples and boundary coverage run in addition to fuzz examples.
+
+Run URL pytest and CLI checks together with automatic server startup, readiness checks, and cleanup:
+
+```bash
+uv run python -m scripts.fuzz.run_checks
+# Run the same always-run pre-commit hook explicitly:
+uv run pre-commit run openapi-fuzz --all-files
+```
+
+This runner refuses an occupied port `8080`, overrides `API_TOKEN` with the synthetic token, and
+runs the CLI even if pytest fails. Both tests use 500 fuzz examples per operation. The hook adds
+roughly 20 seconds to pre-commit on the development machine; actual runtime depends on the host.
+It runs alongside the existing canonical test hook, which includes the `.env`-driven integration
+checks when credentials are available.
+
+For URL-based pytest and CLI tests, start the **mocked test target** in one terminal:
+
+```bash
+uv run python -m scripts.fuzz.target
+```
+
+It listens on `127.0.0.1:8080`, uses only synthetic authentication/profile data, and protects metrics
+with the synthetic token `secret-token`. PESU Academy requests are blocked. Test clients disable
+redirect following, so `/readme` cannot make them contact GitHub. Stop the target with Ctrl+C when
+finished. Keep these fuzz commands pointed at this local target.
+
+In a second terminal, run the URL test explicitly; default pytest discovery only searches `tests/`:
+
+```bash
+uv run pytest scripts/fuzz/test_api_url.py --junitxml=schemathesis-report/pytest.xml
+```
+
+The basic pattern from the [Schemathesis pytest tutorial](https://schemathesis.readthedocs.io/en/stable/tutorials/pytest/)
+is:
+
+```python
+import schemathesis
+
+schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json")
+# Include the synthetic token in curl reproduction commands.
+schema.config.output.sanitization.update(enabled=False)
+
+
+@schema.parametrize()
+def test_api(case):
+    case.call_and_validate(headers={"Authorization": "Bearer secret-token"}, allow_redirects=False)
+```
+
+For deeper runs, import `settings` from Hypothesis and add it below `@schema.parametrize()`:
+
+```python
+from hypothesis import settings
+
+
+@schema.parametrize()
+@settings(max_examples=500, database=None, deadline=None)
+def test_api(case):
+    case.call_and_validate(headers={"Authorization": "Bearer secret-token"}, allow_redirects=False)
+```
+
+The committed URL test uses this 500-example budget, seed `218`, and the same four explicit checks
+as the ASGI suite. Separate regression cases exercise missing, malformed, wrong, and correct bearer
+credentials rather than relying on randomized requests to reach every authorization branch.
+
+The explicitly loaded `scripts/fuzz/schemathesis.toml` includes these
+[configuration settings](https://schemathesis.readthedocs.io/en/stable/reference/configuration/):
+
+```toml
+headers = { Authorization = "Bearer ${API_TOKEN}" }
+seed = 218
+
+[output.sanitization]
+enabled = false
+
+[generation]
+max-examples = 500
+```
+
+Sanitization is disabled only for this synthetic local target so reproduction commands include
+the example token. Never use this configuration with real credentials. Keep sanitization enabled
+when testing an API with real tokens, passwords, or personal data.
+
+Run the locked [CLI](https://schemathesis.readthedocs.io/en/stable/tutorials/cli/) with JUnit and JSON
+reports and [TraceCov schema coverage](https://schemathesis.readthedocs.io/en/stable/guides/coverage/):
+
+```bash
+API_TOKEN=secret-token PYTHONPATH=. \
+SCHEMATHESIS_COVERAGE_REPORT_HTML_PATH=schemathesis-report/schema-coverage.html \
+uv run schemathesis --config-file scripts/fuzz/schemathesis.toml \
+  run http://127.0.0.1:8080/openapi.json --wait-for-schema 30 \
+  --report junit,json \
+  --report-junit-path schemathesis-report/cli.xml \
+  --report-json-path schemathesis-report/cli.json
+```
+
+The configuration loads `scripts.fuzz.hooks` to enable TraceCov and selects examples, coverage, and
+fuzzing phases; stateful resource workflows do
+not apply to this API. On failure, Schemathesis reports a reduced example and curl reproduction.
+Replay it against the mocked target, add a focused regression test, and fix the contract or
+application behavior before rerunning. Do not suppress a failing contract check.
+
+The **OpenAPI fuzz** CI job uses the same runner with synthetic credentials on pull
+requests, `dev` pushes, and merge groups. It fails on test/configuration errors or missing operation
+coverage and participates in Greenlight. It runs the CLI even when pytest fails, always stops the
+mocked target, and uploads the `openapi-fuzz-reports` artifact with both JUnit reports, the JSON
+summary, server log, and TraceCov HTML. See the
+[CI integration guide](https://schemathesis.readthedocs.io/en/stable/guides/cicd/) for report formats
+and exit codes.
+
+Open `schemathesis-report/schema-coverage.html` to inspect which OpenAPI constraints and responses
+were exercised. This report is informational and has no percentage gate. It complements Python
+application-code coverage: continue aiming for 100% application coverage with the existing 95%
+gate. Generated reports and fuzz caches are gitignored.
 
 ### Benchmark output
 

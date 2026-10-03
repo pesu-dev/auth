@@ -50,3 +50,11 @@ repos:
         # test counts, the coverage total and the "live tests skipped" warning were all invisible
         # in CI -- a partial run looked identical to a full one.
         verbose: true
+
+      - id: openapi-fuzz
+        name: Run OpenAPI URL and CLI fuzz checks
+        entry: python -m scripts.fuzz.run_checks
+        language: system
+        pass_filenames: false
+        always_run: true
+        verbose: true

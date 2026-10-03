@@ -117,6 +117,13 @@ dependencies.
 
 ## How to use the PESUAuth API
 
+The offline test suite includes deterministic OpenAPI fuzz tests; pre-commit and CI also run URL
+pytest and CLI checks against a mocked local target. A bounded `.env`-driven Schemathesis run uses
+actual credentials and the real PESU backend; existing integration tests also check real
+authentication responses against OpenAPI. See
+[Contributing: OpenAPI fuzz tests](.github/CONTRIBUTING.md#openapi-fuzz-tests) for local pytest,
+CLI, and CI report instructions.
+
 The API provides multiple endpoints for authentication, documentation, and monitoring.
 
 | **Endpoint**    | **Method** | **Description**                                        |
@@ -143,14 +150,14 @@ object, with the user's profile information if requested.
 
 #### Responses
 
-| **Code** | **When**                                                                          |
-| -------- | --------------------------------------------------------------------------------- |
-| `200`    | The credentials are valid. `profile` is included if it was requested              |
-| `400`    | The request body failed validation — a missing field, or an unknown profile field |
-| `401`    | Invalid username or password, or the user does not exist                          |
-| `422`    | PESU Academy's profile page could not be parsed, which means their page changed   |
-| `500`    | An unexpected failure, rendered by the catch-all handler                          |
-| `502`    | PESU Academy could not be reached, or did not answer with what was expected       |
+| **Code** | **When**                                                                                                 |
+| -------- | -------------------------------------------------------------------------------------------------------- |
+| `200`    | The credentials are valid. `profile` is included if it was requested                                     |
+| `400`    | The request body could not be parsed or failed validation — a missing field, or an unknown profile field |
+| `401`    | Invalid username or password, or the user does not exist                                                 |
+| `422`    | PESU Academy's profile page could not be parsed, which means their page changed                          |
+| `500`    | An unexpected failure, rendered by the catch-all handler                                                 |
+| `502`    | PESU Academy could not be reached, or did not answer with what was expected                              |
 
 Every non-`200` carries the same `{status, message, timestamp}` body, with `status` set to `false`.
 
@@ -290,11 +297,11 @@ A few definitions that are easy to assume wrongly:
 
 **Failures**
 
-| Metric                           | Meaning                                                                                                                                                                                                     |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `failures_total{fault}`          | Failed requests by whose fault it was: `client` for 4xx, `server` for 5xx. Alert on `server` without enumerating status codes                                                                               |
-| `errors_total{type}`             | Errors rendered by an exception handler, by exception class: `AuthenticationError`, `CSRFTokenError`, `ProfileFetchError`, `ProfileParseError`, `RequestValidationError`, or whatever reached the catch-all |
-| `validation_errors_total{field}` | Request validation failures by the field that failed. Unrecognised keys collapse into `other`, since the request body is caller-controlled                                                                  |
+| Metric                           | Meaning                                                                                                                                                                                                                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `failures_total{fault}`          | Failed requests by whose fault it was: `client` for 4xx, `server` for 5xx. Alert on `server` without enumerating status codes                                                                                                        |
+| `errors_total{type}`             | Errors rendered by an exception handler, by exception class: `AuthenticationError`, `CSRFTokenError`, `ProfileFetchError`, `ProfileParseError`, `RequestBodyParseError`, `RequestValidationError`, or whatever reached the catch-all |
+| `validation_errors_total{field}` | Request validation failures by the field that failed. Unrecognised keys collapse into `other`, since the request body is caller-controlled                                                                                           |
 
 **Authentication**
 
@@ -646,7 +653,9 @@ scrape_configs:
 
 ### `/readme`
 
-This endpoint redirects to the project's official GitHub repository with a `308`, and takes no request parameters. A `500` would come from the catch-all handler, as on any other endpoint.
+This endpoint redirects to the project's official GitHub repository with a bodyless `308` response
+and a `Location` header, and takes no request parameters. A `500` would come from the catch-all
+handler, as on any other endpoint.
 
 ### Integrating your application with the PESUAuth API
 

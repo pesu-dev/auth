@@ -18,3 +18,7 @@ bruno.json
 *.csv
 *.png
 scratch/
+.hypothesis/
+.schemathesis/
+schemathesis-report/
+schema-coverage.html

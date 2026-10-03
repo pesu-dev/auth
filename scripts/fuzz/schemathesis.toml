@@ -1,0 +1,29 @@
+# Use only against scripts.fuzz.target: unsanitized output contains synthetic credentials.
+base-url = "http://127.0.0.1:8080"
+hooks = "scripts.fuzz.hooks"
+headers = { Authorization = "Bearer ${API_TOKEN}" }
+seed = 218
+
+[output.sanitization]
+enabled = false
+
+[cache]
+enabled = false
+
+[generation]
+max-examples = 500
+mode = "all"
+database = "none"
+
+[phases]
+enabled = false
+examples.enabled = true
+coverage.enabled = true
+fuzzing.enabled = true
+
+[checks]
+enabled = false
+not_a_server_error.enabled = true
+status_code_conformance.enabled = true
+content_type_conformance.enabled = true
+response_schema_conformance.enabled = true
