@@ -1,7 +1,7 @@
 """Custom docs for the /metrics PESUAuth endpoint."""
 
 from app.docs.base import ApiDocs
-from app.models import ResponseModel
+from app.models import MetricsModel, ResponseModel
 
 _INTERNAL_SERVER_ERROR = {
     "description": "Internal Server Error.",
@@ -155,6 +155,7 @@ metrics_docs = ApiDocs(
     response_examples={
         200: {
             "description": "The collected metrics, in the format named by `fmt`.",
+            "model": MetricsModel,
             "content": {
                 "text/plain": {"schema": {"type": "string"}, "example": _PROMETHEUS_EXAMPLE},
                 "application/json": {"example": _JSON_EXAMPLE},

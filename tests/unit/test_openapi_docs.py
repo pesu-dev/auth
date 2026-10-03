@@ -140,6 +140,23 @@ def test_the_metrics_format_enum_is_documented(schema):
     assert sorted(values) == ["json", "prometheus"]
 
 
+def test_metrics_json_documents_the_actual_model(schema):
+    content = schema["paths"]["/metrics"]["get"]["responses"]["200"]["content"]
+    assert content["application/json"]["schema"] == {"$ref": "#/components/schemas/MetricsModel"}
+    assert content["text/plain"]["schema"] == {"type": "string"}
+
+
+def test_readme_documents_a_bodyless_redirect(client, schema):
+    documented = schema["paths"]["/readme"]["get"]["responses"]["308"]
+    response = client.get("/readme", follow_redirects=False)
+    assert response.status_code == 308
+    assert response.content == b""
+    assert "content-type" not in response.headers
+    assert not documented.get("content")
+    assert documented["headers"]["Location"]["schema"]["type"] == "string"
+    assert documented["headers"]["Location"]["example"] == response.headers["location"]
+
+
 def test_the_metrics_token_scheme_is_documented(schema):
     """Swagger's Authorize button is how a reader discovers the endpoint can be protected."""
     scheme = schema["components"]["securitySchemes"]["MetricsToken"]

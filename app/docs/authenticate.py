@@ -94,14 +94,27 @@ authenticate_docs = ApiDocs(
             },
         },
         400: {
-            "description": "Bad Request - Invalid request data",
+            "description": "Bad Request - Invalid or unreadable request data",
             "model": ResponseModel,
             "content": {
                 "application/json": {
-                    "example": {
-                        "status": False,
-                        "message": "Could not validate request data - body.password: Field required",
-                        "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                    "examples": {
+                        "validation": {
+                            "summary": "Missing required field",
+                            "value": {
+                                "status": False,
+                                "message": "Could not validate request data - body.password: Field required",
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                        "bodyParse": {
+                            "summary": "Unreadable JSON body",
+                            "value": {
+                                "status": False,
+                                "message": "Could not parse request body.",
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
                     }
                 }
             },

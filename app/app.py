@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 import uvicorn
 from fastapi import Depends, FastAPI
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 
@@ -24,9 +25,11 @@ if TYPE_CHECKING:
     from starlette.middleware.base import RequestResponseEndpoint
 
 from pydantic import ValidationError
+from starlette.exceptions import HTTPException
 
 from app.docs import authenticate_docs, health_docs, metrics_docs, readme_docs
 from app.exceptions.base import PESUAcademyError
+from app.exceptions.request import RequestBodyParseError
 from app.metrics.auth import require_metrics_token
 from app.metrics.collector import (
     AUTHENTICATION_REQUESTS,
@@ -241,6 +244,26 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             "timestamp": datetime.datetime.now(IST).isoformat(),
         },
     )
+
+
+@app.exception_handler(HTTPException)
+async def request_body_exception_handler(request: Request, exc: HTTPException) -> Response:
+    """Render body decoding failures through the documented error contract.
+
+    FastAPI raises HTTPException(400), rather than RequestValidationError, if the body cannot
+    even be decoded (for example non-UTF-8 JSON). Do not echo its detail or the submitted bytes.
+    Framework errors outside request parsing retain their existing response semantics.
+
+    Args:
+        request (Request): The request whose body could not be read.
+        exc (HTTPException): The framework exception raised before validation.
+
+    Returns:
+        Response: A standard parse error, or the framework's original HTTP error response.
+    """
+    if exc.status_code == 400:
+        return await pesu_exception_handler(request, RequestBodyParseError())
+    return await http_exception_handler(request, exc)
 
 
 @app.get(

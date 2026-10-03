@@ -1,8 +1,16 @@
 import os
 
 import pytest
+import schemathesis
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
+from schemathesis.checks import not_a_server_error
+from schemathesis.core.failures import FailureGroup
+from schemathesis.specs.openapi.checks import (
+    content_type_conformance,
+    response_schema_conformance,
+    status_code_conformance,
+)
 
 from app.app import app
 
@@ -23,8 +31,35 @@ def client():
         yield client
 
 
+@pytest.fixture(scope="module")
+def live_contract():
+    """Validate real responses without generating or retaining credential-bearing requests."""
+    schema = schemathesis.openapi.from_dict(app.openapi(), config=schemathesis.Config())
+    schema.config.output.sanitization.update(enabled=True)
+
+    def validate(response):
+        # An empty Case keeps real username/password values out of failure reproductions. Do
+        # not print schema failures: response bodies can contain a real student's profile.
+        case = schema["/authenticate"]["POST"].Case()
+        try:
+            case.validate_response(
+                response,
+                checks=[
+                    not_a_server_error,
+                    status_code_conformance,
+                    content_type_conformance,
+                    response_schema_conformance,
+                ],
+            )
+        except FailureGroup as failures:
+            titles = ", ".join(sorted({failure.title for failure in failures.exceptions}))
+            pytest.fail(f"Real /authenticate response violates OpenAPI: {titles}", pytrace=False)
+
+    return validate
+
+
 @pytest.mark.secret_required
-def test_integration_authenticate_success_username_email(client):
+def test_integration_authenticate_success_username_email(client, live_contract):
     payload = {
         "username": os.getenv("TEST_EMAIL"),
         "password": os.getenv("TEST_PASSWORD"),
@@ -32,6 +67,7 @@ def test_integration_authenticate_success_username_email(client):
     }
 
     response = client.post("/authenticate", json=payload)
+    live_contract(response)
     assert response.status_code == 200
     data = response.json()
     assert data["status"] is True
@@ -41,7 +77,7 @@ def test_integration_authenticate_success_username_email(client):
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_success_username_prn(client):
+def test_integration_authenticate_success_username_prn(client, live_contract):
     payload = {
         "username": os.getenv("TEST_PRN"),
         "password": os.getenv("TEST_PASSWORD"),
@@ -49,6 +85,7 @@ def test_integration_authenticate_success_username_prn(client):
     }
 
     response = client.post("/authenticate", json=payload)
+    live_contract(response)
     assert response.status_code == 200
     data = response.json()
     assert data["status"] is True
@@ -58,7 +95,7 @@ def test_integration_authenticate_success_username_prn(client):
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_success_username_phone(client):
+def test_integration_authenticate_success_username_phone(client, live_contract):
     payload = {
         "username": os.getenv("TEST_PHONE"),
         "password": os.getenv("TEST_PASSWORD"),
@@ -66,6 +103,7 @@ def test_integration_authenticate_success_username_phone(client):
     }
 
     response = client.post("/authenticate", json=payload)
+    live_contract(response)
     assert response.status_code == 200
     data = response.json()
     assert data["status"] is True
@@ -75,7 +113,7 @@ def test_integration_authenticate_success_username_phone(client):
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_with_specific_profile_fields(client):
+def test_integration_authenticate_with_specific_profile_fields(client, live_contract):
     email = os.getenv("TEST_EMAIL")
     password = os.getenv("TEST_PASSWORD")
     prn = os.getenv("TEST_PRN")
@@ -98,6 +136,7 @@ def test_integration_authenticate_with_specific_profile_fields(client):
     }
 
     response = client.post("/authenticate", json=payload)
+    live_contract(response)
     assert response.status_code == 200
     data = response.json()
     assert data["status"] is True
@@ -117,7 +156,7 @@ def test_integration_authenticate_with_specific_profile_fields(client):
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_with_all_profile_fields(client):
+def test_integration_authenticate_with_all_profile_fields(client, live_contract):
     name = os.getenv("TEST_NAME")
     email = os.getenv("TEST_EMAIL")
     password = os.getenv("TEST_PASSWORD")
@@ -166,6 +205,7 @@ def test_integration_authenticate_with_all_profile_fields(client):
     }
 
     response = client.post("/authenticate", json=payload)
+    live_contract(response)
     assert response.status_code == 200
     data = response.json()
     assert data["status"] is True
@@ -189,7 +229,7 @@ def test_integration_authenticate_with_all_profile_fields(client):
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_invalid_password(client):
+def test_integration_authenticate_invalid_password(client, live_contract):
     payload = {
         "username": os.getenv("TEST_EMAIL"),
         "password": "wrongpass",
@@ -197,6 +237,7 @@ def test_integration_authenticate_invalid_password(client):
     }
 
     response = client.post("/authenticate", json=payload)
+    live_contract(response)
     assert response.status_code in (200, 401, 500)
     data = response.json()
     assert data["status"] is False

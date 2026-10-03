@@ -122,6 +122,37 @@ jobs:
       - name: Run tests with coverage
         run: uv run python scripts/run_tests.py
 
+  openapi_fuzz:
+    name: OpenAPI fuzz
+    needs: [pr_source_checker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Run URL and CLI fuzz checks
+        run: uv run python -m scripts.fuzz.run_checks
+
+      - name: Upload fuzz reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: openapi-fuzz-reports
+          path: schemathesis-report/
+          if-no-files-found: warn
+
   pr_image_build:
     name: Build image on PR
     needs: [pr_source_checker]
@@ -216,6 +247,7 @@ jobs:
       - pr_source_checker
       - package_checks
       - test_runner
+      - openapi_fuzz
       - pr_image_build
       - container_checks
       - version_check
@@ -228,6 +260,7 @@ jobs:
             pr_source_checker=${{ needs.pr_source_checker.result }}
             package_checks=${{ needs.package_checks.result }}
             test_runner=${{ needs.test_runner.result }}
+            openapi_fuzz=${{ needs.openapi_fuzz.result }}
             pr_image_build=${{ needs.pr_image_build.result }}
             container_checks=${{ needs.container_checks.result }}
             version_check=${{ needs.version_check.result }}
