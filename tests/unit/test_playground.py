@@ -25,7 +25,7 @@ def test_root_serves_the_custom_api_explorer():
     assert "PESUAuth API Explorer" in response.text
     assert "Theme" in response.text
     assert "Reload endpoints" in response.text
-    assert "Endpoint explanation" in response.text
+    assert "Example request" in response.text
     assert "Swagger UI" not in response.text
 
 
