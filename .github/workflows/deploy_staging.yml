@@ -31,22 +31,36 @@ jobs:
        github.event.workflow_run.head_branch == 'dev')
     outputs:
       sha: ${{ steps.vars.outputs.sha }}
+      eligible: ${{ steps.vars.outputs.eligible }}
     steps:
       - name: Resolve deployment commit SHA
         id: vars
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-            echo "Resolved commit SHA from workflow_run: ${{ github.event.workflow_run.head_sha }}"
-          else
-            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "Resolved commit SHA from workflow_dispatch: ${{ github.sha }}"
+          DEV_HEAD=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/dev" --jq .object.sha)
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "sha=$DEV_HEAD" >> "$GITHUB_OUTPUT"
+            echo "eligible=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch: deploying current dev HEAD ($DEV_HEAD)."
+            exit 0
           fi
+          if [ "$DEV_HEAD" != "$EVENT_SHA" ]; then
+            echo "::notice::dev advanced past $EVENT_SHA; skipping stale staging deployment."
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "eligible=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$EVENT_SHA" >> "$GITHUB_OUTPUT"
+          echo "Resolved commit SHA from workflow_run: $EVENT_SHA"
 
   build_and_push_image:
     name: Build and push commit image
     needs: [prepare]
+    if: needs.prepare.outputs.eligible == 'true'
     uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
     with:
       ref: ${{ needs.prepare.outputs.sha }}
@@ -61,7 +75,7 @@ jobs:
     uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
     with:
       environment: staging
-      image_url: ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ needs.prepare.outputs.sha }}
+      commit_sha: ${{ needs.prepare.outputs.sha }}
       wait_for_completion: true
     secrets: inherit
 
