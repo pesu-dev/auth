@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -42,6 +42,7 @@ from app.metrics.middleware import record_request_metrics
 from app.metrics.prometheus import PROMETHEUS_CONTENT_TYPE, MetricsFormat, render_prometheus
 from app.models import MetricsModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
+from app.playground import PLAYGROUND_HTML
 
 IST = ZoneInfo("Asia/Kolkata")
 CSRF_TOKEN_REFRESH_INTERVAL_SECONDS = 45 * 60
@@ -108,7 +109,7 @@ app = FastAPI(
     title="PESUAuth API",
     description="A simple and lightweight API to authenticate PESU credentials using PESU Academy",
     version=version("pesu-auth"),
-    docs_url="/",
+    docs_url=None,
     lifespan=lifespan,
     openapi_tags=[
         {
@@ -168,6 +169,12 @@ def _openapi_without_phantom_validation_errors() -> dict[str, Any]:
 
 
 app.openapi = _openapi_without_phantom_validation_errors
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def api_playground() -> HTMLResponse:
+    """Serve the interactive API explorer that replaces Swagger UI."""
+    return HTMLResponse(PLAYGROUND_HTML)
 
 
 @app.middleware("http")
