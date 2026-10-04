@@ -56,8 +56,8 @@ Dockerfile. Enable automatic PR previews only on staging. Keep the existing Rend
 `promote-gate` approval, and release App credentials.
 
 Production promotion advances `main` to the approved commit, publishes its image, and deploys staging before
-production. On production deployment failure, the shared action redeploys the previous version-tagged commit,
-falling back to the previous `main` commit if no version tag exists. Rollback does not rewind `main`.
+production. Before promotion, the workflow records the commit currently live on Render production. On production
+deployment failure, the shared action redeploys that commit. Rollback does not rewind `main`.
 For the first production run after migration, select `dev` in the Run workflow branch selector so the updated workflow
 is used before it reaches `main`.
 
