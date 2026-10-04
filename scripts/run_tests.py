@@ -36,7 +36,8 @@ def run_tests() -> int:
     """Run all the tests with coverage and return the exit code."""
     load_dotenv()
 
-    test_username = os.getenv("TEST_EMAIL") and os.getenv("TEST_PRN") and os.getenv("TEST_PHONE")
+    # Every username the live tests log in with: one missing would send None as a username
+    test_username = all(os.getenv(name) for name in ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_PHONE"))
     test_password = os.getenv("TEST_PASSWORD")
 
     command = ["pytest", *COVERAGE_ARGS, "--disable-warnings", "-v", "-s"]

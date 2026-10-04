@@ -601,14 +601,12 @@ class PESUAcademy:
             # from None: the chained error would quote the response, which is personal data
             raise UpstreamError(f"PESU Academy sent an unexpected login response for user={username}.") from None
 
-        if login.user.login is None:
-            # The marker is missing, not negative: the response has changed shape. Calling that a wrong
-            # password would tell every user their credentials are bad and hide an outage as 4xx noise.
-            raise UpstreamError(f"PESU Academy sent a login response without a status for user={username}.")
+        # Rejected credentials have only ever been seen as an HTTP 401, handled above. A 200 that does not
+        # say SUCCESS -- whether the marker is missing or holds anything else -- is a response nobody has
+        # seen, so it is reported as PESU's failure. Calling it a wrong password would tell every user
+        # their credentials are bad, and hide an upstream change as 4xx noise.
         if login.user.login != "SUCCESS":
-            # A 200 that is not a success has not been seen, but if PESU starts reporting rejected
-            # credentials this way it must not read as a successful login
-            raise AuthenticationError(f"Invalid username or password, or user does not exist for user={username}.")
+            raise UpstreamError(f"PESU Academy did not report a successful login for user={username}.")
         return login
 
     async def _fetch_profile(self, client: httpx2.AsyncClient, access_token: str, username: str) -> _Student:

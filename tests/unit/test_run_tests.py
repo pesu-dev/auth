@@ -7,7 +7,7 @@ import pytest
 
 from scripts import run_tests
 
-CREDENTIALS = ("TEST_EMAIL", "TEST_PRN", "TEST_PHONE", "TEST_PASSWORD")
+CREDENTIALS = ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_PHONE", "TEST_PASSWORD")
 
 
 @pytest.fixture(autouse=True)

@@ -118,24 +118,21 @@ async def test_rejected_credentials_are_an_authentication_error(pesu, upstream, 
 
 
 @pytest.mark.asyncio
-async def test_a_200_that_is_not_a_success_is_an_authentication_error(pesu, upstream, make_response, login_payload):
-    login_payload["mobileJsonObject"]["login"] = "FAILURE"
-    upstream.side_effect = [make_response(json=login_payload)]
-
-    with pytest.raises(AuthenticationError):
-        await pesu.authenticate("user", "pass")
-
-
-@pytest.mark.asyncio
-async def test_a_login_without_a_status_is_an_upstream_error(pesu, upstream, make_response, login_payload):
-    """A missing marker means the response changed shape, not that the password was wrong."""
-    del login_payload["mobileJsonObject"]["login"]
+@pytest.mark.parametrize("marker", ["FAILURE", "success", "NA", None, "missing"])
+async def test_a_200_that_is_not_a_success_is_an_upstream_error(pesu, upstream, make_response, login_payload, marker):
+    """Only an HTTP 401 means rejected credentials; any other non-success is PESU answering unexpectedly."""
+    if marker == "missing":
+        del login_payload["mobileJsonObject"]["login"]
+    else:
+        login_payload["mobileJsonObject"]["login"] = marker
     upstream.side_effect = [make_response(json=login_payload)]
 
     with pytest.raises(UpstreamError) as exc_info:
-        await pesu.authenticate("user", "pass")
+        await pesu.authenticate("user", "pass", profile=True)
 
     assert exc_info.value.status_code == 502
+    # No profile call after a login that did not succeed
+    upstream.assert_awaited_once()
 
 
 @pytest.mark.asyncio
