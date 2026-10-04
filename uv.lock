@@ -630,13 +630,14 @@ wheels = [
 
 [[package]]
 name = "pesu-auth"
-version = "4.18.0"
+version = "4.19.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx2" },
     { name = "pydantic" },
     { name = "selectolax" },
+    { name = "snapshot" },
     { name = "uvicorn" },
 ]
 
@@ -663,6 +664,7 @@ requires-dist = [
     { name = "httpx2", specifier = ">=2.12.0" },
     { name = "pydantic", specifier = ">=2.13.5" },
     { name = "selectolax", specifier = ">=0.4.11" },
+    { name = "snapshot", specifier = ">=0.1.2" },
     { name = "uvicorn", specifier = ">=0.52.4" },
 ]
 
@@ -1015,6 +1017,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
 ]
+
+[[package]]
+name = "snapshot"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/04/1c823500a2499ac1dff732c8107e25e9c3ccbeac04f42a275a659e9967db/snapshot-0.1.2.tar.gz", hash = "sha256:6d0809a8b488eee00def7edc7775b1cb9dd84bfbadef38aa6890934535731a2e", size = 4437, upload-time = "2021-11-15T12:45:56.562Z" }
 
 [[package]]
 name = "starlette"

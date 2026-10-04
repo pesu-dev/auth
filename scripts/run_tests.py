@@ -13,6 +13,7 @@ COVERAGE_ARGS = [
     "--cov=app",
     "--cov-report=term-missing",
     "--cov-fail-under=95",
+    "--cov-branch",
 ]
 
 

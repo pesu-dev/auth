@@ -215,10 +215,10 @@ To run tests manually:
 uv run pytest
 ```
 
-To check coverage:
+To check line and branch coverage:
 
 ```bash
-uv run pytest --cov
+uv run pytest --cov --cov-branch
 ```
 
 > [!NOTE]

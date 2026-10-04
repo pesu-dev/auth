@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import snapshot
 
 from app.exceptions.authentication import CSRFTokenError, ProfileFetchError, ProfileParseError
 from app.metrics.collector import (
@@ -15,7 +16,7 @@ from app.metrics.collector import (
     UPSTREAM_RESPONSES,
     MetricsCollector,
 )
-from app.pesu import PESUAcademy
+from app.pesu import PESUAcademy, _upstream_call
 
 
 @pytest.fixture
@@ -240,3 +241,23 @@ async def test_a_wrong_password_still_counts_the_login_as_reaching_pesu(mock_cli
     snapshot = collector.snapshot()
     assert snapshot.value(UPSTREAM_REQUESTS.name, operation="login", outcome="success") == 1.0
     assert snapshot.value(UPSTREAM_REQUESTS.name, operation="login", outcome="error") == 0.0
+
+@pytest.mark.asyncio
+async def test_upstream_call_without_appending(collector):
+    async with _upstream_call(collector, "csrf_fetch") as sink:
+        pass
+    snapshot = collector.snapshot()
+    assert snapshot.value(UPSTREAM_REQUESTS.name, operation="csrf_fetch", outcome="success") == 1.0
+    assert snapshot.value(UPSTREAM_REQUESTS.name, operation="csrf_fetch", outcome="error") == 0.0
+    assert snapshot.value(f"{UPSTREAM_LATENCY.name}_count", operation="csrf_fetch") == 1.0
+    assert list(snapshot.samples(UPSTREAM_RESPONSES.name)) == []
+
+@pytest.mark.asyncio
+async def test_upstream_call_with_test_subject(collector):
+    async with _upstream_call(collector, "csrf_fetch") as sink:
+        sink.append(object())
+    snapshot = collector.snapshot()
+    assert snapshot.value(UPSTREAM_REQUESTS.name, operation="csrf_fetch", outcome="success") == 1.0
+    assert snapshot.value(UPSTREAM_REQUESTS.name, operation="csrf_fetch", outcome="error") == 0.0
+    assert snapshot.value(f"{UPSTREAM_LATENCY.name}_count", operation="csrf_fetch") == 1.0
+    assert list(snapshot.samples(UPSTREAM_RESPONSES.name)) == []
