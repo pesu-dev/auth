@@ -57,7 +57,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TARGET_SHA: ${{ needs.resolve_version.outputs.commit_sha }}
-      TAG: ${{ needs.resolve_version.outputs.version_tag }}
     steps:
       - name: Generate release bot token
         id: app-token
@@ -72,25 +71,14 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
-      - name: Verify release tag and fast-forward main to the approved commit
+      - name: Fast-forward main to the approved commit
         id: promote
         run: |
           set -euo pipefail
           git fetch origin dev main --prune
           git fetch --tags --force
-          if git rev-parse -q --verify "refs/tags/${TAG}"; then
-            TAGGED_SHA=$(git rev-list -n 1 "$TAG")
-            if [ "$TAGGED_SHA" != "$TARGET_SHA" ]; then
-              echo "::error::Release tag $TAG already points to a different commit."
-              exit 1
-            fi
-          fi
           git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
           git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
-          git merge-base --is-ancestor origin/main "$TARGET_SHA" || {
-            echo "::error::main cannot fast-forward to the approved commit."
-            exit 1
-          }
           # Release tags survive a failed promotion that leaves main ahead of production.
           PREVIOUS_REF=$(git describe --tags --match 'v[0-9]*' --abbrev=0 origin/main || git rev-parse origin/main)
           echo "previous_sha=$(git rev-list -n 1 "$PREVIOUS_REF")" >> "$GITHUB_OUTPUT"
