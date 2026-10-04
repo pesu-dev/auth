@@ -23,8 +23,9 @@ PESUAuth API acts solely as an API gateway for authenticating PESU credentials v
 
 - Credentials are sent only to PESU Academy, over HTTPS, through the API its mobile app uses. They are never stored or
   logged, and neither is the access token PESU Academy issues.
-- Profile data is returned to the caller and not stored. PESU Academy's responses also contain personal data that the
-  API does not return (such as photos and family details); PESUAuth discards it as soon as the response is read.
+- Profile data is returned to the caller and not stored.
+- PESU Academy's responses also contain personal data that the API does not return (such as photos, addresses, parents'
+  details and marks); PESUAuth discards it as soon as the response is read.
 - We **do not control or take responsibility** for any third-party applications or services that use this API.
 - Users and developers should exercise caution when using or integrating with applications built on top of this API.
 - Always verify the trustworthiness and security practices of any client application using PESUAuth.

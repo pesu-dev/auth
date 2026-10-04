@@ -247,19 +247,32 @@ def _authenticate_examples(schema, code):
     return {"example": content["example"]}
 
 
-def test_the_documented_full_profile_has_every_field(schema):
-    """The full-profile example is what callers copy, so it must show every field the API returns."""
+def test_the_documented_full_profile_has_every_default_field(schema):
+    """The full-profile example is what callers copy, so it must show exactly what they get by default."""
     example = _authenticate_examples(schema, 200)["authentication_with_profile"]
+    assert list(example["profile"]) == PESUAcademy.DEFAULT_FIELDS
+
+
+def test_the_profile_model_documents_every_field(schema):
+    """Every field a caller can request is in the published model, in order."""
+    from typing import get_args
+
+    from app.pesu import ProfileField
+
     documented_fields = [field.alias for field in ProfileModel.model_fields.values()]
-    assert list(example["profile"]) == documented_fields == PESUAcademy.DEFAULT_FIELDS
+    assert documented_fields == list(get_args(ProfileField))
+    assert list(schema["components"]["schemas"]["ProfileModel"]["properties"]) == documented_fields
 
 
-def test_the_documented_filtered_profile_matches_its_request(schema):
-    """The filtered response example answers the filtered request example, field for field."""
+
+def test_each_documented_field_request_has_a_matching_response(schema):
+    """Every request example that names fields is answered by a response example with exactly those."""
     body = schema["paths"]["/authenticate"]["post"]["requestBody"]["content"]["application/json"]
-    requested = next(e["value"]["fields"] for e in body["examples"].values() if "fields" in e["value"])
-    example = _authenticate_examples(schema, 200)["authentication_with_selected_fields"]
-    assert set(example["profile"]) == set(requested)
+    requested = [set(e["value"]["fields"]) for e in body["examples"].values() if "fields" in e["value"]]
+    answered = [set(e["profile"]) for e in _authenticate_examples(schema, 200).values() if "profile" in e]
+    assert requested, "no request example uses fields"
+    for fields in requested:
+        assert fields in answered, f"no response example returns exactly {sorted(fields)}"
 
 
 @pytest.mark.parametrize(

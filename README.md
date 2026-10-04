@@ -200,19 +200,32 @@ Every requested field is present, and **any field can be `null`** when PESU Acad
 a student who is not currently in a class (such as one who has graduated) has a `null` `semester` and `section`, and a
 student without a PRN on record has a `null` `prn`. Fields left out by `fields` are not included at all.
 
-| **Field**    | **Type** | **Description**                                                                                                      |
-| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------- |
-| `name`       | `str`    | Full name of the user, as registered with PESU                                                                       |
-| `prn`        | `str`    | PRN of the user, such as `PES1202000001`                                                                             |
-| `srn`        | `str`    | SRN of the user, such as `PES1UG20CS001`                                                                             |
-| `program`    | `str`    | Full name of the academic program, such as `Bachelor of Technology`. An unrecognised one is returned as PESU sent it |
-| `branch`     | `str`    | Full name of the branch, such as `Computer Science and Engineering`                                                  |
-| `semester`   | `str`    | Current semester, such as `Sem-4`                                                                                    |
-| `section`    | `str`    | Current section, such as `Section C`                                                                                 |
-| `email`      | `str`    | Email address registered with PESU                                                                                   |
-| `phone`      | `str`    | Phone number registered with PESU                                                                                    |
-| `campusCode` | `int`    | `1` for RR or `2` for EC, worked out from the SRN (or from the PRN when there is no SRN)                             |
-| `campus`     | `str`    | `RR` or `EC`, the abbreviation of the campus                                                                         |
+| **Field**          | **Type** | **Description**                                                                                                      |
+| ------------------ | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `name`             | `str`    | Full name of the user, as registered with PESU                                                                       |
+| `prn`              | `str`    | PRN of the user, such as `PES1202000001`                                                                             |
+| `srn`              | `str`    | SRN of the user, such as `PES1UG20CS001`                                                                             |
+| `program`          | `str`    | Full name of the academic program, such as `Bachelor of Technology`. An unrecognised one is returned as PESU sent it |
+| `branch`           | `str`    | Full name of the branch, such as `Computer Science and Engineering`                                                  |
+| `semester`         | `str`    | Current semester, such as `Sem-4`                                                                                    |
+| `section`          | `str`    | Current section, such as `Section C`                                                                                 |
+| `email`            | `str`    | Email address registered with PESU                                                                                   |
+| `phone`            | `str`    | Phone number registered with PESU                                                                                    |
+| `campusCode`       | `int`    | `1` for RR or `2` for EC, worked out from the SRN (or from the PRN when there is no SRN)                             |
+| `campus`           | `str`    | `RR` or `EC`, the abbreviation of the campus                                                                         |
+| `firstName`        | `str`    | First name of the user                                                                                               |
+| `middleName`       | `str`    | Middle name of the user, or `null` if they have none                                                                 |
+| `lastName`         | `str`    | Last name of the user                                                                                                |
+| `programShortCode` | `str`    | Abbreviation of the program as PESU Academy writes it, such as `B.Tech.`                                             |
+| `branchShortCode`  | `str`    | Abbreviation of the branch, such as `CSE`                                                                            |
+| `institute`        | `str`    | Full name of the institute and campus, such as `PES University (Ring Road)`                                          |
+| `rollNumber`       | `int`    | Roll number in the current semester, or in the latest one for a student who has graduated                            |
+| `gender`           | `str`    | Gender of the user, as recorded by PESU                                                                              |
+| `dateOfBirth`      | `str`    | Date of birth, as `YYYY-MM-DD`                                                                                       |
+| `bloodGroup`       | `str`    | Blood group, such as `O+`                                                                                            |
+
+Everything else in PESU Academy's responses, such as the photo, addresses, parents' details and marks, is discarded and
+never returned.
 
 ### `/health`
 
@@ -708,7 +721,17 @@ print(response.json())
     "email": "johnnyblaze@gmail.com",
     "phone": "1234567890",
     "campusCode": 1,
-    "campus": "RR"
+    "campus": "RR",
+    "firstName": "Johnny",
+    "middleName": null,
+    "lastName": "Blaze",
+    "programShortCode": "B.Tech.",
+    "branchShortCode": "CSE",
+    "institute": "PES University (Ring Road)",
+    "rollNumber": 27,
+    "gender": "Male",
+    "dateOfBirth": "2002-01-31",
+    "bloodGroup": "O+"
   },
   "message": "Login successful.",
   "timestamp": "2024-07-28T22:30:10.103368+05:30"

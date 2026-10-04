@@ -30,6 +30,16 @@ FULL_PROFILE = {
     "phone": "9876543210",
     "campusCode": 2,
     "campus": "EC",
+    "firstName": "JOHN",
+    "middleName": None,
+    "lastName": "DOE",
+    "programShortCode": "B.Tech.",
+    "branchShortCode": "CSE",
+    "institute": "PES University (Electronic City)",
+    "rollNumber": 27,
+    "gender": "Male",
+    "dateOfBirth": "2005-01-01",
+    "bloodGroup": "O+",
 }
 
 
@@ -209,3 +219,36 @@ def test_the_upstream_error_text_is_not_forwarded(client, wire, caplog):
     body = _assert_error_body(_authenticate(client), 502)
 
     assert "internal-detail-xyz" not in body["message"]
+
+
+# --- Personal details ---
+
+
+def test_personal_details_are_in_the_default_profile(client, pesu_up):
+    default = _authenticate(client, profile=True).json()["profile"]
+    requested = _authenticate(client, profile=True, fields=["srn", "gender", "dateOfBirth", "bloodGroup"]).json()
+
+    assert (default["gender"], default["dateOfBirth"], default["bloodGroup"]) == ("Male", "2005-01-01", "O+")
+    assert requested["profile"] == {
+        "srn": "PES2UG25CS001",
+        "gender": "Male",
+        "dateOfBirth": "2005-01-01",
+        "bloodGroup": "O+",
+    }
+
+
+def test_personal_details_are_null_when_pesu_has_none(client, pesu_up, profile_payload, login_payload):
+    profile_payload["STUDENT_INFO"].update(DateOfBirth=None, BloodGroup="NA")
+    profile_payload["STUDENT_PHOTO"].update(gender="", dateOfBirth=None)
+    login_payload["mobileJsonObject"]["dateofBirth"] = None
+
+    profile = _authenticate(client, profile=True, fields=["gender", "dateOfBirth", "bloodGroup"]).json()["profile"]
+
+    assert profile == {"gender": None, "dateOfBirth": None, "bloodGroup": None}
+
+
+def test_an_unknown_field_name_is_still_rejected(client, pesu_up):
+    body = _assert_error_body(_authenticate(client, profile=True, fields=["fatherName"]), 400)
+
+    assert "fields.0" in body["message"]
+    assert pesu_up.requests == []

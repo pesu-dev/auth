@@ -7,6 +7,7 @@ import logging
 import re
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Literal, get_args
 
 import httpx2
@@ -43,6 +44,16 @@ ProfileField = Literal[
     "phone",
     "campusCode",
     "campus",
+    "firstName",
+    "middleName",
+    "lastName",
+    "programShortCode",
+    "branchShortCode",
+    "institute",
+    "rollNumber",
+    "gender",
+    "dateOfBirth",
+    "bloodGroup",
 ]
 
 # The mobile app's API is undocumented. Every value below was read off the app's own traffic and can
@@ -59,6 +70,10 @@ PROFILE_FORM = {"action": "27", "mode": "1", "menuId": "11172"}
 UPSTREAM_TIMEOUT_SECONDS = 10.0
 
 CAMPUS_NAMES = {"1": "RR", "2": "EC"}
+# PESU stores a date of birth as the epoch milliseconds of midnight IST on that day. Read in UTC, the
+# same instant is 18:30 on the day before, so the timezone is what makes the date right.
+IST = timezone(timedelta(hours=5, minutes=30))
+ISO_DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
 # The mobile API only returns the program's abbreviation, but the API has always returned the full
 # name, which is what callers display. Keys are normalised by _normalise_program. "B.Tech." has been
 # checked against the full name the web portal shows; the rest are the standard expansions.
@@ -100,8 +115,8 @@ class _UpstreamModel(BaseModel):
     """Base for the response shapes read from PESU Academy.
 
     Only the fields this service returns are declared; everything else is dropped as the response is
-    parsed. Those responses also carry the student's photo, date of birth, addresses, marks and their
-    parents' contact details. Never holding them means no log line, exception or repr can leak them.
+    parsed. Those responses also carry the student's photo, addresses, marks and their parents'
+    contact details. Never holding them means no log line, exception or repr can leak them.
     """
 
     model_config = ConfigDict(extra="ignore", coerce_numbers_to_str=True)
@@ -130,13 +145,18 @@ class _LoginUser(_UpstreamModel):
     """The student as described by the login response's `mobileJsonObject`."""
 
     login: str | None = None
+    # The first name only, despite the key
     name: str | None = None
     email: str | None = None
     phone: str | None = None
     program: str | None = None
+    # Prefixed, as in "Branch:CSE"
+    branch: str | None = None
     class_name: str | None = Field(None, alias="className")
     section_name: str | None = Field(None, alias="sectionName")
     login_id: str | None = Field(None, alias="loginId")
+    # Already a YYYY-MM-DD string here, unlike the profile response's timestamp
+    date_of_birth: str | None = Field(None, alias="dateofBirth")
 
 
 class _LoginResponse(_UpstreamModel):
@@ -153,12 +173,18 @@ class _StudentInfo(_UpstreamModel):
     login_id: str | None = Field(None, alias="LoginId")
     srn: str | None = Field(None, alias="SRN")
     name: str | None = Field(None, alias="NameAsInSSLC")
+    first_name: str | None = Field(None, alias="FirstName")
+    middle_name: str | None = Field(None, alias="MiddleName")
+    last_name: str | None = Field(None, alias="LastName")
     email: str | None = Field(None, alias="Email")
     mobile: str | None = Field(None, alias="Mobile")
     program: str | None = Field(None, alias="ProgramAbbreviation")
     branch: str | None = Field(None, alias="Branch")
+    branch_short_code: str | None = Field(None, alias="BranchAbbreviation")
     class_name: str | None = Field(None, alias="ClassName")
     section_name: str | None = Field(None, alias="SectionName")
+    date_of_birth: int | None = Field(None, alias="DateOfBirth")
+    blood_group: str | None = Field(None, alias="BloodGroup")
 
 
 class _StudentPhoto(_UpstreamModel):
@@ -166,8 +192,43 @@ class _StudentPhoto(_UpstreamModel):
 
     login_id: str | None = Field(None, alias="loginId")
     name: str | None = Field(None, alias="nameAsInSSLC")
+    first_name: str | None = Field(None, alias="firstName")
     email: str | None = Field(None, alias="email")
     mobile: str | None = Field(None, alias="mobile")
+    institute: str | None = Field(None, alias="instituteName")
+    gender: str | None = None
+    date_of_birth: int | None = Field(None, alias="dateOfBirth")
+
+
+class _Semester(_UpstreamModel):
+    """One of the student's semesters, from the profile response's `STUDENT_SEMESTERS`."""
+
+    roll_number: int | None = Field(None, alias="studentRollNo")
+    # Orders the semesters chronologically; the list itself is not guaranteed to be in order
+    order: int | None = Field(None, alias="batchClassOrder")
+
+
+class _Student(_UpstreamModel):
+    """The student, merged from the blocks of the profile response."""
+
+    login_id: str | None = None
+    srn: str | None = None
+    name: str | None = None
+    first_name: str | None = None
+    middle_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    mobile: str | None = None
+    program: str | None = None
+    branch: str | None = None
+    branch_short_code: str | None = None
+    class_name: str | None = None
+    section_name: str | None = None
+    institute: str | None = None
+    roll_number: int | None = None
+    gender: str | None = None
+    date_of_birth: int | None = None
+    blood_group: str | None = None
 
 
 class _ProfileResponse(_UpstreamModel):
@@ -179,6 +240,8 @@ class _ProfileResponse(_UpstreamModel):
     # student into a 422, so either block will do and the profile is built from what is there.
     info: _StudentInfo | None = Field(None, alias="STUDENT_INFO")
     photo: _StudentPhoto | None = Field(None, alias="STUDENT_PHOTO")
+    # Optional like the blocks above: a student with no semesters yet must not turn into a 422
+    semesters: list[_Semester] | None = Field(None, alias="STUDENT_SEMESTERS")
 
     @model_validator(mode="after")
     def _has_student(self) -> _ProfileResponse:
@@ -194,25 +257,48 @@ class _ProfileResponse(_UpstreamModel):
             raise ValueError("neither STUDENT_INFO nor STUDENT_PHOTO is present")
         return self
 
-    def student(self) -> _StudentInfo:
-        """Merge the two student blocks, filling STUDENT_INFO's gaps from STUDENT_PHOTO.
+    def student(self) -> _Student:
+        """Merge the student blocks, filling STUDENT_INFO's gaps from STUDENT_PHOTO.
 
         Returns:
-            _StudentInfo: The student details.
+            _Student: The student details.
         """
         info = self.info or _StudentInfo()
-        if self.photo is None:
-            return info
-        return info.model_copy(
-            update={
-                "login_id": info.login_id or self.photo.login_id,
-                # STUDENT_PHOTO has no separate SRN; its loginId is the SRN for current students
-                "srn": info.srn or self.photo.login_id,
-                "name": info.name or self.photo.name,
-                "email": info.email or self.photo.email,
-                "mobile": info.mobile or self.photo.mobile,
-            },
+        photo = self.photo or _StudentPhoto()
+        return _Student(
+            login_id=info.login_id or photo.login_id,
+            # STUDENT_PHOTO has no separate SRN; its loginId is the SRN for current students
+            srn=info.srn or photo.login_id,
+            name=info.name or photo.name,
+            first_name=info.first_name or photo.first_name,
+            middle_name=info.middle_name,
+            last_name=info.last_name,
+            email=info.email or photo.email,
+            mobile=info.mobile or photo.mobile,
+            program=info.program,
+            branch=info.branch,
+            branch_short_code=info.branch_short_code,
+            class_name=info.class_name,
+            section_name=info.section_name,
+            institute=photo.institute,
+            roll_number=self._current_roll_number(),
+            gender=photo.gender,
+            date_of_birth=info.date_of_birth or photo.date_of_birth,
+            blood_group=info.blood_group,
         )
+
+    def _current_roll_number(self) -> int | None:
+        """Get the roll number from the student's latest semester.
+
+        Roll numbers change from one semester to the next, so only the most recent one is current.
+
+        Returns:
+            int | None: The roll number, or None if there are no semesters with one.
+        """
+        semesters = [s for s in self.semesters or () if s.order is not None and s.roll_number is not None]
+        if not semesters:
+            return None
+        return max(semesters, key=lambda semester: semester.order).roll_number
 
 
 @asynccontextmanager
@@ -367,6 +453,51 @@ def _as_prn(login_id: str | None) -> str | None:
     return None
 
 
+def _date_from_epoch_ms(milliseconds: int | None) -> str | None:
+    """Turn PESU's date-of-birth timestamp into an ISO date.
+
+    Args:
+        milliseconds (int | None): Epoch milliseconds of midnight IST on the date.
+
+    Returns:
+        str | None: The date as YYYY-MM-DD, or None if there is none or it is out of range.
+    """
+    if milliseconds is None:
+        return None
+    try:
+        return datetime.fromtimestamp(milliseconds / 1000, tz=IST).date().isoformat()
+    except OverflowError, OSError, ValueError:
+        return None
+
+
+def _iso_date(value: str | None) -> str | None:
+    """Return a date string only if it is already YYYY-MM-DD.
+
+    Args:
+        value (str | None): A date string from upstream.
+
+    Returns:
+        str | None: The value, or None if it is missing or in another format.
+    """
+    if value is not None and ISO_DATE_PATTERN.fullmatch(value):
+        return value
+    return None
+
+
+def _branch_code(branch: str | None) -> str | None:
+    """Get the branch code from the login response's prefixed branch, such as "Branch:CSE".
+
+    Args:
+        branch (str | None): The branch from the login response.
+
+    Returns:
+        str | None: The code without its prefix, or None if there is none.
+    """
+    if branch is None:
+        return None
+    return branch.removeprefix("Branch:").strip() or None
+
+
 class PESUAcademy:
     """Class to interact with the PESU Academy server through its mobile API.
 
@@ -441,7 +572,7 @@ class PESUAcademy:
             raise AuthenticationError(f"Invalid username or password, or user does not exist for user={username}.")
         return login
 
-    async def _fetch_profile(self, client: httpx2.AsyncClient, access_token: str, username: str) -> _StudentInfo:
+    async def _fetch_profile(self, client: httpx2.AsyncClient, access_token: str, username: str) -> _Student:
         """Fetch the student's profile from the dispatcher.
 
         Args:
@@ -450,7 +581,7 @@ class PESUAcademy:
             username (str): The username of the user, for logging.
 
         Returns:
-            _StudentInfo: The parsed student details.
+            _Student: The parsed student details.
 
         Raises:
             ProfileFetchError: If the profile could not be fetched.
@@ -526,7 +657,7 @@ class PESUAcademy:
             return None, None
         return int(campus_code), CAMPUS_NAMES[campus_code]
 
-    def _build_profile(self, user: _LoginUser, student: _StudentInfo, username: str) -> dict[str, Any]:
+    def _build_profile(self, user: _LoginUser, student: _Student, username: str) -> dict[str, Any]:
         """Merge the login and profile responses into the profile this API returns.
 
         The profile response is the more complete source, so most fields come from there. The login
@@ -535,7 +666,7 @@ class PESUAcademy:
 
         Args:
             user (_LoginUser): The student from the login response.
-            student (_StudentInfo): The student from the profile response.
+            student (_Student): The student from the profile response.
             username (str): The username of the user, for logging.
 
         Returns:
@@ -560,6 +691,17 @@ class PESUAcademy:
             "phone": user.phone or student.mobile,
             "campusCode": campus_code,
             "campus": campus,
+            # The login's "name" is the first name too
+            "firstName": student.first_name or user.name,
+            "middleName": student.middle_name,
+            "lastName": student.last_name,
+            "programShortCode": user.program or student.program,
+            "branchShortCode": student.branch_short_code or _branch_code(user.branch),
+            "institute": student.institute,
+            "rollNumber": student.roll_number,
+            "gender": student.gender,
+            "dateOfBirth": _date_from_epoch_ms(student.date_of_birth) or _iso_date(user.date_of_birth),
+            "bloodGroup": student.blood_group,
         }
 
     async def authenticate(

@@ -103,7 +103,7 @@ def test_integration_authenticate_with_specific_profile_fields(client, expected_
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_with_all_profile_fields(client, expected_profile):
+def test_integration_authenticate_with_all_profile_fields(client, check_live_profile):
     payload = {
         "username": os.getenv("TEST_EMAIL"),
         "password": os.getenv("TEST_PASSWORD"),
@@ -116,8 +116,8 @@ def test_integration_authenticate_with_all_profile_fields(client, expected_profi
     assert data["status"] is True
     assert "timestamp" in data
     assert data["message"] == "Login successful."
-    # Every field is present; one the account has no value for is null
-    assert data["profile"] == expected_profile
+    # Every default field is present; one the account has no value for is null
+    check_live_profile(data["profile"])
 
 
 @pytest.mark.secret_required

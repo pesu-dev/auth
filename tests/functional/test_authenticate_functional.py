@@ -81,14 +81,15 @@ async def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcade
 
 @pytest.mark.secret_required
 @pytest.mark.asyncio
-async def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy, expected_profile):
+async def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy, check_live_profile):
     result = await pesu_academy.authenticate(
         os.getenv("TEST_EMAIL"), os.getenv("TEST_PASSWORD"), profile=True, fields=None
     )
 
     assert result["status"] is True
     assert "Login successful" in result["message"]
-    assert result["profile"] == expected_profile
+    check_live_profile(result["profile"])
+
 
 
 @pytest.mark.asyncio

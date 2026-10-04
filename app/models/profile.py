@@ -77,3 +77,63 @@ class ProfileModel(BaseModel):
         description="Abbreviation of the campus name.",
         json_schema_extra={"example": "RR"},
     )
+    first_name: str | None = Field(
+        None,
+        title="First Name",
+        description="First name of the user.",
+        json_schema_extra={"example": "John"},
+    )
+    middle_name: str | None = Field(
+        None,
+        title="Middle Name",
+        description="Middle name of the user. Null when the user has none.",
+        json_schema_extra={"example": "Michael"},
+    )
+    last_name: str | None = Field(
+        None,
+        title="Last Name",
+        description="Last name of the user.",
+        json_schema_extra={"example": "Doe"},
+    )
+    program_short_code: str | None = Field(
+        None,
+        title="Program Short Code",
+        description="Abbreviation of the program, as PESU Academy writes it.",
+        json_schema_extra={"example": "B.Tech."},
+    )
+    branch_short_code: str | None = Field(
+        None,
+        title="Branch Short Code",
+        description="Abbreviation of the branch.",
+        json_schema_extra={"example": "CSE"},
+    )
+    institute: str | None = Field(
+        None,
+        title="Institute",
+        description="Full name of the institute and campus.",
+        json_schema_extra={"example": "PES University (Ring Road)"},
+    )
+    roll_number: int | None = Field(
+        None,
+        title="Roll Number",
+        description="Roll number in the user's current (or latest) semester.",
+        json_schema_extra={"example": 27},
+    )
+    gender: str | None = Field(
+        None,
+        title="Gender",
+        description="Gender of the user, as recorded by PESU.",
+        json_schema_extra={"example": "Male"},
+    )
+    date_of_birth: str | None = Field(
+        None,
+        title="Date of Birth",
+        description="Date of birth of the user, as YYYY-MM-DD.",
+        json_schema_extra={"example": "2002-01-31"},
+    )
+    blood_group: str | None = Field(
+        None,
+        title="Blood Group",
+        description="Blood group of the user.",
+        json_schema_extra={"example": "O+"},
+    )

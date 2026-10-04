@@ -66,3 +66,51 @@ def pytest_collection_modifyitems(config, items):
         return 99
 
     items.sort(key=sort_key)
+
+
+@pytest.fixture
+def check_live_profile(expected_profile):
+    """Check a default profile from the live API against the test account.
+
+    The original fields must equal the TEST_* values. The newer fields have no TEST_* variable, so
+    they are checked for consistency and format instead, which needs no new secrets. Checks compute a bool
+    before asserting, so a failure never prints the account's values into the test output.
+    """
+    import re
+    from datetime import date
+
+    from app.pesu import PROGRAM_NAMES, PESUAcademy, _normalise_program
+
+    def check(profile):
+        assert list(profile) == PESUAcademy.DEFAULT_FIELDS
+        assert {field: profile[field] for field in expected_profile} == expected_profile
+        for field in ("firstName", "middleName", "lastName", "institute"):
+            ok = profile[field] is None or (isinstance(profile[field], str) and profile[field].strip() == profile[field])
+            assert ok, f"{field} is not a trimmed string or null"
+        ok = profile["firstName"] is not None and profile["firstName"].casefold() in (profile["name"] or "").casefold()
+        assert ok, "firstName is missing or not part of name"
+        ok = profile["institute"] is not None and "PES" in profile["institute"]
+        assert ok, "institute is missing or not a PES institute"
+        ok = profile["rollNumber"] is None or (isinstance(profile["rollNumber"], int) and profile["rollNumber"] > 0)
+        assert ok, "rollNumber is not a positive integer or null"
+        # The short code must be what the full program name was expanded from
+        short_code = profile["programShortCode"]
+        ok = short_code is not None and PROGRAM_NAMES.get(_normalise_program(short_code)) == profile["program"]
+        assert ok, "programShortCode does not expand to program"
+        ok = isinstance(profile["gender"], str) and bool(profile["gender"])
+        assert ok, "gender is missing"
+        try:
+            ok = date.fromisoformat(profile["dateOfBirth"]).year > 1900
+        except (TypeError, ValueError):
+            ok = False
+        assert ok, "dateOfBirth is not a plausible YYYY-MM-DD date"
+        ok = profile["bloodGroup"] is not None and re.fullmatch(r"(A|B|AB|O)[+-]", profile["bloodGroup"]) is not None
+        assert ok, "bloodGroup is not a blood group"
+        if expected_short_code := os.getenv("TEST_BRANCH_SHORT_CODE"):
+            assert profile["branchShortCode"] == expected_short_code
+        else:
+            ok = profile["branchShortCode"] is None or re.fullmatch(r"[A-Z&()-]+", profile["branchShortCode"]) is not None
+            assert ok, "branchShortCode does not look like a branch code"
+
+    return check
+

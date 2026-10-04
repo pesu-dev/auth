@@ -41,6 +41,10 @@ PROFILE_PAYLOAD = {
     "STUDENT_PHOTO": {
         "loginId": "PES2UG25CS001",
         "nameAsInSSLC": "JOHN DOE",
+        "firstName": "JOHN",
+        "gender": "Male",
+        # Midnight IST on 2005-01-01, which is 2004-12-31 in UTC
+        "dateOfBirth": 1104517800000,
         "profilePicture": "data:image/png;base64,PROFILEPHOTOSECRET",
         "instituteName": "PES University (Electronic City)",
     },
@@ -49,7 +53,12 @@ PROFILE_PAYLOAD = {
         "LoginId": "PES2202500001",
         "SRN": "PES2UG25CS001",
         "FirstName": "JOHN",
+        "MiddleName": "",
+        "LastName": "DOE",
         "NameAsInSSLC": "JOHN DOE",
+        "DateOfBirth": 1104517800000,
+        "BloodGroup": "O+",
+        "SSLCMarksObtained": "MARKSSECRET",
         "Email": "john.doe@example.com",
         "Mobile": "9876543210",
         "FatherName": "FATHERNAMESECRET",
@@ -63,6 +72,13 @@ PROFILE_PAYLOAD = {
         "ClassName": None,
         "SectionName": None,
     },
+    # Deliberately out of order: the latest semester is chosen by batchClassOrder, not position
+    "STUDENT_SEMESTERS": [
+        {"studentId": "00000000-0000-0000-0000-000000000000", "studentRollNo": 12, "className": "Sem-3", "batchClassOrder": 2026071499},
+        {"studentId": "00000000-0000-0000-0000-000000000000", "studentRollNo": 27, "className": "Sem-4", "batchClassOrder": 2027010199},
+        {"studentId": "00000000-0000-0000-0000-000000000000", "studentRollNo": 9, "className": "Sem-2", "batchClassOrder": 2026010199},
+    ],
+    "STUDENT_CGPA_DETAILS": [{"USN": "PES2UG25CS001", "CGPA": "CGPASECRET"}],
 }
 
 # Values that must never appear in a log line or an exception message
@@ -74,6 +90,8 @@ SECRETS = (
     "FATHERNAMESECRET",
     "ADDRESSSECRET",
     "1112223334",
+    "MARKSSECRET",
+    "CGPASECRET",
 )
 
 

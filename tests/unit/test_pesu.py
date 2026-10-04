@@ -33,6 +33,17 @@ FULL_PROFILE = {
     "phone": "9876543210",
     "campusCode": 2,
     "campus": "EC",
+    "firstName": "JOHN",
+    "middleName": None,
+    "lastName": "DOE",
+    "programShortCode": "B.Tech.",
+    "branchShortCode": "CSE",
+    "institute": "PES University (Electronic City)",
+    "rollNumber": 27,
+    "gender": "Male",
+    # Midnight IST on 2005-01-01; read in UTC it would be 2004-12-31
+    "dateOfBirth": "2005-01-01",
+    "bloodGroup": "O+",
 }
 
 
@@ -251,8 +262,12 @@ async def test_a_profile_without_student_info_is_built_from_student_photo(
 
     assert profile == {
         **FULL_PROFILE,
-        # Only STUDENT_INFO has the full branch name; the login's "Branch:CSE" is an abbreviation
+        # Only STUDENT_INFO has the full branch name; the login's "Branch:CSE" is an abbreviation,
+        # which still gives the short code
         "branch": None,
+        "lastName": None,
+        # Only in STUDENT_INFO
+        "bloodGroup": None,
     }
 
 
@@ -881,3 +896,166 @@ async def test_an_upstream_call_without_a_status_records_no_status(collector, si
     snapshot = collector.snapshot()
     assert snapshot.value(UPSTREAM_REQUESTS.name, operation="login", outcome="success") == 1.0
     assert list(snapshot.samples(UPSTREAM_RESPONSES.name)) == []
+
+
+# --- Profile details beyond the core fields ---
+
+PERSONAL_FIELDS = ["gender", "dateOfBirth", "bloodGroup"]
+
+
+@pytest.mark.asyncio
+async def test_personal_details_are_returned_when_requested(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["name", *PERSONAL_FIELDS])
+
+    assert result["profile"] == {
+        "name": "JOHN DOE",
+        "gender": "Male",
+        # Midnight IST on 2005-01-01; read in UTC it would be 2004-12-31
+        "dateOfBirth": "2005-01-01",
+        "bloodGroup": "O+",
+    }
+
+
+@pytest.mark.asyncio
+async def test_the_date_of_birth_comes_from_student_photo_then_the_login(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    profile_payload["STUDENT_INFO"]["DateOfBirth"] = None
+    profile_payload["STUDENT_PHOTO"]["dateOfBirth"] = 1104604200000  # 2005-01-02 IST
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+    from_photo = await pesu.authenticate("user", "pass", profile=True, fields=["dateOfBirth"])
+
+    profile_payload["STUDENT_PHOTO"]["dateOfBirth"] = None
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+    from_login = await pesu.authenticate("user", "pass", profile=True, fields=["dateOfBirth"])
+
+    assert from_photo["profile"] == {"dateOfBirth": "2005-01-02"}
+    assert from_login["profile"] == {"dateOfBirth": "2005-01-01"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("timestamp", "login_value"),
+    [
+        (None, "01-01-2005"),  # the login's string in another format is not trusted
+        (None, None),
+        (10**18, None),  # out of range for a date
+    ],
+)
+async def test_an_unusable_date_of_birth_is_null(
+    pesu, upstream, make_response, login_payload, profile_payload, timestamp, login_value
+):
+    profile_payload["STUDENT_INFO"]["DateOfBirth"] = timestamp
+    profile_payload["STUDENT_PHOTO"]["dateOfBirth"] = timestamp
+    login_payload["mobileJsonObject"]["dateofBirth"] = login_value
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["dateOfBirth"])
+
+    assert result["profile"] == {"dateOfBirth": None}
+
+
+@pytest.mark.asyncio
+async def test_a_date_of_birth_before_1970(pesu, upstream, make_response, login_payload, profile_payload):
+    profile_payload["STUDENT_INFO"]["DateOfBirth"] = -19800000  # midnight IST on 1970-01-01
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["dateOfBirth"])
+
+    assert result["profile"] == {"dateOfBirth": "1970-01-01"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("semesters", "roll_number"),
+    [
+        ([], None),
+        (None, None),
+        ([{"studentRollNo": None, "batchClassOrder": 2}, {"studentRollNo": 5, "batchClassOrder": 1}], 5),
+        ([{"studentRollNo": 8, "batchClassOrder": None}, {"studentRollNo": 5, "batchClassOrder": 1}], 5),
+        ([{"studentRollNo": "14", "batchClassOrder": "3"}], 14),
+    ],
+    ids=["no semesters", "null semesters", "latest has no roll", "unordered entry", "numbers as text"],
+)
+async def test_the_roll_number_is_from_the_latest_usable_semester(
+    pesu, upstream, make_response, login_payload, profile_payload, semesters, roll_number
+):
+    profile_payload["STUDENT_SEMESTERS"] = semesters
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["rollNumber"])
+
+    assert result["profile"] == {"rollNumber": roll_number}
+
+
+@pytest.mark.asyncio
+async def test_the_first_name_falls_back_to_student_photo_then_the_login(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    profile_payload["STUDENT_INFO"]["FirstName"] = None
+    profile_payload["STUDENT_PHOTO"]["firstName"] = "JOHNNY"
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+    from_photo = await pesu.authenticate("user", "pass", profile=True, fields=["firstName"])
+
+    profile_payload["STUDENT_PHOTO"]["firstName"] = None
+    login_payload["mobileJsonObject"]["name"] = "JON"
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+    from_login = await pesu.authenticate("user", "pass", profile=True, fields=["firstName"])
+
+    assert from_photo["profile"] == {"firstName": "JOHNNY"}
+    assert from_login["profile"] == {"firstName": "JON"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("login_branch", "expected"),
+    [("Branch:ECE", "ECE"), ("AIML", "AIML"), ("Branch:", None), (None, None)],
+)
+async def test_the_branch_code_falls_back_to_the_login(
+    pesu, upstream, make_response, login_payload, profile_payload, login_branch, expected
+):
+    profile_payload["STUDENT_INFO"]["BranchAbbreviation"] = None
+    login_payload["mobileJsonObject"]["branch"] = login_branch
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["branchShortCode"])
+
+    assert result["profile"] == {"branchShortCode": expected}
+
+
+@pytest.mark.asyncio
+async def test_the_program_code_is_returned_as_pesu_writes_it(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    login_payload["mobileJsonObject"]["program"] = None
+    profile_payload["STUDENT_INFO"]["ProgramAbbreviation"] = "M.Tech"
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["program", "programShortCode"])
+
+    assert result["profile"] == {"program": "Master of Technology", "programShortCode": "M.Tech"}
+
+
+@pytest.mark.asyncio
+async def test_without_student_photo_there_is_no_institute_or_gender(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    del profile_payload["STUDENT_PHOTO"]
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["institute", "gender", "dateOfBirth"])
+
+    # The date of birth is in STUDENT_INFO too
+    assert result["profile"] == {"institute": None, "gender": None, "dateOfBirth": "2005-01-01"}
+
+
+def test_the_default_fields_are_every_field():
+    from typing import get_args
+
+    from app.pesu import ProfileField
+
+    assert PESUAcademy.DEFAULT_FIELDS == list(get_args(ProfileField))
