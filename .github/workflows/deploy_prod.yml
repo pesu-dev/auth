@@ -103,6 +103,10 @@ jobs:
           git checkout main
           # dev may advance during approval; promote only the approved commit.
           git merge --ff-only "$TARGET_SHA"
+          if [ "$(git rev-parse HEAD)" != "$TARGET_SHA" ]; then
+            echo "::error::main is ahead of the approved commit; promotion stopped."
+            exit 1
+          fi
           git push origin main
 
   build_and_push_image:
