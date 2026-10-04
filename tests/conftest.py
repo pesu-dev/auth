@@ -113,4 +113,3 @@ def check_live_profile(expected_profile):
             assert ok, "branchShortCode does not look like a branch code"
 
     return check
-

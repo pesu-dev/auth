@@ -292,10 +292,15 @@ async def test_student_photo_fills_the_gaps_in_student_info(
     "body",
     [
         b"<html>not json</html>",
-        # What the dispatcher answers, with a 200, to a request it does not understand
-        b'{"status": 400, "message": "Invalid request", "errorCode": null, "timestamp": 1}',
         b'{"MESSAGE": "SUCCESS_Record found Successfully"}',
+        # PESU sends {} for an empty block; with every field optional it must not pass as a student
+        b'{"MESSAGE": "SUCCESS_Record found Successfully", "STUDENT_INFO": {}, "STUDENT_PHOTO": {}}',
+        b'{"MESSAGE": "SUCCESS_Record found Successfully", "STUDENT_INFO": {"SomethingNew": "x"}}',
+        b'{"MESSAGE": "SUCCESS_Record found Successfully", "STUDENT_INFO": {"SRN": null, "Email": "NA"}}',
+        # Not PESU's error envelope: a status of 200 is not an error
+        b'{"status": 200, "message": "OK"}',
     ],
+    ids=["not json", "no student", "empty blocks", "unknown keys only", "only empty values", "status 200"],
 )
 async def test_an_unexpected_profile_response_is_a_parse_error(
     pesu, upstream, make_response, login_payload, collector, body
@@ -308,6 +313,36 @@ async def test_an_unexpected_profile_response_is_a_parse_error(
     assert exc_info.value.status_code == 422
     assert exc_info.value.__cause__ is None
     assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="response_structure") == 1.0
+
+
+@pytest.mark.asyncio
+async def test_an_error_envelope_from_the_dispatcher_is_a_fetch_error(
+    pesu, upstream, make_response, login_payload, collector
+):
+    """What the dispatcher answers, with an HTTP 200, to a request it rejects. PESU failed, so a 502."""
+    envelope = {"status": 400, "message": "Invalid request", "errorCode": None, "timestamp": 1}
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=envelope)]
+
+    with pytest.raises(ProfileFetchError) as exc_info:
+        await pesu.authenticate("user", "pass", profile=True)
+
+    assert exc_info.value.status_code == 502
+    assert "error status 400" in exc_info.value.message
+    # PESU's own text is not forwarded to the caller
+    assert "Invalid request" not in exc_info.value.message
+    assert exc_info.value.__cause__ is None
+    # Not a parse failure: the API has not changed shape, PESU said no
+    assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="response_structure") == 0.0
+
+
+@pytest.mark.asyncio
+async def test_one_block_with_data_is_enough(pesu, upstream, make_response, login_payload, profile_payload):
+    profile_payload["STUDENT_INFO"] = {}
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["srn"] == "PES2UG25CS001"
+    assert profile["name"] == "JOHN DOE"
 
 
 # --- Mapping ---

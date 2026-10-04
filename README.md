@@ -784,7 +784,7 @@ curl -X POST http://localhost:5000/authenticate \
   "timestamp": "2024-07-28T22:30:10.103368+05:30",
   "profile": {
     "name": "Johnny Blaze",
-    "srn": "PES1201800001",
+    "srn": "PES1UG20CS001",
     "semester": null,
     "campus": "RR"
   }

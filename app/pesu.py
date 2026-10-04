@@ -231,6 +231,25 @@ class _Student(_UpstreamModel):
     blood_group: str | None = None
 
 
+class _ErrorEnvelope(_UpstreamModel):
+    """PESU's error body, which it can send with an HTTP 200, as in {"status": 400, "message": "..."}."""
+
+    status: int
+    message: str | None = None
+
+
+def _has_values(block: BaseModel | None) -> bool:
+    """Tell whether a parsed block holds any value at all.
+
+    Args:
+        block (BaseModel | None): The block, or None if it was absent.
+
+    Returns:
+        bool: True if the block is present and at least one of its fields is not None.
+    """
+    return block is not None and any(value is not None for value in block.model_dump().values())
+
+
 class _ProfileResponse(_UpstreamModel):
     """The profile (dispatcher) response."""
 
@@ -247,14 +266,18 @@ class _ProfileResponse(_UpstreamModel):
     def _has_student(self) -> _ProfileResponse:
         """Reject a response that describes no student at all.
 
+        A block counts only if it holds a value. PESU sends `{}` for an empty block (PLACEMENT_DETAILS
+        is one), and since every field is optional, `{}` -- or a block of only unknown or null keys --
+        would otherwise parse into an all-empty block and pass as a profile.
+
         Returns:
             _ProfileResponse: The response, unchanged.
 
         Raises:
-            ValueError: If neither STUDENT_INFO nor STUDENT_PHOTO is present.
+            ValueError: If neither STUDENT_INFO nor STUDENT_PHOTO holds any student data.
         """
-        if self.info is None and self.photo is None:
-            raise ValueError("neither STUDENT_INFO nor STUDENT_PHOTO is present")
+        if not _has_values(self.info) and not _has_values(self.photo):
+            raise ValueError("neither STUDENT_INFO nor STUDENT_PHOTO holds any student data")
         return self
 
     def student(self) -> _Student:
@@ -411,6 +434,22 @@ def _validation_failure_summary(error: ValidationError) -> list[tuple[Any, ...]]
         list[tuple[Any, ...]]: The location and error type of each failure.
     """
     return [(*e["loc"], e["type"]) for e in error.errors()]
+
+
+def _error_envelope_status(content: bytes) -> int | None:
+    """Get the error status from a response that is PESU's error envelope.
+
+    Args:
+        content (bytes): The response body.
+
+    Returns:
+        int | None: The envelope's status if the body is one that reports an error, otherwise None.
+    """
+    try:
+        envelope = _ErrorEnvelope.model_validate_json(content)
+    except ValidationError:
+        return None
+    return envelope.status if envelope.status != 200 else None
 
 
 def _semester_from_class_name(class_name: str | None) -> str | None:
@@ -603,6 +642,12 @@ class PESUAcademy:
         try:
             parsed = _ProfileResponse.model_validate_json(response.content)
         except ValidationError as e:
+            # PESU reporting an error is PESU failing to serve the profile, not a response we cannot
+            # read: a 502 like the login's, rather than the 422 that means their API has changed
+            if (status := _error_envelope_status(response.content)) is not None:
+                raise ProfileFetchError(
+                    f"PESU Academy answered the profile request for user={username} with error status {status}.",
+                ) from None
             self._metrics.increment(PROFILE_PARSE_ERRORS, reason="response_structure")
             logging.warning(f"Unexpected profile response for user={username}: {_validation_failure_summary(e)}")
             # from None: the chained error would quote the response, which is personal data
