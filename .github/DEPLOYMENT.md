@@ -20,7 +20,7 @@ Render's `PORT` environment variable. Use the Dockerfile's default command.
 ## Workflow configuration
 
 The GitHub environments `staging` and `production` each provide the `RENDER_SERVICE_ID` variable and
-`RENDER_API_KEY` secret. These credentials are also used by the deployment checks and rollback helper. The
+`RENDER_API_KEY` secret. The
 `promote-gate` environment retains its required reviewers. The release GitHub App retains its existing permissions
 and credentials for advancing `main` and creating releases. No deploy-hook secret is required.
 
@@ -42,18 +42,22 @@ with build and bandwidth allowances.
 ## Production promotion
 
 `deploy_prod.yml` resolves one `dev` commit and project version for the whole run. After the `promote-gate` approval,
-it verifies that staging is live at that exact commit and captures production's current live deployment for rollback.
-Production must already have a successful live deployment before using this workflow.
+the release App fast-forwards `main` to that selected SHA, following the original branch-based promotion order.
+The workflow rejects a conflicting version tag or a promotion that cannot fast-forward. It publishes the selected commit's multi-architecture GHCR image and deploys the selected SHA
+to staging and waits for it to become live before deploying that same SHA to production. Both deployments use the
+existing shared Render action. Later changes to `dev` do not change this run's selected commit.
 
-The release App fast-forwards `main` to the selected SHA before production deployment, following the original
-branch-based promotion order. The workflow rejects a conflicting version tag or a promotion that cannot fast-forward.
-It deploys that same SHA, waits for Render to report it live, and then publishes version/latest/prod image tags and
-the GitHub release for that SHA. Later changes to `dev` do not change this run's selected commit.
+After production is live, the workflow publishes version/latest/prod image tags and the GitHub release for that SHA.
+The production workflow publishes its commit image before deployment so release tagging does not depend on another
+staging run having finished.
 
-If production deployment fails, the workflow requests a rollback to the captured Render deployment and waits for it
-to become live. The workflow remains failed even if rollback succeeds. A rollback restores the runtime; it does not
-rewind `main` or create a release. A maintainer must resolve the failed promotion before the next release. Render can
-only roll back to artifacts it still retains, so rollback can also fail and requires manual investigation.
+Before advancing `main`, the workflow records its most recent reachable version-tagged commit as the rollback SHA,
+falling back to the previous `main` SHA if no version tag exists. If production deployment fails, the shared Render
+action rebuilds and redeploys that rollback SHA and waits for it to become live. This uses the same deployment tooling;
+there is no separate Render API helper or retained-artifact rollback. The workflow remains failed even if rollback
+succeeds. Rollback does not rewind `main` or create a release. If there is no prior version tag, or tags do not represent
+successful releases, a maintainer must verify the rollback target before retrying a failed promotion. A failed staging
+deployment prevents production deployment and leaves `main` at the selected commit.
 
 Git-backed staging and production build separately. Their source commit matches, but their container artifacts need
 not be byte-for-byte identical, especially when upstream base-image tags change.
@@ -68,8 +72,8 @@ not be byte-for-byte identical, especially when upstream base-image tags change.
    the deployment workflows temporarily, then re-enable them after both sides are configured.
 1. Configure staging with `dev` and production with `main`, Docker runtime, `/health`, and Auto-Deploy Off. If new
    services were created, update the respective environment's `RENDER_SERVICE_ID`. Keep credentials out of PRs and logs.
-1. Establish a successful production deployment of the intended stable `main` commit so the first promotion has a
-   rollback target. Confirm health, version, environment variables, and domains.
+1. Confirm production is running the intended stable version and its version tag identifies that commit.
+   Confirm health, environment variables, and domains.
 1. Enable staging PR previews after reviewing inherited environment variables. Verify a contributor PR gets a preview
    and closing it removes the preview.
 1. Once the workflow changes are merged and deployment workflows re-enabled, run staging for the current `dev` SHA,
