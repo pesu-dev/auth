@@ -11,9 +11,15 @@ from app.exceptions.authentication import (
     ProfileParseError,
     UpstreamError,
 )
-from app.metrics.collector import HTTP_CLIENTS, PROFILE_PARSE_ERRORS, MetricsCollector
+from app.metrics.collector import (
+    HTTP_CLIENTS,
+    PROFILE_PARSE_ERRORS,
+    UPSTREAM_REQUESTS,
+    UPSTREAM_RESPONSES,
+    MetricsCollector,
+)
 from app.models import ProfileModel
-from app.pesu import DISPATCHER_URL, LOGIN_URL, PESUAcademy
+from app.pesu import _CLOSE_TASKS, DISPATCHER_URL, LOGIN_URL, PESUAcademy, _as_prn, _upstream_call
 
 FULL_PROFILE = {
     "name": "JOHN DOE",
@@ -600,3 +606,278 @@ async def test_parsed_login_does_not_expose_the_token_in_its_repr(login_payload)
     assert "ACCESS-TOKEN-SECRET" not in repr(login)
     # Fields never declared are never kept
     assert "LOGINPHOTOSECRET" not in repr(login)
+
+
+# --- More login and profile responses ---
+
+
+@pytest.mark.asyncio
+async def test_a_login_with_a_null_user_is_an_upstream_error(pesu, upstream, make_response):
+    upstream.side_effect = [make_response(json={"mobileJsonObject": None, "accessToken": "t"})]
+
+    with pytest.raises(UpstreamError):
+        await pesu.authenticate("user", "pass")
+
+
+@pytest.mark.asyncio
+async def test_a_401_is_rejected_credentials_whatever_its_body(pesu, upstream, make_response):
+    """Only the status is relied on, so a 401 with an HTML or empty body is still a 401."""
+    upstream.side_effect = [make_response(401, content=b"<html>Unauthorized</html>")]
+
+    with pytest.raises(AuthenticationError):
+        await pesu.authenticate("user", "wrong")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("token", ["", "   ", None])
+async def test_a_blank_access_token_cannot_fetch_the_profile(pesu, upstream, make_response, login_payload, token):
+    login_payload["accessToken"] = token
+    upstream.side_effect = [make_response(json=login_payload)]
+
+    with pytest.raises(UpstreamError):
+        await pesu.authenticate("user", "pass", profile=True)
+
+    upstream.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_extra_upstream_fields_are_ignored(pesu, upstream, make_response, login_payload, profile_payload):
+    """PESU adding a field must not break parsing; only removing or retyping one we use can."""
+    login_payload["mobileJsonObject"]["someNewField"] = {"nested": [1, 2, 3]}
+    profile_payload["STUDENT_INFO"]["AnotherNewField"] = "value"
+    profile_payload["BRAND_NEW_BLOCK"] = {}
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile == FULL_PROFILE
+
+
+@pytest.mark.asyncio
+async def test_a_retyped_field_we_use_is_a_parse_error(
+    pesu, upstream, make_response, login_payload, profile_payload, collector
+):
+    profile_payload["STUDENT_INFO"]["SRN"] = ["PES2UG25CS001"]
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    with pytest.raises(ProfileParseError):
+        await pesu.authenticate("user", "pass", profile=True)
+
+    assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="response_structure") == 1.0
+
+
+@pytest.mark.parametrize(
+    ("login_id", "expected"),
+    [
+        ("PES1201800001", "PES1201800001"),  # older PRN, also used as the SRN
+        ("PES2202500001", "PES2202500001"),  # current PRN
+        ("PES2UG25CS001", None),  # an SRN
+        ("PES220250000", None),  # one digit short
+        ("PES22025000011", None),  # one digit long
+        ("pes2202500001", None),  # not how PESU writes it
+        ("john.doe@example.com", None),
+        (None, None),
+    ],
+)
+def test_only_a_prn_shaped_login_id_is_a_prn(login_id, expected):
+    assert _as_prn(login_id) == expected
+
+
+@pytest.mark.asyncio
+async def test_duplicate_requested_fields_are_returned_once(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["name", "name"])
+
+    assert result["profile"] == {"name": "JOHN DOE"}
+
+
+@pytest.mark.asyncio
+async def test_fields_without_a_profile_are_ignored(pesu, login_ok):
+    result = await pesu.authenticate("user", "pass", profile=False, fields=["name"])
+
+    assert "profile" not in result
+    login_ok.assert_awaited_once()
+
+
+# --- On the wire ---
+
+
+def _route_logins(wire, make_response, login_payload, profile_payload):
+    wire.routes[LOGIN_URL] = lambda request: make_response(json=login_payload)
+    wire.routes[DISPATCHER_URL] = lambda request: make_response(json=profile_payload)
+
+
+def _multipart_fields(request):
+    """Decode a multipart request body into {field name: value}."""
+    boundary = request.headers["content-type"].split("boundary=")[1].encode()
+    fields = {}
+    for part in request.content.split(b"--" + boundary):
+        if b'name="' not in part:
+            continue
+        head, _, value = part.partition(b"\r\n\r\n")
+        name = head.split(b'name="')[1].split(b'"')[0].decode()
+        fields[name] = value.rstrip(b"\r\n").decode()
+    return fields
+
+
+@pytest.mark.asyncio
+async def test_the_login_request_on_the_wire(pesu, wire, make_response, login_payload, profile_payload):
+    _route_logins(wire, make_response, login_payload, profile_payload)
+
+    await pesu.authenticate("PES2UG25CS001", "hunter2")
+
+    (login,) = wire.requests
+    assert login.method == "POST"
+    assert str(login.url) == LOGIN_URL
+    assert login.headers["x-client-type"] == "MOBILE"
+    assert login.headers["content-type"].startswith("multipart/form-data; boundary=")
+    # Nothing to authenticate with yet, and nothing from another login
+    assert "authorization" not in login.headers
+    assert _multipart_fields(login) == {
+        "userName": "PES2UG25CS001",
+        "password": "hunter2",
+        "j_appId": "YES",
+        "instId": "1,6,7,14",
+    }
+
+
+@pytest.mark.asyncio
+async def test_the_profile_request_on_the_wire(pesu, wire, make_response, login_payload, profile_payload):
+    _route_logins(wire, make_response, login_payload, profile_payload)
+
+    await pesu.authenticate("user", "hunter2", profile=True)
+
+    login, dispatcher = wire.requests
+    assert str(dispatcher.url) == DISPATCHER_URL
+    assert dispatcher.headers["authorization"] == "Bearer ACCESS-TOKEN-SECRET"
+    assert dispatcher.headers["x-client-type"] == "MOBILE"
+    assert _multipart_fields(dispatcher) == {"action": "27", "mode": "1", "menuId": "11172"}
+    # The password goes to the login and nowhere else
+    assert b"hunter2" in login.content
+    assert b"hunter2" not in dispatcher.content
+
+
+@pytest.mark.asyncio
+async def test_one_client_per_login_with_a_timeout_and_no_redirects(
+    pesu, wire, make_response, login_payload, profile_payload
+):
+    _route_logins(wire, make_response, login_payload, profile_payload)
+
+    await pesu.authenticate("user", "pass", profile=True)
+    await pesu.authenticate("user", "pass")
+
+    # Two logins, two clients; the profile call reused its login's client
+    assert wire.client_options == [{"timeout": 10.0}, {"timeout": 10.0}]
+
+
+@pytest.mark.asyncio
+async def test_a_redirect_is_not_followed(pesu, wire, make_response):
+    """A redirect means something in front of PESU changed; following it could post the password elsewhere."""
+    wire.routes[LOGIN_URL] = lambda request: httpx2.Response(302, headers={"location": "https://elsewhere.example/"})
+
+    with pytest.raises(UpstreamError) as exc_info:
+        await pesu.authenticate("user", "pass")
+
+    assert "302" in exc_info.value.message
+    assert len(wire.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_timeout_is_an_upstream_error(pesu, wire, collector):
+    wire.routes[LOGIN_URL] = lambda request: httpx2.ReadTimeout("timed out", request=request)
+
+    with pytest.raises(UpstreamError):
+        await pesu.authenticate("user", "pass")
+
+    assert collector.snapshot().value(UPSTREAM_REQUESTS.name, operation="login", outcome="error") == 1.0
+    assert _clients(collector) == {"created": 1.0, "closed": 1.0}
+
+
+# --- Concurrency and cancellation ---
+
+
+@pytest.mark.asyncio
+async def test_concurrent_logins_do_not_share_anything(pesu, upstream, make_response, login_payload, profile_payload):
+    """Two students logging in at once each get their own token, profile and client."""
+    students = {
+        "alice": ("TOKEN-ALICE", "PES1UG25CS001", "ALICE A"),
+        "bob": ("TOKEN-BOB", "PES2UG25EC002", "BOB B"),
+    }
+    tokens = {token: student for student, (token, _, _) in students.items()}
+
+    async def respond(url, files, headers):
+        # Yield first, so the two logins interleave rather than run back to back
+        await asyncio.sleep(0)
+        if url == LOGIN_URL:
+            student = files["userName"][1]
+            body = {**login_payload, "accessToken": students[student][0]}
+            return make_response(json=body)
+        student = tokens[headers["Authorization"].removeprefix("Bearer ")]
+        _, srn, name = students[student]
+        info = {**profile_payload["STUDENT_INFO"], "SRN": srn, "NameAsInSSLC": name}
+        return make_response(json={**profile_payload, "STUDENT_INFO": info})
+
+    upstream.side_effect = respond
+
+    alice, bob = await asyncio.gather(
+        pesu.authenticate("alice", "pass", profile=True, fields=["name", "srn", "campus"]),
+        pesu.authenticate("bob", "pass", profile=True, fields=["name", "srn", "campus"]),
+    )
+
+    assert alice["profile"] == {"name": "ALICE A", "srn": "PES1UG25CS001", "campus": "RR"}
+    assert bob["profile"] == {"name": "BOB B", "srn": "PES2UG25EC002", "campus": "EC"}
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_profile_fetch_closes_the_client(pesu, upstream, make_response, login_payload, collector):
+    upstream.side_effect = [make_response(json=login_payload), asyncio.CancelledError()]
+
+    with pytest.raises(asyncio.CancelledError):
+        await pesu.authenticate("user", "pass", profile=True)
+
+    snapshot = collector.snapshot()
+    assert snapshot.value(UPSTREAM_REQUESTS.name, operation="profile_fetch", outcome="cancelled") == 1.0
+    assert _clients(collector) == {"created": 1.0, "closed": 1.0}
+
+
+@pytest.mark.asyncio
+async def test_a_cancellation_during_the_close_still_closes(
+    pesu, upstream, make_response, login_payload, collector, monkeypatch
+):
+    """A shutdown can cancel a request that is already closing its client; the close must finish."""
+    close_started, release = asyncio.Event(), asyncio.Event()
+
+    async def slow_close(self):
+        close_started.set()
+        await release.wait()
+
+    monkeypatch.setattr("app.pesu.httpx2.AsyncClient.aclose", slow_close)
+    upstream.side_effect = [make_response(json=login_payload)]
+
+    task = asyncio.create_task(pesu.authenticate("user", "pass"))
+    await close_started.wait()
+    task.cancel()
+    release.set()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    # The shielded close outlives the cancelled request and completes on its own
+    while _CLOSE_TASKS:
+        await asyncio.sleep(0)
+    assert _clients(collector) == {"created": 1.0, "closed": 1.0}
+
+
+# --- Upstream call accounting ---
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sink_contents", [[], [object()]])
+async def test_an_upstream_call_without_a_status_records_no_status(collector, sink_contents):
+    async with _upstream_call(collector, "login") as sink:
+        sink.extend(sink_contents)
+
+    snapshot = collector.snapshot()
+    assert snapshot.value(UPSTREAM_REQUESTS.name, operation="login", outcome="success") == 1.0
+    assert list(snapshot.samples(UPSTREAM_RESPONSES.name)) == []

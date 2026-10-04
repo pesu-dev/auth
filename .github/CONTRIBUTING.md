@@ -224,6 +224,12 @@ To check coverage:
 uv run pytest --cov
 ```
 
+Coverage is measured over every Python file outside `tests/` (`app/`, `scripts/` and
+`.github/scripts/`), counting branches as well as lines, and the gate is **100%**. It is configured
+once, under `[tool.coverage]` in `pyproject.toml`, so the command above, the pre-commit hook and CI
+all enforce the same thing. Only the `if __name__ == "__main__":` line of a script is excluded; keep
+its logic in a function that a test can call.
+
 > [!NOTE]
 > The pre-commit hook runs `python scripts/run_tests.py`, which uses the same underlying `pytest` runner.
 
@@ -269,6 +275,12 @@ run it alongside the live tests.
 - Place them in the `tests/` directory
 - Name your test files and functions with the `test_` prefix (required by `pytest` and validated by pre-commit)
 - Keep test cases small, meaningful, and well-named
+- Never let a unit test reach PESU Academy. `tests/unit/conftest.py` has fixtures for this:
+  `upstream` replaces the client's `post()`, and `wire` serves responses at the transport layer so a
+  test can inspect the exact requests sent, through the whole app if needed
+  (`tests/unit/test_authenticate_flow.py`)
+- Put assertions about an exception after its `with pytest.raises(...)` block, not inside it, where
+  they never run
 
 ## 🚀 Submitting Changes
 

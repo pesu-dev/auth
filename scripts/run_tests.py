@@ -9,11 +9,9 @@ import sys
 
 from dotenv import load_dotenv
 
-COVERAGE_ARGS = [
-    "--cov=app",
-    "--cov-report=term-missing",
-    "--cov-fail-under=95",
-]
+# What is measured, branch coverage and the 100% gate are configured in [tool.coverage] in
+# pyproject.toml, so a plain `pytest --cov` measures exactly what this runner and CI enforce
+COVERAGE_ARGS = ["--cov", "--cov-report=term-missing"]
 
 
 def announce_skipped_live_tests() -> None:

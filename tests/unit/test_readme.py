@@ -1,15 +1,12 @@
-from unittest.mock import AsyncMock, patch
+from fastapi.testclient import TestClient
 
-import pytest
-from fastapi.responses import RedirectResponse
+from app.app import app
 
 
-@pytest.mark.asyncio
-async def test_unit_readme_redirects():
-    with patch("app.app.readme", new_callable=AsyncMock) as mock_readme:
-        mock_response = RedirectResponse(url="https://github.com/pesu-dev/auth", status_code=308)
-        mock_readme.return_value = mock_response
-        response = await mock_readme()
-        assert isinstance(response, RedirectResponse)
-        assert response.status_code == 308
-        assert response.headers["location"] == "https://github.com/pesu-dev/auth"
+def test_readme_redirects_permanently_to_the_repository():
+    with TestClient(app) as client:
+        response = client.get("/readme", follow_redirects=False)
+
+    # 308, not 301: a permanent redirect that keeps the method
+    assert response.status_code == 308
+    assert response.headers["location"] == "https://github.com/pesu-dev/auth"

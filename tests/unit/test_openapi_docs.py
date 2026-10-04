@@ -12,8 +12,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.app import app
-from app.exceptions.authentication import AuthenticationError
-from app.models import MetricsModel, RequestModel, ResponseModel
+from app.exceptions.authentication import (
+    AuthenticationError,
+    ProfileFetchError,
+    ProfileParseError,
+    UpstreamError,
+)
+from app.models import MetricsModel, ProfileModel, RequestModel, ResponseModel
+from app.pesu import PESUAcademy
 
 MODELS = {"ResponseModel": ResponseModel, "MetricsModel": MetricsModel}
 
@@ -232,3 +238,49 @@ def test_the_model_still_rejects_a_wrong_type_elsewhere(client):
     body = client.get("/health").json()
     with pytest.raises(Exception, match="status"):
         ResponseModel.model_validate({**body, "status": "not-a-bool"})
+
+
+def _authenticate_examples(schema, code):
+    content = schema["paths"]["/authenticate"]["post"]["responses"][str(code)]["content"]["application/json"]
+    if "examples" in content:
+        return {name: example["value"] for name, example in content["examples"].items()}
+    return {"example": content["example"]}
+
+
+def test_the_documented_full_profile_has_every_field(schema):
+    """The full-profile example is what callers copy, so it must show every field the API returns."""
+    example = _authenticate_examples(schema, 200)["authentication_with_profile"]
+    documented_fields = [field.alias for field in ProfileModel.model_fields.values()]
+    assert list(example["profile"]) == documented_fields == PESUAcademy.DEFAULT_FIELDS
+
+
+def test_the_documented_filtered_profile_matches_its_request(schema):
+    """The filtered response example answers the filtered request example, field for field."""
+    body = schema["paths"]["/authenticate"]["post"]["requestBody"]["content"]["application/json"]
+    requested = next(e["value"]["fields"] for e in body["examples"].values() if "fields" in e["value"])
+    example = _authenticate_examples(schema, 200)["authentication_with_selected_fields"]
+    assert set(example["profile"]) == set(requested)
+
+
+@pytest.mark.parametrize(
+    ("code", "errors"),
+    [
+        (422, (ProfileParseError,)),
+        (502, (UpstreamError, ProfileFetchError)),
+    ],
+)
+def test_the_documented_upstream_errors_match_the_exceptions(schema, code, errors):
+    """Each documented failure is one this API can raise, with that exception's own message."""
+    documented = {example["message"] for example in _authenticate_examples(schema, code).values()}
+    assert documented == {error().message for error in errors}
+    assert {error().status_code for error in errors} == {code}
+
+
+@pytest.mark.parametrize("error", [UpstreamError, ProfileFetchError, ProfileParseError])
+@patch("app.app.pesu_academy.authenticate")
+def test_the_documented_upstream_errors_match_a_real_response(mock_authenticate, client, schema, error):
+    mock_authenticate.side_effect = error()
+    response = client.post("/authenticate", json={"username": "u", "password": "p"})
+    documented = next(iter(_authenticate_examples(schema, response.status_code).values()))
+    assert set(response.json()) == set(documented)
+    assert response.json()["message"] == error().message

@@ -115,3 +115,40 @@ def upstream():
     """
     with patch("app.pesu.httpx2.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         yield mock_post
+
+
+class Wire:
+    """A stand-in for PESU Academy at the transport layer.
+
+    Unlike `upstream`, which replaces `post()`, this lets the real client build and send each
+    request -- headers, multipart encoding, redirect handling -- so tests see exactly what would go
+    over the wire.
+    """
+
+    def __init__(self):
+        self.requests = []
+        self.client_options = []
+        # URL -> callable(request) returning an httpx2.Response, or an exception to raise
+        self.routes = {}
+
+    def handler(self, request):
+        request.read()
+        self.requests.append(request)
+        reply = self.routes[str(request.url)](request)
+        if isinstance(reply, BaseException):
+            raise reply
+        return reply
+
+
+@pytest.fixture
+def wire(monkeypatch):
+    """Route every client PESUAcademy creates through a recorded mock transport."""
+    recorder = Wire()
+    real_client = httpx2.AsyncClient
+
+    def client_factory(**options):
+        recorder.client_options.append(options)
+        return real_client(transport=httpx2.MockTransport(recorder.handler), **options)
+
+    monkeypatch.setattr("app.pesu.httpx2.AsyncClient", client_factory)
+    return recorder
