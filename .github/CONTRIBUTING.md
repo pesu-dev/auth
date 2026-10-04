@@ -49,6 +49,10 @@ We maintain two deployment environments:
 - **Staging**: https://pesuauth-dev.onrender.com - [Status Page](https://6ns95sgb.status.cron-job.org/)
 - **Production**: https://pesuauth.onrender.com - [Status Page](https://xzlk85cp.status.cron-job.org/)
 
+Both services are Git-backed Docker services, with GitHub Actions selecting the exact commit to deploy. Staging
+supports Render PR previews for changes targeting `dev`. Production promotion retains manual approval and automated
+rollback. See the [deployment guide](DEPLOYMENT.md) for the workflow, required configuration, and migration steps.
+
 ### 🔄 Development Workflow
 
 The standard workflow for contributing is as follows:

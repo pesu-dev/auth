@@ -49,25 +49,131 @@ jobs:
         run: |
           echo "✅ Approved ${{ needs.resolve_version.outputs.version_tag }} (commit ${{ needs.resolve_version.outputs.commit_sha }}) for production deployment."
 
+  validate_staging:
+    name: Validate staged release commit
+    needs: [resolve_version, await_approval]
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+      TARGET_SHA: ${{ needs.resolve_version.outputs.commit_sha }}
+    steps:
+      - name: Checkout deployment tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve_version.outputs.commit_sha }}
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Verify the selected commit is live on staging
+        run: python3 .github/scripts/render_deployment.py validate-staging --target-sha "$TARGET_SHA"
+
+  snapshot_production:
+    name: Capture production rollback target
+    needs: [resolve_version, validate_staging]
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+    outputs:
+      previous_deploy_id: ${{ steps.snapshot.outputs.previous_deploy_id }}
+    steps:
+      - name: Checkout deployment tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve_version.outputs.commit_sha }}
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Capture the active production deployment
+        id: snapshot
+        run: python3 .github/scripts/render_deployment.py snapshot
+
+  sync_main:
+    name: Promote the approved commit to main
+    needs: [resolve_version, snapshot_production]
+    runs-on: ubuntu-latest
+    env:
+      TARGET_SHA: ${{ needs.resolve_version.outputs.commit_sha }}
+      TAG: ${{ needs.resolve_version.outputs.version_tag }}
+    steps:
+      - name: Generate release bot token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Verify release tag and fast-forward main to the approved commit
+        run: |
+          set -euo pipefail
+          git fetch origin dev main --prune
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/${TAG}"; then
+            TAGGED_SHA=$(git rev-list -n 1 "$TAG")
+            if [ "$TAGGED_SHA" != "$TARGET_SHA" ]; then
+              echo "::error::Release tag $TAG already points to a different commit."
+              exit 1
+            fi
+          fi
+          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          git merge-base --is-ancestor origin/main "$TARGET_SHA" || {
+            echo "::error::main cannot fast-forward to the approved commit."
+            exit 1
+          }
+          git checkout main
+          # dev may advance during approval; promote only the staged, approved commit.
+          git merge --ff-only "$TARGET_SHA"
+          git push origin main
+
   deploy_prod:
     name: Deploy to Render Production
-    needs: [resolve_version, await_approval]
+    needs: [resolve_version, sync_main]
     uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
     with:
       environment: production
-      image_url: ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ needs.resolve_version.outputs.commit_sha }}
+      commit_sha: ${{ needs.resolve_version.outputs.commit_sha }}
       wait_for_completion: true
     secrets: inherit
 
   rollback_prod:
-    name: Rollback prod to last stable prod image
-    needs: [deploy_prod]
+    name: Roll back to the previous production deployment
+    needs: [resolve_version, deploy_prod, snapshot_production]
     if: failure() && needs.deploy_prod.result == 'failure'
-    uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
-    with:
-      environment: production
-      image_url: ghcr.io/${{ github.repository_owner }}/pesu-auth:prod
-    secrets: inherit
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+      PREVIOUS_DEPLOY_ID: ${{ needs.snapshot_production.outputs.previous_deploy_id }}
+    steps:
+      - name: Checkout deployment tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve_version.outputs.commit_sha }}
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Restore and wait for the previous deployment
+        run: python3 .github/scripts/render_deployment.py rollback --deploy-id "$PREVIOUS_DEPLOY_ID"
 
   fail_after_rollback:
     name: Mark deployment as failed after rollback
@@ -79,7 +185,7 @@ jobs:
         run: exit 1
 
   release:
-    name: Create release, sync main, and retag
+    name: Create release and retag published images
     needs: [resolve_version, deploy_prod]
     if: needs.deploy_prod.result == 'success'
     runs-on: ubuntu-latest
@@ -104,20 +210,6 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
-
-      - name: Sync dev branch to main
-        run: |
-          set -euo pipefail
-          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
-          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
-          git fetch origin dev main --prune
-          git checkout main
-          git merge --ff-only origin/dev || {
-            echo "❌ Fast-forward merge failed. Manual conflict resolution required."
-            echo "Please ensure dev branch is ahead of main with no conflicts."
-            exit 1
-          }
-          git push origin main
 
       - name: GHCR login
         uses: docker/login-action@v4

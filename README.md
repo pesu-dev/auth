@@ -25,6 +25,11 @@ returns the user's profile information. No personal data is stored.
   [PESUAuth metrics dashboard](https://loyalplateau1250.grafana.net/public-dashboards/bd1df85e9420490f88978906b0d9fbdf),
   built from the counters that [`/metrics`](#metrics) exposes.
 
+Both Render services deploy Git commits using the repository's Dockerfile. GitHub Actions deploys `dev` to staging
+after CI succeeds; production promotion is manual and requires approval. Pull requests targeting `dev` can have
+temporary Render previews. Published GHCR and Docker Hub images remain available for users running the service elsewhere.
+See the [deployment and migration guide](.github/DEPLOYMENT.md) for service settings, promotion, and rollback.
+
 #### API Status
 
 | **Environment** | **Check**                        | **Status**                                                                                                                                                                                           |
