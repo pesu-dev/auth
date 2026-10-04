@@ -1,5 +1,6 @@
 <!--
-Set the PR title like this: `#IssueNumber` - [Pull Request Description]
+Use a Conventional Commit title, such as `feat: add X` or `fix: handle Y` (`feat!:` or `fix!:` for a breaking
+change), and link the issue below.
 
 Then delete this comment.
 -->
@@ -27,7 +28,7 @@ Please provide a concise summary of the changes:
 - [ ] 🧪 Test suite change – Adds/updates unit, functional, or integration tests
 - [ ] ⚙️ CI/CD pipeline update – Modifies GitHub Actions, pre-commit, or Docker build
 - [ ] 🧹 Code quality / Refactor – Improves structure, readability, or style (no functional changes)
-- [ ] 🐢 Performance improvement – Speeds up auth, scraping, or reduces I/O
+- [ ] 🐢 Performance improvement – Speeds up auth, profile retrieval, or reduces I/O
 - [ ] 🕵️ Debug/logging enhancement – Adds or improves logging/debug support
 - [ ] 🔧 Developer tooling – Scripts, benchmarks, local testing improvements
 - [ ] 🔒 Security fix – Addresses auth/session/data validation vulnerabilities
@@ -71,13 +72,13 @@ Please provide a concise summary of the changes:
 > *Please indicate the areas affected by changes introduced in your PR*
 
 - [ ] `app/app.py` – Modified `/authenticate` route logic
-- [ ] `app/pesu.py` – Updated scraping or authentication handling
+- [ ] `app/pesu.py` – Updated PESU Academy login or profile handling
 
 ### 🧩 Models
 
 - [ ] `app/models/request.py` – Input validation or request schema changes
 - [ ] `app/models/response.py` – Authentication response formatting
-- [ ] `app/models/profile.py` – Profile extraction logic
+- [ ] `app/models/profile.py` – Profile response schema
 
 ### 🐳 DevOps & Config
 

@@ -13,6 +13,24 @@ A simple and lightweight API to authenticate PESU credentials using PESU Academy
 The API is secure and protects user privacy by not storing any user credentials. It only validates credentials and
 returns the user's profile information. No personal data is stored.
 
+### How it works
+
+PESUAuth signs in to [PESU Academy](https://www.pesuacademy.com/) on the user's behalf, through the same API that the
+PESU Academy mobile app uses:
+
+1. The username and password are sent to PESU Academy's login endpoint. If PESU Academy accepts them, the request
+   succeeds; if it rejects them, PESUAuth answers `401`.
+1. If the profile was requested, a second call fetches it with the access token that the login returned, and the result
+   is mapped into the [`ProfileObject`](#profileobject) described below.
+
+Credentials are only ever sent to PESU Academy, over HTTPS. The password is never stored or logged, and neither is the
+access token PESU Academy issues. Every request uses its own connection to PESU Academy, closed before PESUAuth
+responds, so nothing from one user's sign-in is shared with another's.
+
+> [!NOTE]
+> PESU Academy's mobile API is not publicly documented and can change without notice. If it does, `/authenticate`
+> may answer `422` or `502` until PESUAuth is updated to match.
+
 ## PESUAuth LIVE Deployment
 
 [![Production API version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpesuauth.onrender.com%2Fopenapi.json&query=%24.info.version&label=production&color=blue&prefix=v&cacheSeconds=120)](https://pesuauth.onrender.com/)
@@ -134,25 +152,31 @@ object, with the user's profile information if requested.
 
 #### Request Parameters
 
-| **Parameter** | **Optional** | **Type**    | **Default** | **Description**                                                                                 |
-| ------------- | ------------ | ----------- | ----------- | ----------------------------------------------------------------------------------------------- |
-| `username`    | No           | `str`       |             | The user's SRN, PRN, email address, or phone number                                             |
-| `password`    | No           | `str`       |             | The user's password                                                                             |
-| `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information                                                            |
-| `fields`      | Yes          | `list[str]` | `None`      | Which fields to fetch from the profile information. If not provided, all fields will be fetched |
+| **Parameter** | **Optional** | **Type**    | **Default** | **Description**                                                                                                                        |
+| ------------- | ------------ | ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `username`    | No           | `str`       |             | The user's SRN, PRN, email address, or phone number                                                                                    |
+| `password`    | No           | `str`       |             | The user's password                                                                                                                    |
+| `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information. This makes a second call to PESU Academy, so it takes longer                                     |
+| `fields`      | Yes          | `list[str]` | `None`      | Which [`ProfileObject`](#profileobject) fields to return. Only used when `profile` is `true`. If not provided, all fields are returned |
+
+The request body is validated strictly. A missing or empty `username` or `password`, a value of the wrong type (such as
+the string `"true"` for `profile`), an unknown key, an empty `fields` list, or an unknown field name is rejected with a
+`400`.
 
 #### Responses
 
-| **Code** | **When**                                                                          |
-| -------- | --------------------------------------------------------------------------------- |
-| `200`    | The credentials are valid. `profile` is included if it was requested              |
-| `400`    | The request body failed validation — a missing field, or an unknown profile field |
-| `401`    | Invalid username or password, or the user does not exist                          |
-| `422`    | PESU Academy's profile page could not be parsed, which means their page changed   |
-| `500`    | An unexpected failure, rendered by the catch-all handler                          |
-| `502`    | PESU Academy could not be reached, or did not answer with what was expected       |
+| **Code** | **When**                                                                                            |
+| -------- | --------------------------------------------------------------------------------------------------- |
+| `200`    | The credentials are valid. `profile` is included if it was requested                                |
+| `400`    | The request body failed validation, as described above                                              |
+| `401`    | PESU Academy rejected the credentials: a wrong password, or a user that does not exist              |
+| `422`    | PESU Academy's profile response could not be parsed, which means their API changed                  |
+| `500`    | An unexpected failure, rendered by the catch-all handler                                            |
+| `502`    | PESU Academy could not be reached, timed out, or answered the login or profile request unexpectedly |
 
-Every non-`200` carries the same `{status, message, timestamp}` body, with `status` set to `false`.
+Every error this API renders carries the same `{status, message, timestamp}` body, with `status` set to `false`. The
+only exceptions are an unknown path or an unsupported method, which get the framework's own `404` or `405` with a
+`{"detail": ...}` body.
 
 #### Response Object
 
@@ -172,19 +196,23 @@ profile data was requested, the response's `profile` key will store a dictionary
 This object contains the user's profile information, which is returned only if the `profile` parameter is set to `True`.
 If the authentication fails, this field will not be present in the response.
 
-| **Field**    | **Description**                                        |
-| ------------ | ------------------------------------------------------ |
-| `name`       | Name of the user                                       |
-| `prn`        | PRN of the user                                        |
-| `srn`        | SRN of the user                                        |
-| `program`    | Academic program that the user is enrolled into        |
-| `branch`     | Complete name of the branch that the user is pursuing  |
-| `semester`   | Current semester that the user is in                   |
-| `section`    | Section of the user                                    |
-| `email`      | Email address of the user registered with PESU         |
-| `phone`      | Phone number of the user registered with PESU          |
-| `campusCode` | The integer code of the campus (1 for RR and 2 for EC) |
-| `campus`     | Abbreviation of the user's campus name                 |
+Every requested field is present, and **any field can be `null`** when PESU Academy has no value for it. For example,
+a student who is not currently in a class (such as one who has graduated) has a `null` `semester` and `section`, and a
+student without a PRN on record has a `null` `prn`. Fields left out by `fields` are not included at all.
+
+| **Field**    | **Type** | **Description**                                                                                                      |
+| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `name`       | `str`    | Full name of the user, as registered with PESU                                                                       |
+| `prn`        | `str`    | PRN of the user, such as `PES1202000001`                                                                             |
+| `srn`        | `str`    | SRN of the user, such as `PES1UG20CS001`                                                                             |
+| `program`    | `str`    | Full name of the academic program, such as `Bachelor of Technology`. An unrecognised one is returned as PESU sent it |
+| `branch`     | `str`    | Full name of the branch, such as `Computer Science and Engineering`                                                  |
+| `semester`   | `str`    | Current semester, such as `Sem-4`                                                                                    |
+| `section`    | `str`    | Current section, such as `Section C`                                                                                 |
+| `email`      | `str`    | Email address registered with PESU                                                                                   |
+| `phone`      | `str`    | Phone number registered with PESU                                                                                    |
+| `campusCode` | `int`    | `1` for RR or `2` for EC, worked out from the SRN (or from the PRN when there is no SRN)                             |
+| `campus`     | `str`    | `RR` or `EC`, the abbreviation of the campus                                                                         |
 
 ### `/health`
 
@@ -238,11 +266,11 @@ exposed so a dashboard can tell a restart apart from a drop in traffic.
 
 Collection happens at three layers, and which layer records what is deliberate:
 
-| Layer                  | What it records                                                               | Why there                                                                                                                                                                                         |
-| ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **HTTP middleware**    | request counts, status codes, matched route, latency, in-flight               | It is the only place that sees every request, including ones that never reach a route                                                                                                             |
-| **Exception handlers** | the error's exception class                                                   | The middleware sees a status code; only the handler knows which class produced it. `CSRFTokenError` and `ProfileFetchError` are both `502`, and the class is the only thing that tells them apart |
-| **`app/pesu.py`**      | upstream calls, CSRF cache, prefetch tasks, client lifecycle, profile parsing | These are not HTTP requests to this API at all, so nothing above could see them                                                                                                                   |
+| Layer                  | What it records                                                 | Why there                                                                                                                                                                                        |
+| ---------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **HTTP middleware**    | request counts, status codes, matched route, latency, in-flight | It is the only place that sees every request, including ones that never reach a route                                                                                                            |
+| **Exception handlers** | the error's exception class                                     | The middleware sees a status code; only the handler knows which class produced it. `UpstreamError` and `ProfileFetchError` are both `502`, and the class is the only thing that tells them apart |
+| **`app/pesu.py`**      | upstream calls, client lifecycle, profile parsing               | These are not HTTP requests to this API at all, so nothing above could see them                                                                                                                  |
 
 The middleware and the handlers write to **different metric families**, so a single failed request contributes exactly
 one status sample and exactly one error sample — never two of either.
@@ -290,11 +318,11 @@ A few definitions that are easy to assume wrongly:
 
 **Failures**
 
-| Metric                           | Meaning                                                                                                                                                                                                     |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `failures_total{fault}`          | Failed requests by whose fault it was: `client` for 4xx, `server` for 5xx. Alert on `server` without enumerating status codes                                                                               |
-| `errors_total{type}`             | Errors rendered by an exception handler, by exception class: `AuthenticationError`, `CSRFTokenError`, `ProfileFetchError`, `ProfileParseError`, `RequestValidationError`, or whatever reached the catch-all |
-| `validation_errors_total{field}` | Request validation failures by the field that failed. Unrecognised keys collapse into `other`, since the request body is caller-controlled                                                                  |
+| Metric                           | Meaning                                                                                                                                                                                                    |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `failures_total{fault}`          | Failed requests by whose fault it was: `client` for 4xx, `server` for 5xx. Alert on `server` without enumerating status codes                                                                              |
+| `errors_total{type}`             | Errors rendered by an exception handler, by exception class: `AuthenticationError`, `UpstreamError`, `ProfileFetchError`, `ProfileParseError`, `RequestValidationError`, or whatever reached the catch-all |
+| `validation_errors_total{field}` | Request validation failures by the field that failed. Unrecognised keys collapse into `other`, since the request body is caller-controlled                                                                 |
 
 **Authentication**
 
@@ -303,13 +331,13 @@ A few definitions that are easy to assume wrongly:
 | `authentication_requests_total{profile}` | Authentication requests, split by whether profile data was asked for                                                                                                                                                                                                                              |
 | `authentication_results_total{result}`   | Attempts by outcome: `success` or `failure`. Deliberately only those two — `errors_total` already names the exception class, and recording the reason here too would put one fact in two places. This family exists for the login **success rate**, where success and failure share a denominator |
 | `profile_field_filtering_total{enabled}` | Profile fetches, split by whether the caller narrowed the returned fields. Recorded where the branch is taken, so a caller passing exactly the default list counts as `false`                                                                                                                     |
-| `profile_parse_errors_total{reason}`     | Parse failures by what broke: `key_missing`, `value_missing`, `unknown_field`, `page_structure`, `no_data`, `unknown_campus_code`. These mean PESU Academy's page changed                                                                                                                         |
+| `profile_parse_errors_total{reason}`     | Profile response problems by what broke: `response_structure` (the response could not be parsed, a `422`), `unknown_program` (a program abbreviation with no known full name), `unknown_campus_code`. These mean PESU Academy's API changed                                                       |
 
 **Upstream (PESU Academy)**
 
 PESU Academy is the only dependency this service has, and the only thing that can be slow or down. Its latency is
-measured separately from the API's own, so a slow request can be attributed rather than guessed at. Three operations:
-`csrf_fetch` (the pre-login token), `login`, and `profile_fetch`.
+measured separately from the API's own, so a slow request can be attributed rather than guessed at. Two operations,
+both calls to PESU Academy's mobile API: `login`, and `profile_fetch` (made only when a profile is requested).
 
 | Metric                                       | Meaning                                                                                                                                                              |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -317,20 +345,17 @@ measured separately from the API's own, so a slow request can be attributed rath
 | `upstream_responses_total{operation,status}` | The status code PESU Academy returned                                                                                                                                |
 | `upstream_latency_seconds{operation}`        | Seconds spent waiting on each operation                                                                                                                              |
 
-A wrong password counts as a **successful** `login` call: PESU answered with a `200` and a login form. The call worked;
-the credentials did not. Likewise a missing CSRF tag is a successful `csrf_fetch` — the fetch worked and our parsing of
-it did not.
+A wrong password counts as a **successful** `login` call: PESU answered, with a `401`. The call worked; the
+credentials did not. Likewise a profile response we cannot parse is a successful `profile_fetch` — the fetch worked and
+our parsing of it did not.
 
 **Internals**
 
-| Metric                          | Meaning                                                                                                                                                                                           |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `csrf_cache_total{outcome}`     | `hit` or `miss` on the prefetched CSRF client. A miss means a caller waited on the upstream round trip the prefetch exists to avoid, so the hit rate is how well the prefetch is working          |
-| `csrf_refreshes_total{outcome}` | The periodic background token refresh, by outcome                                                                                                                                                 |
-| `prefetch_tasks_total{outcome}` | Background prefetch tasks: `success`, `failure`, `cancelled`. A failure is not fatal — the cache stays empty and the next request fetches inline                                                  |
-| `http_clients_total{event}`     | `created`, `closed`, `close_failed`. **`created` minus `closed` is how many are still open**, which should be `1` at rest — the prefetched client. A number that climbs is a connection-pool leak |
-| `lifespan_events_total{event}`  | `startup` and `shutdown` seen by this process                                                                                                                                                     |
-| `process_start_time_seconds`    | Start time since the Unix epoch. A gauge, so restarts are visible                                                                                                                                 |
+| Metric                         | Meaning                                                                                                                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `http_clients_total{event}`    | `created`, `closed`, `close_failed`. **`created` minus `closed` is how many are still open**, which should be `0` at rest — each login closes its own client. A number that climbs is a connection-pool leak |
+| `lifespan_events_total{event}` | `startup` and `shutdown` seen by this process                                                                                                                                                                |
+| `process_start_time_seconds`   | Start time since the Unix epoch. A gauge, so restarts are visible                                                                                                                                            |
 
 #### Prometheus response
 
@@ -346,7 +371,7 @@ pesu_auth_requests_total 1284
 pesu_auth_requests_success_total 1102
 # HELP pesu_auth_requests_failed_total HTTP requests answered with a status of 400 or above.
 # TYPE pesu_auth_requests_failed_total counter
-pesu_auth_requests_failed_total 182
+pesu_auth_requests_failed_total 181
 # HELP pesu_auth_responses_total HTTP responses, by status code.
 # TYPE pesu_auth_responses_total counter
 pesu_auth_responses_total{status="200"} 1094
@@ -354,31 +379,36 @@ pesu_auth_responses_total{status="308"} 8
 pesu_auth_responses_total{status="400"} 12
 pesu_auth_responses_total{status="401"} 160
 pesu_auth_responses_total{status="500"} 4
-pesu_auth_responses_total{status="502"} 6
+pesu_auth_responses_total{status="502"} 5
 # HELP pesu_auth_route_requests_total HTTP requests, by matched route and method.
 # TYPE pesu_auth_route_requests_total counter
+pesu_auth_route_requests_total{method="GET",route="/"} 8
 pesu_auth_route_requests_total{method="GET",route="/health"} 302
-pesu_auth_route_requests_total{method="POST",route="/authenticate"} 774
+pesu_auth_route_requests_total{method="GET",route="/metrics"} 180
+pesu_auth_route_requests_total{method="GET",route="/readme"} 8
+pesu_auth_route_requests_total{method="POST",route="/authenticate"} 786
 # HELP pesu_auth_errors_total Errors rendered by an exception handler, by exception class.
 # TYPE pesu_auth_errors_total counter
 pesu_auth_errors_total{type="AuthenticationError"} 160
-pesu_auth_errors_total{type="ProfileFetchError"} 2
+pesu_auth_errors_total{type="ProfileFetchError"} 3
 pesu_auth_errors_total{type="RequestValidationError"} 12
+pesu_auth_errors_total{type="RuntimeError"} 4
+pesu_auth_errors_total{type="UpstreamError"} 2
 # HELP pesu_auth_authentication_requests_total Authentication requests, by whether profile data was requested.
 # TYPE pesu_auth_authentication_requests_total counter
 pesu_auth_authentication_requests_total{profile="false"} 640
 pesu_auth_authentication_requests_total{profile="true"} 134
 # HELP pesu_auth_authentication_results_total Authentication attempts, by outcome. errors_total says why one failed.
 # TYPE pesu_auth_authentication_results_total counter
-pesu_auth_authentication_results_total{result="failure"} 162
-pesu_auth_authentication_results_total{result="success"} 612
+pesu_auth_authentication_results_total{result="failure"} 169
+pesu_auth_authentication_results_total{result="success"} 604
 # HELP pesu_auth_profile_field_filtering_total Profile fetches, by whether the caller narrowed the fields returned.
 # TYPE pesu_auth_profile_field_filtering_total counter
-pesu_auth_profile_field_filtering_total{enabled="false"} 94
+pesu_auth_profile_field_filtering_total{enabled="false"} 90
 pesu_auth_profile_field_filtering_total{enabled="true"} 40
-# HELP pesu_auth_profile_parse_errors_total Profile page parse failures, by what could not be parsed.
+# HELP pesu_auth_profile_parse_errors_total Profile response parse failures, by what could not be parsed or mapped.
 # TYPE pesu_auth_profile_parse_errors_total counter
-pesu_auth_profile_parse_errors_total{reason="unknown_field"} 3
+pesu_auth_profile_parse_errors_total{reason="unknown_program"} 3
 # HELP pesu_auth_validation_errors_total Request validation failures, by the field that failed.
 # TYPE pesu_auth_validation_errors_total counter
 pesu_auth_validation_errors_total{field="password"} 4
@@ -386,55 +416,45 @@ pesu_auth_validation_errors_total{field="username"} 8
 # HELP pesu_auth_failures_total Failed requests, by whose fault it was: the caller's (4xx) or ours (5xx).
 # TYPE pesu_auth_failures_total counter
 pesu_auth_failures_total{fault="client"} 172
-pesu_auth_failures_total{fault="server"} 10
+pesu_auth_failures_total{fault="server"} 9
 # HELP pesu_auth_request_latency_seconds Seconds from receiving a request to starting its response.
 # TYPE pesu_auth_request_latency_seconds summary
-pesu_auth_request_latency_seconds_sum 742.1841932
-pesu_auth_request_latency_seconds_count 1284
+pesu_auth_request_latency_seconds_sum 1651.761
+pesu_auth_request_latency_seconds_count 1283
 # HELP pesu_auth_route_latency_seconds Seconds from receiving a request to starting its response, by route.
 # TYPE pesu_auth_route_latency_seconds summary
+pesu_auth_route_latency_seconds_sum{method="GET",route="/"} 0.08
 pesu_auth_route_latency_seconds_sum{method="GET",route="/health"} 0.413
-pesu_auth_route_latency_seconds_sum{method="POST",route="/authenticate"} 741.2118
+pesu_auth_route_latency_seconds_sum{method="GET",route="/metrics"} 0.36
+pesu_auth_route_latency_seconds_sum{method="GET",route="/readme"} 0.008
+pesu_auth_route_latency_seconds_sum{method="POST",route="/authenticate"} 1650.9
+pesu_auth_route_latency_seconds_count{method="GET",route="/"} 8
 pesu_auth_route_latency_seconds_count{method="GET",route="/health"} 302
-pesu_auth_route_latency_seconds_count{method="POST",route="/authenticate"} 774
+pesu_auth_route_latency_seconds_count{method="GET",route="/metrics"} 180
+pesu_auth_route_latency_seconds_count{method="GET",route="/readme"} 8
+pesu_auth_route_latency_seconds_count{method="POST",route="/authenticate"} 785
 # HELP pesu_auth_upstream_requests_total Requests made to PESU Academy, by operation and outcome.
 # TYPE pesu_auth_upstream_requests_total counter
-pesu_auth_upstream_requests_total{operation="csrf_fetch",outcome="error"} 3
-pesu_auth_upstream_requests_total{operation="csrf_fetch",outcome="success"} 790
-pesu_auth_upstream_requests_total{operation="login",outcome="cancelled"} 1
 pesu_auth_upstream_requests_total{operation="login",outcome="error"} 2
-pesu_auth_upstream_requests_total{operation="login",outcome="success"} 774
+pesu_auth_upstream_requests_total{operation="login",outcome="success"} 771
 pesu_auth_upstream_requests_total{operation="profile_fetch",outcome="error"} 1
-pesu_auth_upstream_requests_total{operation="profile_fetch",outcome="success"} 134
+pesu_auth_upstream_requests_total{operation="profile_fetch",outcome="success"} 132
 # HELP pesu_auth_upstream_responses_total Responses from PESU Academy, by operation and status code.
 # TYPE pesu_auth_upstream_responses_total counter
-pesu_auth_upstream_responses_total{operation="csrf_fetch",status="200"} 790
-pesu_auth_upstream_responses_total{operation="login",status="200"} 774
-pesu_auth_upstream_responses_total{operation="profile_fetch",status="200"} 134
+pesu_auth_upstream_responses_total{operation="login",status="200"} 611
+pesu_auth_upstream_responses_total{operation="login",status="401"} 160
+pesu_auth_upstream_responses_total{operation="profile_fetch",status="200"} 130
+pesu_auth_upstream_responses_total{operation="profile_fetch",status="502"} 2
 # HELP pesu_auth_upstream_latency_seconds Seconds spent waiting on PESU Academy, by operation.
 # TYPE pesu_auth_upstream_latency_seconds summary
-pesu_auth_upstream_latency_seconds_sum{operation="csrf_fetch"} 210.4
-pesu_auth_upstream_latency_seconds_sum{operation="login"} 620.4
-pesu_auth_upstream_latency_seconds_sum{operation="profile_fetch"} 190.2
-pesu_auth_upstream_latency_seconds_count{operation="csrf_fetch"} 793
-pesu_auth_upstream_latency_seconds_count{operation="login"} 776
-pesu_auth_upstream_latency_seconds_count{operation="profile_fetch"} 135
-# HELP pesu_auth_csrf_cache_total Lookups of the cached unauthenticated CSRF client, by whether the cache was warm.
-# TYPE pesu_auth_csrf_cache_total counter
-pesu_auth_csrf_cache_total{outcome="hit"} 760
-pesu_auth_csrf_cache_total{outcome="miss"} 14
-# HELP pesu_auth_csrf_refreshes_total Periodic background refreshes of the unauthenticated CSRF token, by outcome.
-# TYPE pesu_auth_csrf_refreshes_total counter
-pesu_auth_csrf_refreshes_total{outcome="failure"} 1
-pesu_auth_csrf_refreshes_total{outcome="success"} 45
-# HELP pesu_auth_prefetch_tasks_total Background CSRF prefetch tasks, by outcome.
-# TYPE pesu_auth_prefetch_tasks_total counter
-pesu_auth_prefetch_tasks_total{outcome="failure"} 4
-pesu_auth_prefetch_tasks_total{outcome="success"} 770
+pesu_auth_upstream_latency_seconds_sum{operation="login"} 1586.7
+pesu_auth_upstream_latency_seconds_sum{operation="profile_fetch"} 53.2
+pesu_auth_upstream_latency_seconds_count{operation="login"} 773
+pesu_auth_upstream_latency_seconds_count{operation="profile_fetch"} 133
 # HELP pesu_auth_http_clients_total Upstream HTTP client lifecycle. created minus closed is how many are still open.
 # TYPE pesu_auth_http_clients_total counter
-pesu_auth_http_clients_total{event="closed"} 775
-pesu_auth_http_clients_total{event="created"} 776
+pesu_auth_http_clients_total{event="closed"} 773
+pesu_auth_http_clients_total{event="created"} 774
 # HELP pesu_auth_lifespan_events_total Application lifespan events, by kind.
 # TYPE pesu_auth_lifespan_events_total counter
 pesu_auth_lifespan_events_total{event="startup"} 1
@@ -460,16 +480,16 @@ which is `null` rather than absent when nothing has been recorded yet, so the sh
 ```json
 {
   "startTimeSeconds": 1757660400.12,
-  "uptimeSeconds": 0.0,
+  "uptimeSeconds": 86400.0,
   "requests": {
     "total": 1284,
     "success": 1102,
-    "failed": 182
+    "failed": 181
   },
   "latency": {
-    "sumSeconds": 742.1841932,
-    "count": 1284,
-    "averageSeconds": 0.5780250725856698
+    "sumSeconds": 1651.761,
+    "count": 1283,
+    "averageSeconds": 1.2874208885424785
   },
   "authentication": {
     "total": 774,
@@ -482,9 +502,17 @@ which is `null` rather than absent when nothing has been recorded yet, so the sh
     "400": 12,
     "401": 160,
     "500": 4,
-    "502": 6
+    "502": 5
   },
   "requestsByRoute": {
+    "GET /": {
+      "requests": 8,
+      "latency": {
+        "sumSeconds": 0.08,
+        "count": 8,
+        "averageSeconds": 0.01
+      }
+    },
     "GET /health": {
       "requests": 302,
       "latency": {
@@ -493,96 +521,91 @@ which is `null` rather than absent when nothing has been recorded yet, so the sh
         "averageSeconds": 0.0013675496688741722
       }
     },
-    "POST /authenticate": {
-      "requests": 774,
+    "GET /metrics": {
+      "requests": 180,
       "latency": {
-        "sumSeconds": 741.2118,
-        "count": 774,
-        "averageSeconds": 0.957637984496124
+        "sumSeconds": 0.36,
+        "count": 180,
+        "averageSeconds": 0.002
+      }
+    },
+    "GET /readme": {
+      "requests": 8,
+      "latency": {
+        "sumSeconds": 0.008,
+        "count": 8,
+        "averageSeconds": 0.001
+      }
+    },
+    "POST /authenticate": {
+      "requests": 786,
+      "latency": {
+        "sumSeconds": 1650.9,
+        "count": 785,
+        "averageSeconds": 2.1030573248407642
       }
     }
   },
   "errorsByType": {
     "AuthenticationError": 160,
-    "ProfileFetchError": 2,
-    "RequestValidationError": 12
+    "ProfileFetchError": 3,
+    "RequestValidationError": 12,
+    "RuntimeError": 4,
+    "UpstreamError": 2
   },
   "requestsInFlight": 1,
   "failuresByFault": {
     "client": 172,
-    "server": 10
+    "server": 9
   },
   "validationErrorsByField": {
     "password": 4,
     "username": 8
   },
   "authenticationResults": {
-    "failure": 162,
-    "success": 612
+    "failure": 169,
+    "success": 604
   },
   "profileFieldFiltering": {
-    "false": 94,
+    "false": 90,
     "true": 40
   },
   "profileParseErrors": {
-    "unknown_field": 3
+    "unknown_program": 3
   },
   "upstream": {
-    "csrf_fetch": {
-      "success": 790,
-      "error": 3,
+    "login": {
+      "success": 771,
+      "error": 2,
       "cancelled": 0,
       "latency": {
-        "sumSeconds": 210.4,
-        "count": 793,
-        "averageSeconds": 0.26532156368221943
+        "sumSeconds": 1586.7,
+        "count": 773,
+        "averageSeconds": 2.0526520051746444
       },
       "responsesByStatus": {
-        "200": 790
-      }
-    },
-    "login": {
-      "success": 774,
-      "error": 2,
-      "cancelled": 1,
-      "latency": {
-        "sumSeconds": 620.4,
-        "count": 776,
-        "averageSeconds": 0.7994845360824742
-      },
-      "responsesByStatus": {
-        "200": 774
+        "200": 611,
+        "401": 160
       }
     },
     "profile_fetch": {
-      "success": 134,
+      "success": 132,
       "error": 1,
       "cancelled": 0,
       "latency": {
-        "sumSeconds": 190.2,
-        "count": 135,
-        "averageSeconds": 1.4088888888888889
+        "sumSeconds": 53.2,
+        "count": 133,
+        "averageSeconds": 0.4
       },
       "responsesByStatus": {
-        "200": 134
+        "200": 130,
+        "502": 2
       }
     }
   },
-  "csrfCache": {
-    "hit": 760,
-    "miss": 14
-  },
-  "csrfRefreshes": {
-    "failure": 1,
-    "success": 45
-  },
-  "prefetchTasks": {
-    "failure": 4,
-    "success": 770
-  },
   "httpClients": {
-    "closed": 775,
-    "created": 776
+    "closed": 773,
+    "created": 774
   },
   "lifespanEvents": {
     "startup": 1
@@ -660,7 +683,7 @@ Here are some examples of how you can integrate your application with the PESUAu
 import requests
 
 data = {
-    "username": "your SRN or PRN here",
+    "username": "your SRN, PRN, email or phone number here",
     "password": "your password here",
     "profile": True,  # Optional, defaults to False
 }
@@ -676,12 +699,12 @@ print(response.json())
   "status": true,
   "profile": {
     "name": "Johnny Blaze",
-    "prn": "PES1201800001",
-    "srn": "PES1201800001",
+    "prn": "PES1202000001",
+    "srn": "PES1UG20CS001",
     "program": "Bachelor of Technology",
     "branch": "Computer Science and Engineering",
-    "semester": "NA",
-    "section": "NA",
+    "semester": "Sem-4",
+    "section": "Section C",
     "email": "johnnyblaze@gmail.com",
     "phone": "1234567890",
     "campusCode": 1,
@@ -700,7 +723,7 @@ print(response.json())
 curl -X POST http://localhost:5000/authenticate \
 -H "Content-Type: application/json" \
 -d '{
-    "username": "your SRN or PRN here",
+    "username": "your SRN, PRN, email or phone number here",
     "password": "your password here"
 }'
 ```
@@ -712,6 +735,36 @@ curl -X POST http://localhost:5000/authenticate \
   "status": true,
   "message": "Login successful.",
   "timestamp": "2024-07-28T22:30:10.103368+05:30"
+}
+```
+
+#### Requesting specific fields
+
+Pass `fields` to receive only some of the profile. A requested field that the user has no value for is `null` — here,
+a student who has graduated and is no longer in a class.
+
+```bash
+curl -X POST http://localhost:5000/authenticate \
+-H "Content-Type: application/json" \
+-d '{
+    "username": "your SRN, PRN, email or phone number here",
+    "password": "your password here",
+    "profile": true,
+    "fields": ["name", "srn", "semester", "campus"]
+}'
+```
+
+```json
+{
+  "status": true,
+  "message": "Login successful.",
+  "timestamp": "2024-07-28T22:30:10.103368+05:30",
+  "profile": {
+    "name": "Johnny Blaze",
+    "srn": "PES1201800001",
+    "semester": null,
+    "campus": "RR"
+  }
 }
 ```
 

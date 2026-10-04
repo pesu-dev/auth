@@ -118,8 +118,10 @@ projects.
    ```
 
 1. **Configure your test credentials:**
-   Open the `.env` file and replace all `<YOUR_..._HERE>` placeholders with your actual test user details. Each variable
-   has been documented in the `.env.example` file for clarity.
+   Open the `.env` file and replace the example values with the details of a PESU Academy account you can test with.
+   Each variable is documented in `.env.example`. The `TEST_*` profile values must match exactly what the API returns
+   for that account; set `TEST_SEMESTER` and `TEST_SECTION` to `NA` if the account is not currently in a class, since
+   the API then returns `null` for both. The file is gitignored: never commit it or paste its values anywhere.
 
 ### Pre-commit Hooks
 
@@ -191,6 +193,7 @@ The following checks are enforced:
 - ✅ `end-of-file-fixer`, `trailing-whitespace`, `check-yaml`, `check-toml`, `check-added-large-files` for formatting
 - ✅ `name-tests-test` to enforce test naming conventions
 - ✅ `debug-statements` to prevent committed `print()` or `pdb`
+- ✅ `sync-agents` to check that `.github/agents/` matches the roles in the agent submodule
 - ✅ A local `pytest` hook that runs the full test suite
 
 > [!WARNING]
@@ -226,12 +229,17 @@ uv run pytest --cov
 
 ### Tests that need credentials
 
-Eleven tests are marked `secret_required` and log in to PESU Academy for real. They need the
+Thirteen tests are marked `secret_required` and log in to PESU Academy for real. They need the
 `TEST_*` variables in your `.env`; without them `scripts/run_tests.py` deselects those tests, warns
 that it has done so, and still enforces the coverage gate on the rest.
 
 The test account allows **one active session**, so never run the live tests while another run is in
 flight -- including CI. A second login is rejected and shows up as a puzzling `401`.
+
+The live tests compare the profile PESU Academy returns with the `TEST_*` values field by field, so a
+failure there after a PESU Academy release usually means their mobile API changed rather than our code.
+The tests that are not marked `secret_required` still call PESU Academy (with invalid credentials), so
+only `tests/unit/` runs offline.
 
 In CI, pull requests come from forks, and GitHub withholds secrets from fork pull requests. So
 *Pre-Commit Checks* runs the reduced suite on every pull request -- it says so in the run's summary
@@ -250,6 +258,10 @@ cd scripts/benchmark
 uv run python benchmark_requests.py --num-requests 100 --parallel --tag baseline
 uv run python analyze_benchmark.py -f ../../benchmark/results/benchmark_requests_*.csv
 ```
+
+`benchmark_requests.py` signs in with `TEST_PRN` and `TEST_PASSWORD` from your `.env`, so every request
+is a real login to PESU Academy through the API you point it at. Keep `--num-requests` small, and do not
+run it alongside the live tests.
 
 ### Writing Tests
 
@@ -312,7 +324,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
 After your PR is merged into `dev`, all `pre-commit` checks will run automatically. If they pass, deployment to staging is triggered.
 The maintainers will review your PR, provide feedback, and may request changes. Once approved, your PR will be merged
 into the `dev` branch and deployed to staging for testing. After successful validation, changes will be promoted to
-production which is manually trigerred by authorized maintainers.
+production, which is triggered manually by authorized maintainers.
 
 ## ❓ Need Help?
 
@@ -330,8 +342,11 @@ If you get stuck or have questions:
 
 If you discover a security vulnerability, **please do not open a public issue**.
 
-Instead, report it privately by contacting the maintainers. We take all security concerns seriously and will respond
-promptly.
+Instead, report it privately as described in [SECURITY.md](SECURITY.md). We take all security concerns seriously and will
+respond promptly.
+
+This service handles students' PESU passwords on every request, so changes must never log, store or return a password,
+the access token PESU Academy issues, or any personal data beyond what the API already returns.
 
 ## ✨ Code Style Guide
 
@@ -410,11 +425,11 @@ each label means:
 
 ### 🔒 Authentication & Core
 
-| Label             | Description                                               |
-| ----------------- | --------------------------------------------------------- |
-| `authentication`  | 🔐 Login, CSRF, token handling, error flows               |
-| `pesuacademy`     | 🎓 PESUAcademy client, authentication, and scraping logic |
-| `student profile` | 🧑‍🎓 HTML parsing & profile field extraction logic          |
+| Label             | Description                                              |
+| ----------------- | -------------------------------------------------------- |
+| `authentication`  | 🔐 Login, token handling, error flows                    |
+| `pesuacademy`     | 🎓 PESUAcademy client, authentication, and profile logic |
+| `student profile` | 🧑‍🎓 Profile response parsing & field mapping logic        |
 
 ### 🧠 Meta / Organization
 
