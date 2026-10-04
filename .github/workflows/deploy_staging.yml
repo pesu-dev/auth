@@ -42,19 +42,20 @@ jobs:
         run: |
           set -euo pipefail
           DEV_HEAD=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/dev" --jq .object.sha)
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "sha=$DEV_HEAD" >> "$GITHUB_OUTPUT"
+            echo "eligible=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch: deploying current dev HEAD ($DEV_HEAD)."
+            exit 0
+          fi
           if [ "$DEV_HEAD" != "$EVENT_SHA" ]; then
             echo "::notice::dev advanced past $EVENT_SHA; skipping stale staging deployment."
             echo "eligible=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "eligible=true" >> "$GITHUB_OUTPUT"
-          if [ "$EVENT_NAME" = "workflow_run" ]; then
-            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-            echo "Resolved commit SHA from workflow_run: ${{ github.event.workflow_run.head_sha }}"
-          else
-            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "Resolved commit SHA from workflow_dispatch: ${{ github.sha }}"
-          fi
+          echo "sha=$EVENT_SHA" >> "$GITHUB_OUTPUT"
+          echo "Resolved commit SHA from workflow_run: $EVENT_SHA"
 
   build_and_push_image:
     name: Build and push commit image
