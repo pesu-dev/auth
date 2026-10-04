@@ -17,7 +17,11 @@ if TYPE_CHECKING:
 
 
 def analyze_benchmark(df: pd.DataFrame) -> None:
-    """Analyze benchmark CSV output and print a summary."""
+    """Analyze benchmark CSV output and print a summary.
+
+    Args:
+        df (pd.DataFrame): One benchmark's results, with `status` and `time` columns.
+    """
     total_requests = df.shape[0]
     success_count = df[df["status"] == 1].shape[0]
     failed_count = total_requests - success_count
@@ -114,7 +118,12 @@ def plot_response_time_over_requests(dfs: list[pd.DataFrame], files: list[str], 
     plt.close()
 
 
-if __name__ == "__main__":
+def main(argv: list[str] | None = None) -> None:
+    """Summarise and plot benchmark CSV files from the command line.
+
+    Args:
+        argv (list[str] | None): The arguments, defaulting to the process's own.
+    """
     parser = argparse.ArgumentParser(description="Analyze benchmark CSV output.")
     # Required: without it args.files is None and the read below fails with a bare TypeError
     parser.add_argument("--files", "-f", help="Path to the benchmark CSV files", nargs="+", required=True)
@@ -128,7 +137,7 @@ if __name__ == "__main__":
         type=str,
         help="An identifier appended to the generated filenames, for telling runs apart",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     dfs = [pd.read_csv(file) for file in args.files]
 
@@ -150,3 +159,7 @@ if __name__ == "__main__":
                 tag=args.tag,
             ),
         )
+
+
+if __name__ == "__main__":
+    main()
