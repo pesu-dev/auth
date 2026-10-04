@@ -11,6 +11,8 @@ from app.exceptions.authentication import (
 )
 from app.pesu import PESUAcademy
 
+from app.models.profile import ProfileModel
+
 
 @pytest.fixture
 def pesu():
@@ -281,11 +283,14 @@ async def test_get_profile_information_unknown_campus_code(
 
     with caplog.at_level("INFO"):
         profile = await pesu.get_profile_information(client, "testuser")
+        validated_profile = ProfileModel.model_validate(profile)
         assert profile["prn"] == "PES3XXXXX"
         assert profile["name"] == "Test User"
         assert profile["branch"] == "Computer Science and Engineering"
         assert profile["email"] == "test@example.com"
         assert profile["phone"] == "1234567890"
+        assert "campusCode" not in profile
+        assert "campus" not in profile
         assert any(
             "Unknown campus code: 3 parsed from PRN=PES3XXXXX for user=testuser" in record.message
             for record in caplog.records
