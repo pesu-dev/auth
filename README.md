@@ -28,7 +28,7 @@ returns the user's profile information. No personal data is stored.
 Both Render services deploy Git commits using the repository's Dockerfile. GitHub Actions deploys `dev` to staging
 after CI succeeds; production promotion is manual and requires approval. Pull requests targeting `dev` can have
 temporary Render previews. Published GHCR and Docker Hub images remain available for users running the service elsewhere.
-See the [deployment and migration guide](.github/DEPLOYMENT.md) for service settings, promotion, and rollback.
+See [Deployment Environment](.github/CONTRIBUTING.md#-deployment-environment) for deployment settings.
 
 #### API Status
 

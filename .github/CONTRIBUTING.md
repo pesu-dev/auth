@@ -51,7 +51,15 @@ We maintain two deployment environments:
 
 Both services are Git-backed Docker services, with GitHub Actions selecting the exact commit to deploy. Staging
 supports Render PR previews for changes targeting `dev`. Production promotion retains manual approval and automated
-rollback. See the [deployment guide](DEPLOYMENT.md) for the workflow, required configuration, and migration steps.
+rollback. Configure staging with branch `dev`, production with branch `main`, Auto-Deploy Off on both, and the existing
+Dockerfile. Enable automatic PR previews only on staging. Keep the existing Render environment credentials,
+`promote-gate` approval, and release App credentials.
+
+Production promotion advances `main` to the approved commit, publishes its image, and deploys staging before
+production. On production deployment failure, the shared action redeploys the previous version-tagged commit,
+falling back to the previous `main` commit if no version tag exists. Rollback does not rewind `main`.
+For the first production run after migration, select `dev` in the Run workflow branch selector so the updated workflow
+is used before it reaches `main`.
 
 ### 🔄 Development Workflow
 
