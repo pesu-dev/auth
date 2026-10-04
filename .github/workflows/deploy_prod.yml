@@ -49,24 +49,106 @@ jobs:
         run: |
           echo "✅ Approved ${{ needs.resolve_version.outputs.version_tag }} (commit ${{ needs.resolve_version.outputs.commit_sha }}) for production deployment."
 
+  sync_main:
+    name: Promote the approved commit to main
+    outputs:
+      previous_sha: ${{ steps.current_production.outputs.commit_sha }}
+    needs: [resolve_version, await_approval]
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      TARGET_SHA: ${{ needs.resolve_version.outputs.commit_sha }}
+    steps:
+      - name: Generate release bot token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Record the commit currently live on production
+        id: current_production
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then
+            echo "::error::Production Render credentials and service ID must be configured."
+            exit 1
+          fi
+          if ! CURRENT_SHA=$(curl --fail --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Accept: application/json" \
+            "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys?status=live&limit=1" \
+            | jq -er '.[0].deploy | select(.status == "live") | .commit.id | strings | select(test("^[0-9a-fA-F]{40}$"))'); then
+            echo "::error::Unable to determine the commit currently live on production; deployment stopped."
+            exit 1
+          fi
+          echo "commit_sha=$CURRENT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Fast-forward main to the approved commit
+        id: promote
+        run: |
+          set -euo pipefail
+          git fetch origin dev main --prune
+          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          git checkout main
+          # dev may advance during approval; promote only the approved commit.
+          git merge --ff-only "$TARGET_SHA"
+          if [ "$(git rev-parse HEAD)" != "$TARGET_SHA" ]; then
+            echo "::error::main is ahead of the approved commit; promotion stopped."
+            exit 1
+          fi
+          git push origin main
+
+  build_and_push_image:
+    name: Publish the approved commit image
+    needs: [resolve_version, sync_main]
+    uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
+    with:
+      ref: ${{ needs.resolve_version.outputs.commit_sha }}
+      image_name: pesu-auth
+      image_tag: ${{ needs.resolve_version.outputs.commit_sha }}
+      platforms: linux/amd64,linux/arm64
+      push: true
+
+  deploy_staging:
+    name: Deploy the approved commit to staging
+    needs: [resolve_version, build_and_push_image]
+    uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
+    with:
+      environment: staging
+      commit_sha: ${{ needs.resolve_version.outputs.commit_sha }}
+      wait_for_completion: true
+    secrets: inherit
+
   deploy_prod:
     name: Deploy to Render Production
-    needs: [resolve_version, await_approval]
+    needs: [resolve_version, deploy_staging]
     uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
     with:
       environment: production
-      image_url: ghcr.io/${{ github.repository_owner }}/pesu-auth:${{ needs.resolve_version.outputs.commit_sha }}
+      commit_sha: ${{ needs.resolve_version.outputs.commit_sha }}
       wait_for_completion: true
     secrets: inherit
 
   rollback_prod:
-    name: Rollback prod to last stable prod image
-    needs: [deploy_prod]
+    name: Redeploy the previous production commit
+    needs: [deploy_prod, sync_main]
     if: failure() && needs.deploy_prod.result == 'failure'
     uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
     with:
       environment: production
-      image_url: ghcr.io/${{ github.repository_owner }}/pesu-auth:prod
+      commit_sha: ${{ needs.sync_main.outputs.previous_sha }}
+      wait_for_completion: true
     secrets: inherit
 
   fail_after_rollback:
@@ -79,7 +161,7 @@ jobs:
         run: exit 1
 
   release:
-    name: Create release, sync main, and retag
+    name: Create release and retag published images
     needs: [resolve_version, deploy_prod]
     if: needs.deploy_prod.result == 'success'
     runs-on: ubuntu-latest
@@ -104,20 +186,6 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
-
-      - name: Sync dev branch to main
-        run: |
-          set -euo pipefail
-          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
-          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
-          git fetch origin dev main --prune
-          git checkout main
-          git merge --ff-only origin/dev || {
-            echo "❌ Fast-forward merge failed. Manual conflict resolution required."
-            echo "Please ensure dev branch is ahead of main with no conflicts."
-            exit 1
-          }
-          git push origin main
 
       - name: GHCR login
         uses: docker/login-action@v4

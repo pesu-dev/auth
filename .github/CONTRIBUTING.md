@@ -49,6 +49,18 @@ We maintain two deployment environments:
 - **Staging**: https://pesuauth-dev.onrender.com - [Status Page](https://6ns95sgb.status.cron-job.org/)
 - **Production**: https://pesuauth.onrender.com - [Status Page](https://xzlk85cp.status.cron-job.org/)
 
+Both services are Git-backed Docker services, with GitHub Actions selecting the exact commit to deploy. Staging
+supports Render PR previews for changes targeting `dev`. Production promotion retains manual approval and automated
+rollback. Configure staging with branch `dev`, production with branch `main`, Auto-Deploy Off on both, and the existing
+Dockerfile. Enable automatic PR previews only on staging. Keep the existing Render environment credentials,
+`promote-gate` approval, and release App credentials.
+
+Production promotion advances `main` to the approved commit, publishes its image, and deploys staging before
+production. Before promotion, the workflow records the commit currently live on Render production. On production
+deployment failure, the shared action redeploys that commit. Rollback does not rewind `main`.
+For the first production run after migration, select `dev` in the Run workflow branch selector so the updated workflow
+is used before it reaches `main`.
+
 ### 🔄 Development Workflow
 
 The standard workflow for contributing is as follows:
