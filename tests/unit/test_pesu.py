@@ -1,788 +1,602 @@
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+"""Tests for PESUAcademy against a mocked PESU Academy mobile API."""
 
+import asyncio
+
+import httpx2
 import pytest
 
 from app.exceptions.authentication import (
     AuthenticationError,
-    CSRFTokenError,
     ProfileFetchError,
     ProfileParseError,
+    UpstreamError,
 )
-from app.pesu import PESUAcademy
+from app.metrics.collector import HTTP_CLIENTS, PROFILE_PARSE_ERRORS, MetricsCollector
+from app.models import ProfileModel
+from app.pesu import DISPATCHER_URL, LOGIN_URL, PESUAcademy
 
-from app.models.profile import ProfileModel
+FULL_PROFILE = {
+    "name": "JOHN DOE",
+    "prn": "PES2202500001",
+    "srn": "PES2UG25CS001",
+    "program": "Bachelor of Technology",
+    "branch": "Computer Science and Engineering",
+    "semester": "Sem-4",
+    "section": "Section C",
+    "email": "john.doe@example.com",
+    "phone": "9876543210",
+    "campusCode": 2,
+    "campus": "EC",
+}
 
 
 @pytest.fixture
-def pesu():
-    return PESUAcademy()
+def collector():
+    return MetricsCollector(clock=lambda: 1000.0)
 
 
-@patch("app.pesu.httpx2.AsyncClient.get")
+@pytest.fixture
+def pesu(collector):
+    return PESUAcademy(collector)
+
+
+@pytest.fixture
+def login_ok(upstream, make_response, login_payload):
+    """Upstream that accepts the login and is not asked for a profile."""
+    upstream.side_effect = [make_response(json=login_payload)]
+    return upstream
+
+
+async def _profile_for(pesu, upstream, make_response, login_payload, profile_payload):
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+    result = await pesu.authenticate("user", "pass", profile=True)
+    return result["profile"]
+
+
+def _clients(collector):
+    snapshot = collector.snapshot()
+    return {event: snapshot.value(HTTP_CLIENTS.name, event=event) for event in ("created", "closed")}
+
+
+# --- Login ---
+
+
 @pytest.mark.asyncio
-async def test_get_profile_information_http_error(mock_get, pesu):
-    mock_get.side_effect = Exception("HTTP request failed")
-    with pytest.raises(ProfileFetchError):
-        result = await pesu.get_profile_information(AsyncMock(), "testuser")
-        assert "error" in result
-        assert "Unable to fetch profile data" in result["error"]
+async def test_login_without_profile_makes_one_call(pesu, login_ok):
+    result = await pesu.authenticate("user", "pass")
+
+    assert result == {"status": True, "message": "Login successful."}
+    login_ok.assert_awaited_once()
 
 
-@patch("app.pesu.httpx2.AsyncClient.get")
 @pytest.mark.asyncio
-async def test_get_profile_information_non_200_status(mock_get, pesu):
-    mock_response = AsyncMock()
-    mock_response.status_code = 404
-    mock_get.return_value = mock_response
-    with pytest.raises(ProfileFetchError):
-        result = await pesu.get_profile_information(AsyncMock(), "testuser")
-        assert "error" in result
-        assert "Unable to fetch profile data" in result["error"]
+async def test_login_sends_the_mobile_app_form(pesu, login_ok):
+    await pesu.authenticate("PES2UG25CS001", "pass")
 
-
-@patch("app.pesu.httpx2.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_authenticate_csrf_token_not_found(mock_get, pesu):
-    mock_response = AsyncMock()
-    mock_response.text = "<html><head></head><body>No CSRF token here</body></html>"
-    mock_get.return_value = mock_response
-    with pytest.raises(CSRFTokenError):
-        result = await pesu.authenticate("testuser", "testpass")
-        assert result["status"] is False
-        assert "Unable to fetch csrf token" in result["message"]
-
-
-@patch("app.pesu.httpx2.AsyncClient.get")
-@patch("app.pesu.httpx2.AsyncClient.post")
-@pytest.mark.asyncio
-async def test_authenticate_post_request_failure(mock_post, mock_get, pesu):
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-    mock_post.side_effect = CSRFTokenError("POST request failed")
-    with pytest.raises(CSRFTokenError):
-        result = await pesu.authenticate("testuser", "testpass")
-        assert result["status"] is False
-        assert "Unable to authenticate" in result["message"]
-
-
-@patch("app.pesu.httpx2.AsyncClient.get")
-@patch("app.pesu.httpx2.AsyncClient.post")
-@pytest.mark.asyncio
-async def test_authenticate_csrf_token_missing_after_login(mock_post, mock_get, pesu):
-    """Test authenticate when CSRF token is missing after successful login."""
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-    mock_post_response = AsyncMock()
-    mock_post_response.text = "<html><body>Login successful but no CSRF token</body></html>"
-    mock_post.return_value = mock_post_response
-    with pytest.raises(CSRFTokenError):
-        result = await pesu.authenticate("testuser", "testpass")
-        assert result["status"] is True
-        assert result["message"] == "Login successful."
-
-
-@patch("app.pesu.httpx2.AsyncClient.get")
-@patch("app.pesu.httpx2.AsyncClient.post")
-@patch("app.pesu.PESUAcademy.get_profile_information")
-@pytest.mark.asyncio
-async def test_authenticate_with_profile_field_filtering(
-    mock_get_profile,
-    mock_post,
-    mock_get,
-    pesu,
-):
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-    mock_post_response = AsyncMock()
-    mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    mock_post.return_value = mock_post_response
-    mock_get_profile.return_value = {
-        "name": "Test User",
-        "prn": "PES12345",
-        "email": "test@example.com",
-        "branch": "Computer Science",
-        "campus": "RR",
+    call = login_ok.await_args
+    assert call.args == (LOGIN_URL,)
+    assert call.kwargs["headers"] == {"X-Client-Type": "MOBILE"}
+    # Multipart fields, not url-encoded data: that is what the endpoint accepts
+    assert call.kwargs["files"] == {
+        "userName": (None, "PES2UG25CS001"),
+        "password": (None, "pass"),
+        "j_appId": (None, "YES"),
+        "instId": (None, "1,6,7,14"),
     }
-    result = await pesu.authenticate("testuser", "testpass", profile=True, fields=["name", "email"])
-    assert result["status"] is True
-    assert "profile" in result
-    assert "name" in result["profile"]
-    assert "email" in result["profile"]
-    assert "prn" not in result["profile"]
-    assert "branch" not in result["profile"]
-    assert "campus" not in result["profile"]
 
 
-@patch("app.pesu.httpx2.AsyncClient.get")
-@patch("app.pesu.httpx2.AsyncClient.post")
-@patch("app.pesu.PESUAcademy.get_profile_information")
 @pytest.mark.asyncio
-async def test_authenticate_with_profile_no_field_filtering(
-    mock_get_profile,
-    mock_post,
-    mock_get,
-    pesu,
-):
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-    mock_post_response = AsyncMock()
-    mock_post_response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    mock_post.return_value = mock_post_response
-    mock_get_profile.return_value = dict.fromkeys(PESUAcademy.DEFAULT_FIELDS, "test_value")
-    result = await pesu.authenticate("testuser", "testpass", profile=True, fields=None)
-    assert result["status"] is True
-    for field in PESUAcademy.DEFAULT_FIELDS:
-        assert field in result["profile"]
-        assert result["profile"][field] == "test_value"
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx2.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_get_profile_information_profile_parse_error(mock_get, mock_html_parser, pesu):
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    mock_get.return_value = mock_response
-    mock_soup = MagicMock()
-    mock_soup.any_css_matches.return_value = True
-    mock_soup.css.return_value = [MagicMock()] * 3
-    mock_html_parser.return_value = mock_soup
-
-    client = AsyncMock()
-    client.get.return_value = mock_response
-
-    with pytest.raises(ProfileParseError):
-        await pesu.get_profile_information(client, "testuser")
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx2.AsyncClient.post")
-@patch("app.pesu.httpx2.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_authenticate_login_form_present(mock_get, mock_post, mock_html_parser, pesu):
-    mock_get_response = MagicMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get_response.status_code = 200
-    mock_get.return_value = mock_get_response
-    mock_soup_csrf = MagicMock()
-    mock_soup_csrf.css_first.side_effect = lambda selector: (
-        MagicMock(attributes={"content": "fake-csrf-token"}) if selector == "meta[name='csrf-token']" else None
-    )
-    mock_soup_login = MagicMock()
-    mock_soup_login.css_first.side_effect = lambda selector: MagicMock() if selector == "div.login-form" else None
-    mock_html_parser.side_effect = [mock_soup_csrf, mock_soup_login]
-    mock_post_response = MagicMock()
-    mock_post_response.text = "<html><body><div class='login-form'></div></body></html>"
-    mock_post_response.status_code = 200
-    mock_post.return_value = mock_post_response
-    with pytest.raises(AuthenticationError):
-        await pesu.authenticate("testuser", "testpass")
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx2.AsyncClient.post")
-@patch("app.pesu.httpx2.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_authenticate_csrf_token_missing_after_login_strict(
-    mock_get,
-    mock_post,
-    mock_html_parser,
-    pesu,
-):
-    mock_get_response = AsyncMock()
-    mock_get_response.text = '<meta name="csrf-token" content="fake-csrf-token">'
-    mock_get.return_value = mock_get_response
-    mock_post_response = AsyncMock()
-    mock_post_response.text = "<html><body>Login successful but no CSRF token</body></html>"
-    mock_post.return_value = mock_post_response
-    mock_soup = MagicMock()
-
-    def css_first(selector):
-        if selector == "div.login-form":
-            return
-        if selector == "meta[name='csrf-token']":
-            return
-        return
-
-    mock_soup.css_first.side_effect = css_first
-    mock_html_parser.return_value = mock_soup
-    with pytest.raises(CSRFTokenError):
-        await pesu.authenticate("testuser", "testpass")
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx2.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_get_profile_information_unknown_campus_code(
-    mock_get,
-    mock_html_parser,
-    pesu,
-    caplog,
-):
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    mock_get.return_value = mock_response
-
-    def make_div(key, value):
-        div = MagicMock()
-        key_label = MagicMock()
-        key_label.text.return_value = key
-        value_label = MagicMock()
-        value_label.text.return_value = value
-
-        def css_first(selector):
-            if selector == "label.lbl-title-light":
-                return key_label
-            if selector == "label.lbl-title-light + label":
-                return value_label
-            return None
-
-        div.css_first.side_effect = css_first
-        return div
-
-    form_group_elems = [
-        make_div("Name", "Test User"),
-        make_div("SRN", "PES1234567"),
-        make_div("PESU Id", "PES3XXXXX"),
-        make_div("Program", "BTech"),
-        make_div("Branch", "Computer Science and Engineering"),
-        make_div("Semester", "6"),
-        make_div("Section", "A"),
+async def test_rejected_credentials_are_an_authentication_error(pesu, upstream, make_response):
+    # What PESU sends for both a wrong password and an unknown user
+    upstream.side_effect = [
+        make_response(401, json={"statusCode": 401, "statusDescription": "Invalid Login Credentials"}),
     ]
 
-    mock_soup = MagicMock()
-    mock_container = MagicMock()
-    mock_container.css.return_value = form_group_elems
+    with pytest.raises(AuthenticationError) as exc_info:
+        await pesu.authenticate("user", "wrong", profile=True)
 
-    email_node = MagicMock()
-    email_node.attributes = {"value": "test@example.com"}
-    phone_node = MagicMock()
-    phone_node.attributes = {"value": "1234567890"}
-
-    def css_first(selector):
-        if selector == "div.elem-info-wrapper":
-            return mock_container
-        if selector == "#updateMail":
-            return email_node
-        if selector == "#updateContact":
-            return phone_node
-        return None
-
-    mock_soup.css_first.side_effect = css_first
-    mock_html_parser.return_value = mock_soup
-
-    client = AsyncMock()
-    client.get.return_value = mock_response
-
-    with caplog.at_level("INFO"):
-        profile = await pesu.get_profile_information(client, "testuser")
-        validated_profile = ProfileModel.model_validate(profile)
-        assert profile["prn"] == "PES3XXXXX"
-        assert profile["name"] == "Test User"
-        assert profile["branch"] == "Computer Science and Engineering"
-        assert profile["email"] == "test@example.com"
-        assert profile["phone"] == "1234567890"
-        assert "campusCode" not in profile
-        assert "campus" not in profile
-        assert any(
-            "Unknown campus code: 3 parsed from PRN=PES3XXXXX for user=testuser" in record.message
-            for record in caplog.records
-        )
-        assert any(
-            "Complete profile information retrieved for user=testuser" in record.message for record in caplog.records
-        )
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx2.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_get_profile_information_campus_code_rr_ec(mock_get, mock_html_parser, pesu):
-    """Test that PRNs with PES1 and PES2 set the correct campus and campusCode."""
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    mock_get.return_value = mock_response
-
-    def make_div(key, value):
-        div = MagicMock()
-        key_label = MagicMock()
-        key_label.text.return_value = key
-        value_label = MagicMock()
-        value_label.text.return_value = value
-
-        def css_first(selector):
-            if selector == "label.lbl-title-light":
-                return key_label
-            if selector == "label.lbl-title-light + label":
-                return value_label
-            return None
-
-        div.css_first.side_effect = css_first
-        return div
-
-    # Subcase 1: PES1... (RR campus)
-    form_group_elems_rr = [
-        make_div("Name", "Test User"),
-        make_div("SRN", "PES1234567"),
-        make_div("PESU Id", "PES1XXXXX"),
-        make_div("Program", "BTech"),
-        make_div("Branch", "Computer Science and Engineering"),
-        make_div("Semester", "6"),
-        make_div("Section", "A"),
-    ]
-    mock_soup_rr = MagicMock()
-    mock_container_rr = MagicMock()
-    mock_container_rr.css.return_value = form_group_elems_rr
-    mock_soup_rr.css_first.side_effect = lambda selector: (
-        mock_container_rr if selector == "div.elem-info-wrapper" else None
-    )
-    mock_html_parser.return_value = mock_soup_rr
-
-    client = AsyncMock()
-    client.get.return_value = mock_response
-
-    profile_rr = await pesu.get_profile_information(client, "testuser")
-    assert profile_rr["campusCode"] == 1
-    assert profile_rr["campus"] == "RR"
-
-    # Subcase 2: PES2... (EC campus)
-    form_group_elems_ec = [
-        make_div("Name", "Test User"),
-        make_div("SRN", "PES2234567"),
-        make_div("PESU Id", "PES2YYYYY"),
-        make_div("Program", "BTech"),
-        make_div("Branch", "Computer Science and Engineering"),
-        make_div("Semester", "6"),
-        make_div("Section", "A"),
-    ]
-    mock_soup_ec = MagicMock()
-    mock_container_ec = MagicMock()
-    mock_container_ec.css.return_value = form_group_elems_ec
-    mock_soup_ec.css_first.side_effect = lambda selector: (
-        mock_container_ec if selector == "div.elem-info-wrapper" else None
-    )
-    mock_html_parser.return_value = mock_soup_ec
-
-    profile_ec = await pesu.get_profile_information(client, "testuser")
-    assert profile_ec["campusCode"] == 2
-    assert profile_ec["campus"] == "EC"
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx2.AsyncClient.get")
-@pytest.mark.asyncio
-async def test_get_profile_information_no_profile_data(mock_get, mock_html_parser, pesu):
-    """Test that ProfileParseError is raised when no profile data is parsed (parsing loop runs but nothing added)."""
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    mock_get.return_value = mock_response
-    mock_soup = MagicMock()
-    mock_soup.any_css_matches.return_value = True
-    mock_soup.css.return_value = [MagicMock(text=MagicMock(return_value="foo bar")) for _ in range(7)]
-    mock_soup.css_first.return_value = None
-    mock_html_parser.return_value = mock_soup
-
-    client = AsyncMock()
-    client.get.return_value = mock_response
-    with pytest.raises(ProfileParseError) as exc_info:
-        await pesu.get_profile_information(client, "testuser")
-    assert "Failed to parse student profile page from PESU Academy for user=testuser." in str(exc_info.value)
-    assert "The webpage might have changed." in str(exc_info.value)
-
-
-@patch("app.pesu.HTMLParser")
-@patch("app.pesu.httpx2.AsyncClient.get")
-@patch("app.pesu.PESUAcademy._extract_and_update_profile", new_callable=MagicMock)
-@pytest.mark.asyncio
-async def test_get_profile_information_empty_profile_triggers_final_parse_error(
-    mock_extract,
-    mock_get,
-    mock_html_parser,
-    pesu,
-):
-    mock_extract.return_value = None
-
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.text = "<html></html>"
-    mock_get.return_value = mock_response
-
-    mock_container = MagicMock()
-    mock_container.css.return_value = [MagicMock() for _ in range(7)]
-    mock_soup = MagicMock()
-    mock_soup.css_first.side_effect = lambda selector: mock_container if selector == "div.elem-info-wrapper" else None
-    mock_html_parser.return_value = mock_soup
-
-    client = AsyncMock()
-    client.get.return_value = mock_response
-
-    with pytest.raises(ProfileParseError) as exc_info:
-        await pesu.get_profile_information(client, "testuser")
-    assert "No profile data could be extracted for user=testuser" in str(exc_info.value)
+    assert exc_info.value.status_code == 401
+    # No profile call after a failed login
+    upstream.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_extract_and_update_profile_key_label_missing(pesu):
-    node = MagicMock()
-    node.css_first.return_value = None  # key label missing
-    profile = {}
-    with pytest.raises(ProfileParseError) as exc_info:
-        await pesu._extract_and_update_profile(node, 0, profile)
-    assert "Could not parse key for field at index 0" in str(exc_info.value)
-
-
-@pytest.mark.asyncio
-async def test_extract_and_update_profile_value_label_missing(pesu):
-    node = MagicMock()
-    key_label = MagicMock()
-    key_label.text.return_value = "Name"
-
-    def css_first(selector):
-        if selector == "label.lbl-title-light":
-            return key_label
-        if selector == "label.lbl-title-light + label":
-            return None  # value label missing
-        return None
-
-    node.css_first.side_effect = css_first
-    profile = {}
-    with pytest.raises(ProfileParseError) as exc_info:
-        await pesu._extract_and_update_profile(node, 0, profile)
-    assert "Could not parse value for field at index 0" in str(exc_info.value)
-
-
-@pytest.mark.asyncio
-async def test_extract_and_update_profile_unknown_key(pesu):
-    node = MagicMock()
-    key_label = MagicMock()
-    key_label.text.return_value = "UnknownKey"
-    value_label = MagicMock()
-    value_label.text.return_value = "SomeValue"
-
-    def css_first(selector):
-        if selector == "label.lbl-title-light":
-            return key_label
-        if selector == "label.lbl-title-light + label":
-            return value_label
-        return None
-
-    node.css_first.side_effect = css_first
-    profile = {}
-    with pytest.raises(ProfileParseError) as exc_info:
-        await pesu._extract_and_update_profile(node, 0, profile)
-    assert "Unknown key: 'UnknownKey' in the profile page" in str(exc_info.value)
-
-
-def test_default_fields_is_list():
-    assert isinstance(PESUAcademy.DEFAULT_FIELDS, list)
-    assert "prn" in PESUAcademy.DEFAULT_FIELDS
-    assert "name" in PESUAcademy.DEFAULT_FIELDS
-    assert "srn" in PESUAcademy.DEFAULT_FIELDS
-    assert "program" in PESUAcademy.DEFAULT_FIELDS
-    assert "branch" in PESUAcademy.DEFAULT_FIELDS
-    assert "semester" in PESUAcademy.DEFAULT_FIELDS
-    assert "section" in PESUAcademy.DEFAULT_FIELDS
-    assert "email" in PESUAcademy.DEFAULT_FIELDS
-    assert "phone" in PESUAcademy.DEFAULT_FIELDS
-    assert "campusCode" in PESUAcademy.DEFAULT_FIELDS
-    assert "campus" in PESUAcademy.DEFAULT_FIELDS
-
-
-@pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._fetch_new_client_with_csrf_token")
-async def test_prefetch_client_closes_old_client_on_second_call(mock_fetch, pesu):
-    old_client = AsyncMock()
-    new_client = AsyncMock()
-    mock_fetch.side_effect = [
-        (old_client, "token-1"),
-        (new_client, "token-2"),
-    ]
-
-    await pesu.prefetch_client_with_csrf_token()
-    await pesu.prefetch_client_with_csrf_token()
-
-    old_client.aclose.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._get_client_with_csrf_token")
-async def test_authenticate_closes_client_on_authentication_error(mock_get_client, pesu):
-    """The request's client must be closed when the credentials are rejected."""
-    client = AsyncMock()
-    login_failed_response = AsyncMock()
-    login_failed_response.text = '<div class="login-form"></div>'
-    client.post.return_value = login_failed_response
-    mock_get_client.return_value = (client, "fake-csrf-token")
+async def test_a_200_that_is_not_a_success_is_an_authentication_error(pesu, upstream, make_response, login_payload):
+    login_payload["mobileJsonObject"]["login"] = "FAILURE"
+    upstream.side_effect = [make_response(json=login_payload)]
 
     with pytest.raises(AuthenticationError):
-        await pesu.authenticate("testuser", "wrongpass")
-
-    client.aclose.assert_awaited_once()
+        await pesu.authenticate("user", "pass")
 
 
 @pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._get_client_with_csrf_token")
-async def test_authenticate_closes_client_on_missing_post_login_csrf_token(mock_get_client, pesu):
-    """The request's client must be closed when the post-login CSRF token is absent."""
-    client = AsyncMock()
-    response = AsyncMock()
-    response.text = "<html><body>no csrf meta tag and no login form</body></html>"
-    client.post.return_value = response
-    mock_get_client.return_value = (client, "fake-csrf-token")
+async def test_a_login_without_a_status_is_an_upstream_error(pesu, upstream, make_response, login_payload):
+    """A missing marker means the response changed shape, not that the password was wrong."""
+    del login_payload["mobileJsonObject"]["login"]
+    upstream.side_effect = [make_response(json=login_payload)]
 
-    with pytest.raises(CSRFTokenError):
-        await pesu.authenticate("testuser", "testpass")
+    with pytest.raises(UpstreamError) as exc_info:
+        await pesu.authenticate("user", "pass")
 
-    client.aclose.assert_awaited_once()
+    assert exc_info.value.status_code == 502
 
 
 @pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy.get_profile_information")
-@patch("app.pesu.PESUAcademy._get_client_with_csrf_token")
-async def test_authenticate_closes_client_on_profile_fetch_error(mock_get_client, mock_get_profile, pesu):
-    """The request's client must be closed when profile fetching fails."""
-    client = AsyncMock()
-    response = AsyncMock()
-    response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    client.post.return_value = response
-    mock_get_client.return_value = (client, "fake-csrf-token")
-    mock_get_profile.side_effect = ProfileFetchError("boom")
+@pytest.mark.parametrize("status", [403, 500, 503])
+async def test_any_other_login_status_is_an_upstream_error(pesu, upstream, make_response, status):
+    upstream.side_effect = [make_response(status, content=b"<html>error</html>")]
+
+    with pytest.raises(UpstreamError) as exc_info:
+        await pesu.authenticate("user", "pass")
+
+    assert exc_info.value.status_code == 502
+    assert str(status) in exc_info.value.message
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"<html>not json</html>",
+        b'{"status": 200}',
+        b'{"mobileJsonObject": "not an object"}',
+        b'"a json string"',
+    ],
+)
+async def test_an_unexpected_login_response_is_an_upstream_error(pesu, upstream, make_response, body):
+    upstream.side_effect = [make_response(content=body)]
+
+    with pytest.raises(UpstreamError) as exc_info:
+        await pesu.authenticate("user", "pass")
+
+    # Not chained: a ValidationError's message would quote the response
+    assert exc_info.value.__cause__ is None
+    assert exc_info.value.__suppress_context__ is True
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_login_is_an_upstream_error(pesu, upstream):
+    upstream.side_effect = httpx2.ConnectError("connection refused")
+
+    with pytest.raises(UpstreamError) as exc_info:
+        await pesu.authenticate("user", "pass")
+
+    assert isinstance(exc_info.value.__cause__, httpx2.ConnectError)
+
+
+@pytest.mark.asyncio
+async def test_a_login_without_a_token_cannot_fetch_the_profile(pesu, upstream, make_response, login_payload):
+    del login_payload["accessToken"]
+    upstream.side_effect = [make_response(json=login_payload)]
+
+    with pytest.raises(UpstreamError):
+        await pesu.authenticate("user", "pass", profile=True)
+
+    upstream.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_a_login_without_a_token_is_fine_without_a_profile(pesu, upstream, make_response, login_payload):
+    del login_payload["accessToken"]
+    upstream.side_effect = [make_response(json=login_payload)]
+
+    result = await pesu.authenticate("user", "pass")
+
+    assert result["status"] is True
+
+
+# --- Profile fetch ---
+
+
+@pytest.mark.asyncio
+async def test_profile_is_built_from_both_responses(pesu, upstream, make_response, login_payload, profile_payload):
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile == FULL_PROFILE
+    # And it is something the response model accepts
+    ProfileModel.model_validate(profile)
+
+
+@pytest.mark.asyncio
+async def test_profile_call_uses_the_login_token(pesu, upstream, make_response, login_payload, profile_payload):
+    await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    call = upstream.await_args_list[1]
+    assert call.args == (DISPATCHER_URL,)
+    assert call.kwargs["headers"] == {"X-Client-Type": "MOBILE", "Authorization": "Bearer ACCESS-TOKEN-SECRET"}
+    assert call.kwargs["files"] == {"action": (None, "27"), "mode": (None, "1"), "menuId": (None, "11172")}
+
+
+@pytest.mark.asyncio
+async def test_a_failed_profile_status_is_a_fetch_error(pesu, upstream, make_response, login_payload):
+    upstream.side_effect = [make_response(json=login_payload), make_response(500, content=b"oops")]
+
+    with pytest.raises(ProfileFetchError) as exc_info:
+        await pesu.authenticate("user", "pass", profile=True)
+
+    assert exc_info.value.status_code == 502
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_profile_is_a_fetch_error(pesu, upstream, make_response, login_payload):
+    upstream.side_effect = [make_response(json=login_payload), httpx2.ReadTimeout("timed out")]
 
     with pytest.raises(ProfileFetchError):
-        await pesu.authenticate("testuser", "testpass", profile=True)
-
-    client.aclose.assert_awaited_once()
+        await pesu.authenticate("user", "pass", profile=True)
 
 
 @pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._get_client_with_csrf_token")
-async def test_authenticate_closes_client_on_success(mock_get_client, pesu):
-    """The request's client must also be closed on the success path."""
-    client = AsyncMock()
-    response = AsyncMock()
-    response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    client.post.return_value = response
-    mock_get_client.return_value = (client, "fake-csrf-token")
+async def test_a_declined_profile_is_a_fetch_error(pesu, upstream, make_response, login_payload, profile_payload):
+    profile_payload["MESSAGE"] = "FAILURE_Record not found"
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    result = await pesu.authenticate("testuser", "testpass")
-
-    assert result["status"] is True
-    client.aclose.assert_awaited_once()
+    with pytest.raises(ProfileFetchError):
+        await pesu.authenticate("user", "pass", profile=True)
 
 
 @pytest.mark.asyncio
-@patch("app.pesu.httpx2.AsyncClient")
-async def test_fetch_new_client_closes_client_when_csrf_token_missing(mock_client_class, pesu):
-    """A client that never gets returned to the caller must not be leaked."""
-    client = AsyncMock()
-    response = AsyncMock()
-    response.text = "<html><body>no csrf meta tag</body></html>"
-    client.get.return_value = response
-    mock_client_class.return_value = client
+async def test_a_profile_without_student_info_is_built_from_student_photo(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    """The shape recorded in issue #233: only STUDENT_PHOTO, with the SRN under loginId."""
+    del profile_payload["STUDENT_INFO"]
 
-    with pytest.raises(CSRFTokenError):
-        await pesu._fetch_new_client_with_csrf_token()
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    client.aclose.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-@patch("app.pesu.httpx2.AsyncClient")
-async def test_fetch_new_client_closes_client_when_get_fails(mock_client_class, pesu):
-    """A client whose initial GET fails must not be leaked."""
-    client = AsyncMock()
-    client.get.side_effect = RuntimeError("connection reset")
-    mock_client_class.return_value = client
-
-    with pytest.raises(RuntimeError):
-        await pesu._fetch_new_client_with_csrf_token()
-
-    client.aclose.assert_awaited_once()
+    assert profile == {
+        **FULL_PROFILE,
+        # Only STUDENT_INFO has the full branch name; the login's "Branch:CSE" is an abbreviation
+        "branch": None,
+    }
 
 
 @pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._fetch_new_client_with_csrf_token")
-async def test_prefetch_survives_a_broken_old_client(mock_fetch, pesu, caplog):
-    """A cached client that refuses to close must not stop the refresh; the failure is logged."""
-    old_client = AsyncMock()
-    old_client.aclose.side_effect = RuntimeError("old client refused to close")
-    new_client = AsyncMock()
-    pesu._client = old_client
-    pesu._csrf_token = "stale-token"
-    mock_fetch.return_value = (new_client, "fresh-token")
+async def test_student_photo_fills_the_gaps_in_student_info(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    login_payload["mobileJsonObject"].update(email=None, phone=None)
+    profile_payload["STUDENT_INFO"].update(SRN=None, NameAsInSSLC=None, Email=None, Mobile=None)
+    profile_payload["STUDENT_PHOTO"].update(email="photo@example.com", mobile="5554443332")
 
-    await pesu.prefetch_client_with_csrf_token()
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert "Failed to close an HTTP client cleanly." in caplog.text
-    # The refresh still went through, and the new client was cached rather than closed
-    assert pesu._client is new_client
-    assert pesu._csrf_token == "fresh-token"
-    new_client.aclose.assert_not_awaited()
+    assert profile["srn"] == "PES2UG25CS001"
+    assert profile["name"] == "JOHN DOE"
+    assert profile["email"] == "photo@example.com"
+    assert profile["phone"] == "5554443332"
 
 
 @pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._fetch_new_client_with_csrf_token")
-async def test_prefetch_closes_new_client_when_cancelled_before_caching(mock_fetch, pesu):
-    """A prefetch cancelled before it can cache its client must close it, not leak it."""
-    new_client = AsyncMock()
-    mock_fetch.return_value = (new_client, "fresh-token")
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"<html>not json</html>",
+        # What the dispatcher answers, with a 200, to a request it does not understand
+        b'{"status": 400, "message": "Invalid request", "errorCode": null, "timestamp": 1}',
+        b'{"MESSAGE": "SUCCESS_Record found Successfully"}',
+    ],
+)
+async def test_an_unexpected_profile_response_is_a_parse_error(
+    pesu, upstream, make_response, login_payload, collector, body
+):
+    upstream.side_effect = [make_response(json=login_payload), make_response(content=body)]
 
-    # Hold the lock so the prefetch blocks at the swap, exactly as it would during shutdown
-    await pesu._csrf_lock.acquire()
-    task = asyncio.create_task(pesu._prefetch_client_with_csrf_token())
-    await asyncio.sleep(0.01)
-    task.cancel()
-    await asyncio.gather(task, return_exceptions=True)
-    pesu._csrf_lock.release()
+    with pytest.raises(ProfileParseError) as exc_info:
+        await pesu.authenticate("user", "pass", profile=True)
 
-    new_client.aclose.assert_awaited_once()
-    assert pesu._client is None
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.__cause__ is None
+    assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="response_structure") == 1.0
 
 
-@pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._fetch_new_client_with_csrf_token")
-async def test_close_client_cancels_in_flight_prefetch(mock_fetch, pesu):
-    """Shutdown must stop in-flight prefetches, or one can cache a client after the close."""
-    slow_client = AsyncMock()
-
-    async def slow_fetch():
-        await asyncio.sleep(3600)
-        return slow_client, "never-arrives"
-
-    mock_fetch.side_effect = slow_fetch
-    pesu._spawn_prefetch_task()
-    await asyncio.sleep(0.01)
-    assert len(pesu._prefetch_tasks) == 1
-    task = next(iter(pesu._prefetch_tasks))
-
-    await pesu.close_client()
-
-    assert task.cancelled()
-    assert pesu._client is None
-    assert pesu._csrf_token is None
+# --- Mapping ---
 
 
 @pytest.mark.asyncio
-async def test_close_client_clears_cached_client_and_token(pesu):
-    """The cached client is closed and both cache slots are cleared."""
-    client = AsyncMock()
-    pesu._client = client
-    pesu._csrf_token = "cached-token"
+async def test_name_falls_back_to_the_login_name(pesu, upstream, make_response, login_payload, profile_payload):
+    profile_payload["STUDENT_INFO"]["NameAsInSSLC"] = None
+    profile_payload["STUDENT_PHOTO"]["nameAsInSSLC"] = None
 
-    await pesu.close_client()
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    client.aclose.assert_awaited_once()
-    assert pesu._client is None
-    assert pesu._csrf_token is None
+    assert profile["name"] == "JOHN"
 
 
 @pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._fetch_new_client_with_csrf_token")
-async def test_get_client_holds_strong_reference_to_prefetch_task(mock_fetch, pesu):
-    """The background prefetch task must be referenced so it cannot be garbage collected."""
-    mock_fetch.side_effect = [(AsyncMock(), "token-1"), (AsyncMock(), "token-2")]
+async def test_a_student_without_a_class_has_no_semester_or_section(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    """What a graduated student looks like: no class, no section, no program or branch either."""
+    user = login_payload["mobileJsonObject"]
+    user.update(className=None, sectionName=None, program=None, branch=None)
+    profile_payload["STUDENT_INFO"].update(ProgramAbbreviation=None, Branch=None)
 
-    await pesu._get_client_with_csrf_token()
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert len(pesu._prefetch_tasks) == 1
-    task = next(iter(pesu._prefetch_tasks))
-
-    await task
-    # add_done_callback fires via loop.call_soon, so yield once to let it run
-    await asyncio.sleep(0)
-
-    assert pesu._prefetch_tasks == set()
+    for field in ("semester", "section", "program", "branch"):
+        assert profile[field] is None
 
 
 @pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._fetch_new_client_with_csrf_token")
-async def test_prefetch_task_failure_is_logged(mock_fetch, pesu, caplog):
-    """A failing background prefetch must be logged, not silently swallowed."""
-    mock_fetch.side_effect = [(AsyncMock(), "token-1"), RuntimeError("upstream is down")]
+async def test_class_and_section_fall_back_to_the_profile_response(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    login_payload["mobileJsonObject"].update(className=None, sectionName=None)
+    profile_payload["STUDENT_INFO"].update(ClassName="Sem-6", SectionName="Section A")
 
-    await pesu._get_client_with_csrf_token()
-    task = next(iter(pesu._prefetch_tasks))
-    await asyncio.gather(task, return_exceptions=True)
-    await asyncio.sleep(0)
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert "Background CSRF token prefetch failed" in caplog.text
-    assert "upstream is down" in caplog.text
+    assert profile["semester"] == "Sem-6"
+    assert profile["section"] == "Section A"
 
 
 @pytest.mark.asyncio
-async def test_prefetch_task_cancellation_is_not_logged(pesu, caplog):
-    """A cancelled prefetch task is expected during shutdown and must not be logged as a failure."""
-    task = asyncio.create_task(asyncio.sleep(3600))
-    pesu._prefetch_tasks.add(task)
-    task.cancel()
-    await asyncio.gather(task, return_exceptions=True)
+@pytest.mark.parametrize("class_name", ["", "   ", ", Section C"])
+async def test_a_blank_class_name_has_no_semester(
+    pesu, upstream, make_response, login_payload, profile_payload, class_name
+):
+    login_payload["mobileJsonObject"]["className"] = class_name
 
-    pesu._on_prefetch_task_done(task)
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert pesu._prefetch_tasks == set()
-    assert "Background CSRF token prefetch failed" not in caplog.text
+    assert profile["semester"] is None
 
 
 @pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._fetch_new_client_with_csrf_token")
-async def test_authenticate_triggers_exactly_one_prefetch(mock_fetch, pesu):
-    """One authentication must cause one inline fetch plus exactly one background prefetch."""
-    client = AsyncMock()
-    response = MagicMock()
-    response.text = '<meta name="csrf-token" content="new-csrf-token">'
-    client.post.return_value = response
-    mock_fetch.side_effect = [(client, "token-1"), (AsyncMock(), "token-2")]
+async def test_na_placeholders_are_treated_as_missing(pesu, upstream, make_response, login_payload, profile_payload):
+    """The web portal printed "NA" for a student with no class; it is not a semester."""
+    login_payload["mobileJsonObject"].update(className="NA", sectionName=" NA ")
 
-    await pesu.authenticate("testuser", "testpass")
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    for task in list(pesu._prefetch_tasks):
-        await asyncio.gather(task, return_exceptions=True)
-    await asyncio.sleep(0)
-
-    # One cold-cache inline fetch for this request, one prefetch for the next. Never more.
-    assert mock_fetch.await_count == 2
+    assert profile["semester"] is None
+    assert profile["section"] is None
 
 
 @pytest.mark.asyncio
-@patch("app.pesu.PESUAcademy._fetch_new_client_with_csrf_token")
-async def test_prefetch_closes_new_client_when_cancelled_during_cleanup(mock_fetch, pesu):
-    """A second cancellation, landing while the client is being closed, must not abandon it.
+async def test_blank_values_are_treated_as_missing(pesu, upstream, make_response, login_payload, profile_payload):
+    login_payload["mobileJsonObject"].update(email="", phone="  ")
 
-    The cleanup in `_prefetch_client_with_csrf_token` runs from an `except BaseException` handler,
-    so it is already unwinding from one cancellation when a shutdown can cancel it again. Without
-    shielding, that second cancellation stops `aclose()` part-way and leaks the connection pool.
-    """
-    close_started = asyncio.Event()
-    close_finished = asyncio.Event()
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    async def slow_aclose():
-        close_started.set()
-        await asyncio.sleep(0.05)
-        close_finished.set()
+    # Filled from the profile response instead of returned as empty strings
+    assert profile["email"] == "john.doe@example.com"
+    assert profile["phone"] == "9876543210"
 
-    new_client = AsyncMock()
-    new_client.aclose.side_effect = slow_aclose
-    mock_fetch.return_value = (new_client, "fresh-token")
 
-    # Hold the lock so the prefetch blocks at the swap, exactly as it would during shutdown
-    await pesu._csrf_lock.acquire()
-    task = asyncio.create_task(pesu._prefetch_client_with_csrf_token())
-    await asyncio.sleep(0.01)
-    task.cancel()
-    # Wait until the close is genuinely in flight, then cancel again on top of it
-    await asyncio.wait_for(close_started.wait(), timeout=1)
-    task.cancel()
-    await asyncio.gather(task, return_exceptions=True)
-    pesu._csrf_lock.release()
+@pytest.mark.asyncio
+async def test_contact_details_fall_back_to_the_profile_response(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    login_payload["mobileJsonObject"].update(email=None, phone=None)
+    profile_payload["STUDENT_INFO"].update(Email="other@example.com", Mobile=9998887776)
 
-    await asyncio.wait_for(close_finished.wait(), timeout=1)
-    new_client.aclose.assert_awaited_once()
-    assert pesu._client is None
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["email"] == "other@example.com"
+    # A number upstream is still a string here, as the model requires
+    assert profile["phone"] == "9998887776"
+
+
+@pytest.mark.asyncio
+async def test_an_srn_under_login_id_is_not_returned_as_the_prn(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    login_payload["mobileJsonObject"]["loginId"] = "PES2UG25CS001"
+    profile_payload["STUDENT_INFO"]["LoginId"] = "PES2UG25CS001"
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["prn"] is None
+    assert profile["srn"] == "PES2UG25CS001"
+
+
+@pytest.mark.asyncio
+async def test_prn_falls_back_to_the_profile_response(pesu, upstream, make_response, login_payload, profile_payload):
+    del login_payload["mobileJsonObject"]["loginId"]
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["prn"] == "PES2202500001"
+
+
+@pytest.mark.asyncio
+async def test_an_older_student_whose_prn_is_their_srn(pesu, upstream, make_response, login_payload, profile_payload):
+    """Students admitted before SRNs existed have the PRN in both places."""
+    login_payload["mobileJsonObject"]["loginId"] = "PES1201800001"
+    profile_payload["STUDENT_INFO"].update(LoginId="PES1201800001", SRN="PES1201800001")
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["prn"] == profile["srn"] == "PES1201800001"
+    assert (profile["campusCode"], profile["campus"]) == (1, "RR")
+
+
+@pytest.mark.asyncio
+async def test_campus_falls_back_to_the_prn(pesu, upstream, make_response, login_payload, profile_payload):
+    login_payload["mobileJsonObject"]["loginId"] = "PES1202500001"
+    profile_payload["STUDENT_INFO"]["SRN"] = None
+    # Without STUDENT_PHOTO too, since its loginId would otherwise stand in for the SRN
+    del profile_payload["STUDENT_PHOTO"]
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert (profile["campusCode"], profile["campus"]) == (1, "RR")
+
+
+@pytest.mark.asyncio
+async def test_no_identifier_means_no_campus(pesu, upstream, make_response, login_payload, profile_payload):
+    del login_payload["mobileJsonObject"]["loginId"]
+    profile_payload["STUDENT_INFO"].update(LoginId=None, SRN=None)
+    del profile_payload["STUDENT_PHOTO"]
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    for field in ("prn", "srn", "campusCode", "campus"):
+        assert profile[field] is None
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_campus_code_is_counted_not_fatal(
+    pesu, upstream, make_response, login_payload, profile_payload, collector, caplog
+):
+    profile_payload["STUDENT_INFO"]["SRN"] = "PES3UG25CS001"
+
+    with caplog.at_level("WARNING"):
+        profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["srn"] == "PES3UG25CS001"
+    assert profile["campus"] is None
+    assert profile["campusCode"] is None
+    assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="unknown_campus_code") == 1.0
+    assert "Unknown campus code: 3" in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("program", ["B.Tech.", "B.Tech", "B.TECH", "b.tech.", " B. Tech. "])
+async def test_program_abbreviations_are_expanded(
+    pesu, upstream, make_response, login_payload, profile_payload, program
+):
+    login_payload["mobileJsonObject"]["program"] = program
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["program"] == "Bachelor of Technology"
+
+
+@pytest.mark.asyncio
+async def test_program_falls_back_to_the_profile_response(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    login_payload["mobileJsonObject"]["program"] = None
+    profile_payload["STUDENT_INFO"]["ProgramAbbreviation"] = "MCA"
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["program"] == "Master of Computer Applications"
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_program_is_returned_as_is_and_counted(
+    pesu, upstream, make_response, login_payload, profile_payload, collector
+):
+    login_payload["mobileJsonObject"]["program"] = "B.Sc.(Hons)"
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["program"] == "B.Sc.(Hons)"
+    assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="unknown_program") == 1.0
+
+
+# --- Field filtering ---
+
+
+@pytest.mark.asyncio
+async def test_field_filtering(pesu, upstream, make_response, login_payload, profile_payload):
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["name", "campus"])
+
+    assert result["profile"] == {"name": "JOHN DOE", "campus": "EC"}
+
+
+@pytest.mark.asyncio
+async def test_a_requested_field_upstream_does_not_have_is_none(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    login_payload["mobileJsonObject"]["className"] = None
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["semester", "srn"])
+
+    # Requested, so present; no value, so None
+    assert result["profile"] == {"srn": "PES2UG25CS001", "semester": None}
+
+
+def test_default_fields_are_every_profile_field():
+    assert PESUAcademy.DEFAULT_FIELDS == list(FULL_PROFILE)
+
+
+# --- Client lifecycle ---
+
+
+@pytest.mark.asyncio
+async def test_each_login_gets_its_own_client_and_closes_it(pesu, upstream, make_response, login_payload, collector):
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=login_payload)]
+
+    await pesu.authenticate("user", "pass")
+    await pesu.authenticate("user", "pass")
+
+    assert _clients(collector) == {"created": 2.0, "closed": 2.0}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("side_effect", "error"),
+    [
+        (httpx2.ConnectError("down"), UpstreamError),
+        (asyncio.CancelledError(), asyncio.CancelledError),
+    ],
+)
+async def test_the_client_is_closed_when_the_login_fails(pesu, upstream, collector, side_effect, error):
+    upstream.side_effect = [side_effect]
+
+    with pytest.raises(error):
+        await pesu.authenticate("user", "pass")
+
+    assert _clients(collector) == {"created": 1.0, "closed": 1.0}
+
+
+@pytest.mark.asyncio
+async def test_the_client_is_closed_when_the_profile_fails(pesu, upstream, make_response, login_payload, collector):
+    upstream.side_effect = [make_response(json=login_payload), make_response(500)]
+
+    with pytest.raises(ProfileFetchError):
+        await pesu.authenticate("user", "pass", profile=True)
+
+    assert _clients(collector) == {"created": 1.0, "closed": 1.0}
+
+
+# --- What is logged ---
+
+
+@pytest.mark.asyncio
+async def test_no_password_token_or_private_data_is_logged(
+    pesu, upstream, make_response, login_payload, profile_payload, secrets, caplog
+):
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    with caplog.at_level("DEBUG"):
+        await pesu.authenticate("user", "hunter2-password", profile=True)
+
+    for secret in (*secrets, "hunter2-password"):
+        assert secret not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_an_unparseable_profile_logs_where_not_what(
+    pesu, upstream, make_response, login_payload, profile_payload, secrets, caplog
+):
+    profile_payload["STUDENT_INFO"]["NameAsInSSLC"] = {"unexpected": "FATHERNAMESECRET"}
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    with caplog.at_level("DEBUG"), pytest.raises(ProfileParseError) as exc_info:
+        await pesu.authenticate("user", "pass", profile=True)
+
+    assert "STUDENT_INFO" in caplog.text
+    assert "NameAsInSSLC" in caplog.text
+    for secret in secrets:
+        assert secret not in caplog.text
+        assert secret not in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_parsed_login_does_not_expose_the_token_in_its_repr(login_payload):
+    from app.pesu import _LoginResponse
+
+    login = _LoginResponse.model_validate(login_payload)
+
+    assert login.access_token == "ACCESS-TOKEN-SECRET"
+    assert "ACCESS-TOKEN-SECRET" not in repr(login)
+    # Fields never declared are never kept
+    assert "LOGINPHOTOSECRET" not in repr(login)

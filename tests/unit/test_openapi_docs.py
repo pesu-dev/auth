@@ -6,7 +6,7 @@ models it claims to follow, and against real responses.
 """
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -28,12 +28,8 @@ def schema():
 
 @pytest.fixture
 def client():
-    with (
-        patch("app.app.pesu_academy.prefetch_client_with_csrf_token", new_callable=AsyncMock),
-        patch("app.app.pesu_academy.close_client", new_callable=AsyncMock),
-    ):
-        with TestClient(app, raise_server_exceptions=False) as test_client:
-            yield test_client
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        yield test_client
 
 
 def _operations(schema):

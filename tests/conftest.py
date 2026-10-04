@@ -1,7 +1,40 @@
+import os
+
 import pytest
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# In a TEST_* profile variable, "NA" stands for a value the test account does not have (it has no
+# current class, so no semester or section), which the API returns as null. A sentinel is needed
+# because GitHub secrets cannot be empty.
+ABSENT = "NA"
+PROFILE_VARIABLES = {
+    "name": "TEST_NAME",
+    "prn": "TEST_PRN",
+    "srn": "TEST_SRN",
+    "program": "TEST_PROGRAM",
+    "branch": "TEST_BRANCH",
+    "semester": "TEST_SEMESTER",
+    "section": "TEST_SECTION",
+    "email": "TEST_EMAIL",
+    "phone": "TEST_PHONE",
+    "campusCode": "TEST_CAMPUS_CODE",
+    "campus": "TEST_CAMPUS",
+}
+
+
+@pytest.fixture
+def expected_profile():
+    """The test account's profile from the TEST_* variables, with None for a field that must be null."""
+    profile = {}
+    for field, variable in PROFILE_VARIABLES.items():
+        value = os.getenv(variable)
+        assert value is not None, f"{variable} environment variable not set"
+        profile[field] = None if value == ABSENT else value
+    if profile["campusCode"] is not None:
+        profile["campusCode"] = int(profile["campusCode"])
+    return profile
 
 
 @pytest.fixture(autouse=True)

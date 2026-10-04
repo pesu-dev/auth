@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import datetime
 import logging
 import os
@@ -32,7 +31,6 @@ from app.metrics.auth import require_metrics_token
 from app.metrics.collector import (
     AUTHENTICATION_REQUESTS,
     AUTHENTICATION_RESULTS,
-    CSRF_REFRESHES,
     ERRORS_BY_TYPE,
     LIFESPAN_EVENTS,
     VALIDATION_ERRORS,
@@ -44,62 +42,18 @@ from app.models import MetricsModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
 IST = ZoneInfo("Asia/Kolkata")
-CSRF_TOKEN_REFRESH_INTERVAL_SECONDS = 45 * 60
 # Validation failures are labelled by field, so the label set has to be closed against a caller who
 # can put anything in the request body
 KNOWN_REQUEST_FIELDS = frozenset({"username", "password", "profile", "fields", "fmt", "body"})
 
 
-async def _refresh_csrf_token() -> None:
-    """Refresh the cached unauthenticated CSRF token and client."""
-    await pesu_academy.prefetch_client_with_csrf_token()
-    logging.info("Unauthenticated CSRF token refreshed successfully.")
-
-
-async def _csrf_token_refresh_loop() -> None:
-    """Background task to refresh the CSRF token periodically."""
-    while True:
-        # Sleep first. `lifespan` has already primed the cache by the time this task starts, so
-        # refreshing immediately would fetch a second token and throw away the one just prefetched
-        # -- an extra upstream round trip on every single startup.
-        await asyncio.sleep(CSRF_TOKEN_REFRESH_INTERVAL_SECONDS)
-        try:
-            logging.debug("Refreshing unauthenticated CSRF token...")
-            await _refresh_csrf_token()
-        except Exception:
-            metrics.increment(CSRF_REFRESHES, outcome="failure")
-            logging.exception("Failed to refresh unauthenticated CSRF token in the background.")
-        else:
-            metrics.increment(CSRF_REFRESHES, outcome="success")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Lifespan event handler for startup and shutdown events."""
-    # Startup
+    # Nothing to prepare or tear down: each login opens and closes its own upstream client
     metrics.increment(LIFESPAN_EVENTS, event="startup")
     logging.info("PESUAuth API startup")
-
-    # Prefetch PESUAcademy client for first request
-    await pesu_academy.prefetch_client_with_csrf_token()
-    logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
-
-    # Start the periodic CSRF token refresh background task
-    refresh_task = asyncio.create_task(_csrf_token_refresh_loop())
-    logging.info("Started the unauthenticated CSRF token refresh background task.")
-
     yield
-
-    # Shutdown
-    refresh_task.cancel()
-    try:
-        await refresh_task
-    except asyncio.CancelledError:
-        logging.debug("Unauthenticated CSRF token refresh background task cancelled.")
-    except Exception:
-        logging.exception("Failed to cancel unauthenticated CSRF token refresh background task.")
-
-    await pesu_academy.close_client()
     metrics.increment(LIFESPAN_EVENTS, event="shutdown")
     logging.info("PESUAuth API shutdown.")
 
@@ -145,7 +99,7 @@ def _openapi_without_phantom_validation_errors() -> dict[str, Any]:
     document a response that cannot occur, in a shape this API never emits.
 
     Only the auto-generated ones are removed. `/authenticate` genuinely returns a 422 for a profile
-    parse failure and documents it with `ResponseModel`, so it is matched on its schema and kept.
+    response it cannot parse and documents it with `ResponseModel`, so it is matched on its schema and kept.
 
     Returns:
         dict[str, Any]: The OpenAPI schema, cached on the app after the first call.
@@ -363,7 +317,10 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
     try:
         authentication_result = ResponseModel.model_validate(authentication_result)
         logging.info(f"Returning auth result for user={username}: {authentication_result}")
-        authentication_result = authentication_result.model_dump(by_alias=True, exclude_none=True)
+        # exclude_unset, not exclude_none: a profile field the user has no value for is returned as
+        # null, while a field that was never set -- `profile` when none was requested, or a profile
+        # field the caller filtered out -- stays out of the response entirely.
+        authentication_result = authentication_result.model_dump(by_alias=True, exclude_unset=True)
         authentication_result["timestamp"] = current_time.isoformat()
         return JSONResponse(
             status_code=200,

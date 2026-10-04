@@ -14,20 +14,20 @@ class ProfileModel(BaseModel):
     name: str | None = Field(
         None,
         title="Full Name",
-        description="Full name of the user.",
+        description="Full name of the user, as registered with PESU.",
         json_schema_extra={"example": "John Doe"},
     )
     prn: str | None = Field(
         None,
         title="PRN",
-        description="PRN of the user.",
-        json_schema_extra={"example": "PES1201800001"},
+        description="PRN of the user. Null when PESU Academy does not return one.",
+        json_schema_extra={"example": "PES1202000001"},
     )
     srn: str | None = Field(
         None,
         title="SRN",
         description="SRN of the user.",
-        json_schema_extra={"example": "PES1201800001"},
+        json_schema_extra={"example": "PES1UG20CS001"},
     )
     program: str | None = Field(
         None,
@@ -44,14 +44,14 @@ class ProfileModel(BaseModel):
     semester: str | None = Field(
         None,
         title="Semester",
-        description="Current semester the user is pursuing.",
-        json_schema_extra={"example": "2"},
+        description="Current semester the user is pursuing. Null when the user is not in a class.",
+        json_schema_extra={"example": "Sem-2"},
     )
     section: str | None = Field(
         None,
         title="Section",
-        description="Section the user belongs to.",
-        json_schema_extra={"example": "C"},
+        description="Section the user belongs to. Null when the user is not in a class.",
+        json_schema_extra={"example": "Section C"},
     )
     email: str | None = Field(
         None,

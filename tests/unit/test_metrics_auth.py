@@ -26,12 +26,8 @@ def client(monkeypatch):
     """A client with a fresh collector and no token configured."""
     monkeypatch.setattr("app.app.metrics", MetricsCollector())
     monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", None)
-    with (
-        patch("app.app.pesu_academy.prefetch_client_with_csrf_token", new_callable=AsyncMock),
-        patch("app.app.pesu_academy.close_client", new_callable=AsyncMock),
-    ):
-        with TestClient(app, raise_server_exceptions=False) as test_client:
-            yield test_client
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        yield test_client
 
 
 @pytest.fixture

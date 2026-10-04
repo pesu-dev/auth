@@ -1,0 +1,117 @@
+"""Shared fixtures for unit tests that drive PESUAcademy against a mocked mobile API."""
+
+import copy
+from unittest.mock import AsyncMock, patch
+
+import httpx2
+import pytest
+
+# Shaped like the real responses (key names and types taken from the live API, values invented).
+# The personal fields this service must never keep or log -- photo, parents, address -- are
+# included so tests can prove they are dropped.
+LOGIN_PAYLOAD = {
+    "mobileJsonObject": {
+        "userId": "00000000-0000-0000-0000-000000000000",
+        "userRoleId": "3",
+        "login": "SUCCESS",
+        "errorMessage": None,
+        "name": "JOHN",
+        "photo": "data:image/png;base64,LOGINPHOTOSECRET",
+        "phone": "9876543210",
+        "email": "john.doe@example.com",
+        "program": "B.Tech.",
+        "branch": "Branch:CSE",
+        "className": "Sem-4, Section C",
+        "sectionName": "Section C",
+        "loginId": "PES2202500001",
+        "departmentId": "0",
+        "usertype": "2",
+        "dateofBirth": "2005-01-01",
+    },
+    "accessToken": "ACCESS-TOKEN-SECRET",
+    "refreshToken": "REFRESH-TOKEN-SECRET",
+    "status": 200,
+    "accessTokenExpiryMinutes": 30,
+}
+
+PROFILE_PAYLOAD = {
+    "MESSAGE": "SUCCESS_Record found Successfully",
+    "image": "",
+    "PLACEMENT_DETAILS": {},
+    "STUDENT_PHOTO": {
+        "loginId": "PES2UG25CS001",
+        "nameAsInSSLC": "JOHN DOE",
+        "profilePicture": "data:image/png;base64,PROFILEPHOTOSECRET",
+        "instituteName": "PES University (Electronic City)",
+    },
+    "STUDENT_INFO": {
+        "UserId": "00000000-0000-0000-0000-000000000000",
+        "LoginId": "PES2202500001",
+        "SRN": "PES2UG25CS001",
+        "FirstName": "JOHN",
+        "NameAsInSSLC": "JOHN DOE",
+        "Email": "john.doe@example.com",
+        "Mobile": "9876543210",
+        "FatherName": "FATHERNAMESECRET",
+        "MotherMobileNo": "1112223334",
+        "PermanentAddress": "ADDRESSSECRET",
+        "ProgramId": 1,
+        "ProgramAbbreviation": "B.Tech.",
+        "BranchId": 3,
+        "BranchAbbreviation": "CSE",
+        "Branch": "Computer Science and Engineering",
+        "ClassName": None,
+        "SectionName": None,
+    },
+}
+
+# Values that must never appear in a log line or an exception message
+SECRETS = (
+    "LOGINPHOTOSECRET",
+    "PROFILEPHOTOSECRET",
+    "ACCESS-TOKEN-SECRET",
+    "REFRESH-TOKEN-SECRET",
+    "FATHERNAMESECRET",
+    "ADDRESSSECRET",
+    "1112223334",
+)
+
+
+@pytest.fixture
+def login_payload():
+    """A successful login response body, safe to modify per test."""
+    return copy.deepcopy(LOGIN_PAYLOAD)
+
+
+@pytest.fixture
+def profile_payload():
+    """A successful profile response body, safe to modify per test."""
+    return copy.deepcopy(PROFILE_PAYLOAD)
+
+
+@pytest.fixture
+def secrets():
+    """Values from the fixture payloads that must never be logged."""
+    return SECRETS
+
+
+@pytest.fixture
+def make_response():
+    """Build a real httpx2.Response, so parsing runs exactly as it does against PESU."""
+
+    def _make(status=200, json=None, content=None):
+        if json is not None:
+            return httpx2.Response(status, json=json)
+        return httpx2.Response(status, content=content or b"")
+
+    return _make
+
+
+@pytest.fixture
+def upstream():
+    """Patch the client's POST, the only verb the mobile API uses.
+
+    Set `side_effect` to the responses in call order: the login, then the profile.
+    """
+    with patch("app.pesu.httpx2.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        yield mock_post

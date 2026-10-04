@@ -113,7 +113,7 @@ AUTHENTICATION_RESULTS = MetricFamily(
 )
 PROFILE_PARSE_ERRORS = MetricFamily(
     f"{METRIC_PREFIX}profile_parse_errors_total",
-    "Profile page parse failures, by what could not be parsed.",
+    "Profile response parse failures, by what could not be parsed or mapped.",
     "counter",
     ("reason",),
 )
@@ -134,24 +134,6 @@ UPSTREAM_LATENCY = MetricFamily(
     "Seconds spent waiting on PESU Academy, by operation.",
     "summary",
     ("operation",),
-)
-CSRF_CACHE = MetricFamily(
-    f"{METRIC_PREFIX}csrf_cache_total",
-    "Lookups of the cached unauthenticated CSRF client, by whether the cache was warm.",
-    "counter",
-    ("outcome",),
-)
-CSRF_REFRESHES = MetricFamily(
-    f"{METRIC_PREFIX}csrf_refreshes_total",
-    "Periodic background refreshes of the unauthenticated CSRF token, by outcome.",
-    "counter",
-    ("outcome",),
-)
-PREFETCH_TASKS = MetricFamily(
-    f"{METRIC_PREFIX}prefetch_tasks_total",
-    "Background CSRF prefetch tasks, by outcome.",
-    "counter",
-    ("outcome",),
 )
 HTTP_CLIENTS = MetricFamily(
     f"{METRIC_PREFIX}http_clients_total",
@@ -185,9 +167,6 @@ FAMILIES: tuple[MetricFamily, ...] = (
     UPSTREAM_REQUESTS,
     UPSTREAM_RESPONSES,
     UPSTREAM_LATENCY,
-    CSRF_CACHE,
-    CSRF_REFRESHES,
-    PREFETCH_TASKS,
     HTTP_CLIENTS,
     LIFESPAN_EVENTS,
     REQUESTS_IN_FLIGHT,

@@ -75,93 +75,38 @@ def test_integration_authenticate_success_username_phone(client):
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_with_specific_profile_fields(client):
-    email = os.getenv("TEST_EMAIL")
-    password = os.getenv("TEST_PASSWORD")
-    prn = os.getenv("TEST_PRN")
-    branch = os.getenv("TEST_BRANCH")
-    campus = os.getenv("TEST_CAMPUS")
-    name = os.getenv("TEST_NAME")
-    assert email is not None, "TEST_EMAIL environment variable not set"
-    assert password is not None, "TEST_PASSWORD environment variable not set"
-    assert prn is not None, "TEST_PRN environment variable not set"
-    assert branch is not None, "TEST_BRANCH environment variable not set"
-    assert campus is not None, "TEST_CAMPUS environment variable not set"
-    assert name is not None, "TEST_NAME environment variable not set"
-
-    expected_fields = ["prn", "branch", "campus", "name"]
-    payload = {
-        "username": email,
-        "password": password,
-        "profile": True,
-        "fields": expected_fields,
-    }
+def test_integration_authenticate_success_username_srn(client):
+    payload = {"username": os.getenv("TEST_SRN"), "password": os.getenv("TEST_PASSWORD")}
 
     response = client.post("/authenticate", json=payload)
     assert response.status_code == 200
-    data = response.json()
-    assert data["status"] is True
-    assert "timestamp" in data
-    assert data["message"] == "Login successful."
-    assert "profile" in data
-    profile = data["profile"]
-    assert len(profile) == len(expected_fields), (
-        f"Expected {len(expected_fields)} fields in profile, got {len(profile)}"
-    )
-
-    assert profile["prn"] == prn
-    assert profile["branch"] == branch
-    assert profile["campus"] == campus
-    assert profile["name"] == name
-    assert "email" not in profile
+    assert response.json()["message"] == "Login successful."
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_with_all_profile_fields(client):
-    name = os.getenv("TEST_NAME")
-    email = os.getenv("TEST_EMAIL")
-    password = os.getenv("TEST_PASSWORD")
-    prn = os.getenv("TEST_PRN")
-    srn = os.getenv("TEST_SRN")
-    program = os.getenv("TEST_PROGRAM")
-    semester = os.getenv("TEST_SEMESTER")
-    section = os.getenv("TEST_SECTION")
-    phone = os.getenv("TEST_PHONE")
-    campus_code = int(os.getenv("TEST_CAMPUS_CODE"))
-    branch = os.getenv("TEST_BRANCH")
-    campus = os.getenv("TEST_CAMPUS")
-
-    assert name is not None, "TEST_NAME environment variable not set"
-    assert email is not None, "TEST_EMAIL environment variable not set"
-    assert password is not None, "TEST_PASSWORD environment variable not set"
-    assert prn is not None, "TEST_PRN environment variable not set"
-    assert branch is not None, "TEST_BRANCH environment variable not set"
-    assert campus is not None, "TEST_CAMPUS environment variable not set"
-    assert srn is not None, "TEST_SRN environment variable not set"
-    assert program is not None, "TEST_PROGRAM environment variable not set"
-    assert semester is not None, "TEST_SEMESTER environment variable not set"
-    assert section is not None, "TEST_SECTION environment variable not set"
-    assert email is not None, "TEST_EMAIL environment variable not set"
-    assert phone is not None, "TEST_PHONE environment variable not set"
-    assert campus_code is not None, "TEST_CAMPUS_CODE environment variable not set"
-
-    all_fields = [
-        "name",
-        "prn",
-        "srn",
-        "program",
-        "branch",
-        "semester",
-        "section",
-        "email",
-        "phone",
-        "campusCode",
-        "campus",
-    ]
-
+def test_integration_authenticate_with_specific_profile_fields(client, expected_profile):
+    fields = ["prn", "branch", "campus", "name"]
     payload = {
-        "username": email,
-        "password": password,
+        "username": os.getenv("TEST_EMAIL"),
+        "password": os.getenv("TEST_PASSWORD"),
+        "profile": True,
+        "fields": fields,
+    }
+
+    response = client.post("/authenticate", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] is True
+    assert "timestamp" in data
+    assert data["message"] == "Login successful."
+    assert data["profile"] == {field: expected_profile[field] for field in fields}
+
+
+@pytest.mark.secret_required
+def test_integration_authenticate_with_all_profile_fields(client, expected_profile):
+    payload = {
+        "username": os.getenv("TEST_EMAIL"),
+        "password": os.getenv("TEST_PASSWORD"),
         "profile": True,
     }
 
@@ -171,21 +116,8 @@ def test_integration_authenticate_with_all_profile_fields(client):
     assert data["status"] is True
     assert "timestamp" in data
     assert data["message"] == "Login successful."
-    assert "profile" in data
-    profile = data["profile"]
-    assert len(profile) == len(all_fields), f"Expected {len(all_fields)} fields in profile, got {len(profile)}"
-
-    assert profile["name"] == name
-    assert profile["prn"] == prn
-    assert profile["srn"] == srn
-    assert profile["program"] == program
-    assert profile["branch"] == branch
-    assert profile["semester"] == semester
-    assert profile["section"] == section
-    assert profile["email"] == email
-    assert profile["phone"] == phone
-    assert profile["campusCode"] == campus_code
-    assert profile["campus"] == campus
+    # Every field is present; one the account has no value for is null
+    assert data["profile"] == expected_profile
 
 
 @pytest.mark.secret_required
@@ -197,10 +129,10 @@ def test_integration_authenticate_invalid_password(client):
     }
 
     response = client.post("/authenticate", json=payload)
-    assert response.status_code in (200, 401, 500)
+    assert response.status_code == 401
     data = response.json()
     assert data["status"] is False
-    assert "Invalid" in data["message"] or "error" in data["message"].lower()
+    assert "Invalid username or password" in data["message"]
 
 
 def test_integration_authenticate_missing_username(client):

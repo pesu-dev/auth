@@ -61,12 +61,12 @@ authenticate_docs = ApiDocs(
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
                                 "profile": {
                                     "name": "John Doe",
-                                    "prn": "PES1201800001",
-                                    "srn": "PES1201800001",
+                                    "prn": "PES1202000001",
+                                    "srn": "PES1UG20CS001",
                                     "program": "Bachelor of Technology",
                                     "branch": "Computer Science and Engineering",
-                                    "semester": "2",
-                                    "section": "C",
+                                    "semester": "Sem-2",
+                                    "section": "Section C",
                                     "email": "johndoe@gmail.com",
                                     "phone": "1234567890",
                                     "campusCode": 1,
@@ -83,7 +83,7 @@ authenticate_docs = ApiDocs(
                                 "profile": {
                                     "name": "John Doe",
                                     "branch": "Computer Science and Engineering",
-                                    "semester": "2",
+                                    "semester": "Sem-2",
                                     "email": "johndoe@gmail.com",
                                     "campus": "RR",
                                 },
@@ -120,13 +120,13 @@ authenticate_docs = ApiDocs(
             },
         },
         422: {
-            "description": "Unprocessable entity - Profile parsing error",
+            "description": "Unprocessable entity - The profile response from PESU Academy could not be parsed",
             "model": ResponseModel,
             "content": {
                 "application/json": {
                     "example": {
                         "status": False,
-                        "message": "Failed to parse student profile page from PESU Academy.",
+                        "message": "Failed to parse the profile response from PESU Academy.",
                         "timestamp": "2024-07-28T22:30:10.103368+05:30",
                     }
                 }
@@ -151,19 +151,19 @@ authenticate_docs = ApiDocs(
             "content": {
                 "application/json": {
                     "examples": {
-                        "csrf_token_error": {
-                            "summary": "CSRF token extraction failed",
+                        "upstream_error": {
+                            "summary": "Login could not be completed",
                             "value": {
                                 "status": False,
-                                "message": "CSRF token could not be extracted from the response.",
+                                "message": "PESU Academy could not be reached or returned an unexpected response.",
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
                             },
                         },
                         "profile_fetch_error": {
-                            "summary": "Profile page fetching failed",
+                            "summary": "Profile fetching failed",
                             "value": {
                                 "status": False,
-                                "message": "Failed to fetch student profile page from PESU Academy.",
+                                "message": "Failed to fetch the student profile from PESU Academy.",
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
                             },
                         },

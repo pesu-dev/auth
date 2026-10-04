@@ -11,25 +11,28 @@ class AuthenticationError(PESUAcademyError):
         super().__init__(message, status_code=401)
 
 
-class CSRFTokenError(PESUAcademyError):
-    """Raised when CSRF token is missing or cannot be extracted."""
+class UpstreamError(PESUAcademyError):
+    """Raised when PESU Academy cannot be reached to log in, or answers the login unexpectedly."""
 
-    def __init__(self, message: str = "CSRF token could not be extracted from the response.") -> None:
-        """Initialize the CSRFTokenError with a custom message."""
+    def __init__(
+        self,
+        message: str = "PESU Academy could not be reached or returned an unexpected response.",
+    ) -> None:
+        """Initialize the UpstreamError with a custom message."""
         super().__init__(message, status_code=502)
 
 
 class ProfileFetchError(PESUAcademyError):
     """Raised when profile data could not be fetched from PESU Academy."""
 
-    def __init__(self, message: str = "Failed to fetch student profile page from PESU Academy.") -> None:
+    def __init__(self, message: str = "Failed to fetch the student profile from PESU Academy.") -> None:
         """Initialize the ProfileFetchError with a custom message."""
         super().__init__(message, status_code=502)
 
 
 class ProfileParseError(PESUAcademyError):
-    """Raised when profile data could not be parsed from PESU Academy."""
+    """Raised when the profile response from PESU Academy does not have the expected shape."""
 
-    def __init__(self, message: str = "Failed to parse student profile page from PESU Academy.") -> None:
+    def __init__(self, message: str = "Failed to parse the profile response from PESU Academy.") -> None:
         """Initialize the ProfileParseError with a custom message."""
         super().__init__(message, status_code=422)

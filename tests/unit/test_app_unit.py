@@ -1,27 +1,21 @@
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.exceptions.authentication import AuthenticationError, CSRFTokenError
+from app.exceptions.authentication import AuthenticationError, UpstreamError
 
-from app.app import _build_arg_parser, _csrf_token_refresh_loop, _refresh_csrf_token, app, main
+from app.app import _build_arg_parser, app, main
 
 import logging
 
 
 @pytest.fixture
 def client():
-    # Patch the prefetch/close so entering the real lifespan does not hit the network. Without
-    # this, every test using this fixture makes a live request to pesuacademy.com. `authenticate`
-    # is deliberately left unpatched so individual tests can still patch it themselves.
-    with (
-        patch("app.app.pesu_academy.prefetch_client_with_csrf_token", new_callable=AsyncMock),
-        patch("app.app.pesu_academy.close_client", new_callable=AsyncMock),
-    ):
-        with TestClient(app, raise_server_exceptions=False) as client:
-            yield client
+    # The lifespan makes no upstream calls, so the real one is safe to enter. `authenticate` is
+    # left unpatched so individual tests can patch it themselves.
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client
 
 
 @patch("app.app.pesu_academy.authenticate")
@@ -41,6 +35,32 @@ def test_authenticate_validation_error(mock_authenticate, client, caplog):
 
 
 @patch("app.app.pesu_academy.authenticate")
+def test_a_profile_field_without_a_value_is_null(mock_authenticate, client):
+    """None in the profile is null on the wire, not a missing key."""
+    mock_authenticate.return_value = {
+        "status": True,
+        "message": "Login successful.",
+        "profile": {"name": "John Doe", "semester": None, "section": None, "campusCode": 1},
+    }
+
+    response = client.post("/authenticate", json={"username": "u", "password": "p", "profile": True})
+
+    assert response.status_code == 200
+    # Fields filtered out (or never produced) stay out; requested ones with no value are null
+    assert response.json()["profile"] == {"name": "John Doe", "semester": None, "section": None, "campusCode": 1}
+
+
+@patch("app.app.pesu_academy.authenticate")
+def test_no_profile_key_when_no_profile_was_requested(mock_authenticate, client):
+    mock_authenticate.return_value = {"status": True, "message": "Login successful."}
+
+    response = client.post("/authenticate", json={"username": "u", "password": "p"})
+
+    assert response.status_code == 200
+    assert sorted(response.json()) == ["message", "status", "timestamp"]
+
+
+@patch("app.app.pesu_academy.authenticate")
 def test_authenticate_general_exception(mock_authenticate, client):
     mock_authenticate.side_effect = Exception("Test exception")
     payload = {"username": "testuser", "password": "testpass", "profile": False}
@@ -50,77 +70,22 @@ def test_authenticate_general_exception(mock_authenticate, client):
     assert "Internal Server Error" in data["message"]
 
 
-@pytest.mark.asyncio
-@patch("asyncio.sleep", new_callable=AsyncMock)
-@patch("app.app._refresh_csrf_token")
-async def test_csrf_token_refresh_loop_logs_exception_on_failure(mock_refresh, mock_sleep, caplog):
-    mock_refresh.side_effect = RuntimeError("Simulated CSRF refresh failure")
-    # The loop sleeps before its first refresh, so let the first sleep pass and stop it on the next
-    mock_sleep.side_effect = [None, asyncio.CancelledError]
-
-    with caplog.at_level("ERROR"):
-        with pytest.raises(asyncio.CancelledError):
-            await _csrf_token_refresh_loop()
-
-    assert "Failed to refresh unauthenticated CSRF token in the background." in caplog.text
-
-
-@pytest.mark.asyncio
-@patch("asyncio.sleep", new_callable=AsyncMock)
-@patch("app.app._refresh_csrf_token")
-async def test_csrf_token_refresh_loop_waits_before_its_first_refresh(mock_refresh, mock_sleep):
-    """lifespan has already primed the cache when this task starts.
-
-    Refreshing immediately fetched a second token and discarded the one just prefetched -- an extra
-    upstream round trip on every startup. Caught by the new upstream metrics showing two csrf_fetch
-    calls on an idle process.
-    """
-    mock_sleep.side_effect = asyncio.CancelledError
-
-    with pytest.raises(asyncio.CancelledError):
-        await _csrf_token_refresh_loop()
-
-    mock_refresh.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-@patch("asyncio.sleep", new_callable=AsyncMock)
-@patch("app.app._refresh_csrf_token")
-async def test_csrf_token_refresh_loop_records_a_successful_refresh(mock_refresh, mock_sleep, monkeypatch):
-    from app.metrics.collector import CSRF_REFRESHES, MetricsCollector
+@patch("app.pesu.httpx2.AsyncClient.get")
+@patch("app.pesu.httpx2.AsyncClient.post")
+def test_lifespan_makes_no_upstream_calls(mock_post, mock_get, monkeypatch):
+    """Startup and shutdown must not touch PESU Academy: there is no token to prefetch any more."""
+    from app.metrics.collector import LIFESPAN_EVENTS, MetricsCollector
 
     collector = MetricsCollector()
     monkeypatch.setattr("app.app.metrics", collector)
-    mock_sleep.side_effect = [None, asyncio.CancelledError]
+    with TestClient(app) as test_client:
+        assert test_client.get("/health").status_code == 200
 
-    with pytest.raises(asyncio.CancelledError):
-        await _csrf_token_refresh_loop()
-
-    mock_refresh.assert_awaited_once()
-    assert collector.snapshot().value(CSRF_REFRESHES.name, outcome="success") == 1.0
-
-
-def test_lifespan_logs_a_refresh_task_that_refuses_to_cancel(caplog):
-    """A background task that fails its own cancellation is reported, not swallowed at shutdown."""
-
-    async def stubborn_loop():
-        try:
-            await asyncio.sleep(3600)
-        except asyncio.CancelledError:
-            raise RuntimeError("refresh task refused to cancel")
-
-    with (
-        patch("app.app.pesu_academy.prefetch_client_with_csrf_token", new_callable=AsyncMock),
-        patch("app.app.pesu_academy.close_client", new_callable=AsyncMock) as mock_close,
-        patch("app.app._csrf_token_refresh_loop", stubborn_loop),
-        caplog.at_level("ERROR"),
-    ):
-        with TestClient(app) as test_client:
-            assert test_client.get("/health").status_code == 200
-
-    assert "Failed to cancel unauthenticated CSRF token refresh background task." in caplog.text
-    # Shutdown must carry on past the failure and still close the client
-    mock_close.assert_awaited_once()
+    mock_post.assert_not_called()
+    mock_get.assert_not_called()
+    snapshot = collector.snapshot()
+    assert snapshot.value(LIFESPAN_EVENTS.name, event="startup") == 1.0
+    assert snapshot.value(LIFESPAN_EVENTS.name, event="shutdown") == 1.0
 
 
 @patch("app.app.argparse.ArgumentParser.parse_args")
@@ -192,44 +157,6 @@ def test_parser_invalid_port(monkeypatch):
     with pytest.raises(SystemExit):
         parser.parse_args([])
 
-@pytest.mark.asyncio
-@patch("app.app.pesu_academy.prefetch_client_with_csrf_token", new_callable=AsyncMock)
-async def test_refresh_csrf_token_delegates_to_pesu_academy(mock_prefetch, caplog):
-    """The refresh helper must delegate to PESUAcademy and report success."""
-    with caplog.at_level("INFO"):
-        await _refresh_csrf_token()
-
-    mock_prefetch.assert_awaited_once()
-    assert "Unauthenticated CSRF token refreshed successfully." in caplog.text
-
-
-@pytest.fixture
-def mocked_pesu_client():
-    """A TestClient whose PESUAcademy singleton is mocked, so lifespan makes no network calls."""
-    with patch("app.app.pesu_academy", new_callable=AsyncMock) as mock_pesu:
-        mock_pesu.authenticate.return_value = {
-            "status": True,
-            "message": "Login successful.",
-        }
-        with TestClient(app, raise_server_exceptions=False) as client:
-            yield client, mock_pesu
-
-
-def test_authenticate_does_not_trigger_additional_prefetch(mocked_pesu_client):
-    """The endpoint must not kick off its own CSRF prefetch; app/pesu.py already does one."""
-    client, mock_pesu = mocked_pesu_client
-    # Snapshot rather than assert an absolute count: lifespan startup and the periodic
-    # refresh loop both legitimately prefetch, and their scheduling is not deterministic.
-    before = mock_pesu.prefetch_client_with_csrf_token.await_count
-
-    response = client.post("/authenticate", json={"username": "user", "password": "pass"})
-
-    assert response.status_code == 200
-    # Starlette runs background tasks before TestClient returns, so any endpoint-level
-    # prefetch would already be counted here.
-    assert mock_pesu.prefetch_client_with_csrf_token.await_count == before
-
-
 def test_client_error_is_logged_without_a_traceback(client, caplog):
     """A 4xx is an expected outcome, so it must be logged at WARNING with no stack trace."""
     with patch("app.app.pesu_academy.authenticate") as mock_authenticate:
@@ -248,12 +175,12 @@ def test_client_error_is_logged_without_a_traceback(client, caplog):
 def test_server_error_is_logged_with_a_traceback(client, caplog):
     """A 5xx is genuinely our problem or the upstream's, so it keeps the stack trace."""
     with patch("app.app.pesu_academy.authenticate") as mock_authenticate:
-        mock_authenticate.side_effect = CSRFTokenError("CSRF token could not be extracted.")
+        mock_authenticate.side_effect = UpstreamError("PESU Academy could not be reached.")
         with caplog.at_level("ERROR"):
             response = client.post("/authenticate", json={"username": "user", "password": "pass"})
 
     assert response.status_code == 502
-    records = [r for r in caplog.records if "CSRFTokenError" in r.message]
+    records = [r for r in caplog.records if "UpstreamError" in r.message]
     assert records, "the 502 should be logged"
     assert all(r.levelname == "ERROR" for r in records)
     assert any(r.exc_info is not None for r in records)
