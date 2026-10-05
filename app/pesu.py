@@ -750,9 +750,11 @@ class PESUAcademy:
         )
         # The SRN's campus digit is the same as the PRN's; the SRN comes first as the ID PESU labels
         campus_code, campus = self._campus(srn or prn, username)
-        # Every field is a value PESU sent, or null; nothing is guessed. The name, program and branch code
-        # in particular are returned as PESU wrote them, with no fallback that could stand in for them
-        # wrongly (the login's "name" is only the first name, for one).
+        # Values are returned as PESU wrote them, or null; none is expanded or stood in for by a related
+        # value (the login's "name" is only the first name, so it is never the full name). The few that
+        # are worked out rather than copied: the PRN and SRN, told apart by shape; the campus, a fixed
+        # mapping of the ID's campus digit; the semester, the part of the class name before the comma;
+        # the roll number, the latest semester's; and the date of birth, converted to YYYY-MM-DD.
         return {
             # The name as registered, which is what the web portal showed
             "name": student.name,

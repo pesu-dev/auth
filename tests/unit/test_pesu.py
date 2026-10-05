@@ -1268,15 +1268,13 @@ async def test_a_secondary_field_of_an_unexpected_shape_is_dropped(
 
 
 @pytest.mark.asyncio
-async def test_secondary_login_fields_of_an_unexpected_shape_do_not_fail_the_login(
+async def test_a_login_date_of_birth_of_an_unexpected_shape_does_not_fail_the_login(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
-    login_payload["mobileJsonObject"].update(branch={"x": 1}, dateofBirth=["2005-01-01"])
-    profile_payload["STUDENT_INFO"]["BranchAbbreviation"] = None
+    login_payload["mobileJsonObject"]["dateofBirth"] = ["2005-01-01"]
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile["branchShortCode"] is None
     # STUDENT_INFO's timestamp still gives the date of birth
     assert profile["dateOfBirth"] == "2005-01-01"
 
