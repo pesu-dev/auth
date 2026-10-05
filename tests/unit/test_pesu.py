@@ -19,7 +19,7 @@ from app.metrics.collector import (
     MetricsCollector,
 )
 from app.models import ProfileModel
-from app.pesu import _CLOSE_TASKS, DISPATCHER_URL, LOGIN_URL, PESUAcademy, _as_prn, _upstream_call
+from app.pesu import _CLOSE_TASKS, DISPATCHER_URL, LOGIN_URL, PESUAcademy, _as_prn, _as_srn, _upstream_call
 
 FULL_PROFILE = {
     "name": "JOHN DOE",
@@ -1091,3 +1091,102 @@ def test_the_default_fields_are_every_field():
     from app.pesu import ProfileField
 
     assert PESUAcademy.DEFAULT_FIELDS == list(get_args(ProfileField))
+
+
+# --- Telling the PRN and the SRN apart ---
+#
+# PRN: PES + campus digit + year of joining + 5 digits (PES1201800001).
+# SRN: PES + campus digit + program + 2-digit year + branch + 3 digits (PES2UG25CS001). Students who
+# joined before SRNs existed have an SRN that is their PRN.
+
+
+@pytest.mark.parametrize(
+    ("login_id", "expected"),
+    [
+        ("PES2UG25CS001", "PES2UG25CS001"),
+        ("PES1PG24EC123", "PES1PG24EC123"),
+        ("PES1201800001", None),  # a PRN
+        ("PES2UG25CSE001", None),  # a three-letter branch
+        ("PES2UG25CS01", None),  # two-digit number
+        ("PES2UG2025CS001", None),  # four-digit year
+        ("pes2ug25cs001", None),  # not how PESU writes it
+        ("john.doe@example.com", None),
+        (None, None),
+    ],
+)
+def test_only_a_new_style_srn_is_an_srn(login_id, expected):
+    assert _as_srn(login_id) == expected
+
+
+@pytest.mark.asyncio
+async def test_the_prn_is_found_in_any_block(pesu, upstream, make_response, login_payload, profile_payload):
+    """Merging the blocks first used to keep STUDENT_INFO's loginId and drop STUDENT_PHOTO's PRN."""
+    del login_payload["mobileJsonObject"]["loginId"]
+    profile_payload["STUDENT_INFO"]["LoginId"] = "PES2UG25CS001"
+    profile_payload["STUDENT_PHOTO"]["loginId"] = "PES2202500001"
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
+
+
+@pytest.mark.asyncio
+async def test_an_older_students_srn_is_also_their_prn(pesu, upstream, make_response, login_payload, profile_payload):
+    """With no loginId anywhere, a PRN-shaped SRN still identifies the PRN, because it is the PRN."""
+    del login_payload["mobileJsonObject"]["loginId"]
+    del profile_payload["STUDENT_PHOTO"]
+    profile_payload["STUDENT_INFO"].update(LoginId=None, SRN="PES1201800001")
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["prn"] == profile["srn"] == "PES1201800001"
+
+
+@pytest.mark.asyncio
+async def test_the_srn_falls_back_to_a_new_style_srn_in_the_login(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    del profile_payload["STUDENT_PHOTO"]
+    profile_payload["STUDENT_INFO"].update(SRN=None, LoginId="PES2202500001")
+    login_payload["mobileJsonObject"]["loginId"] = "PES2UG25CS001"
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
+
+
+@pytest.mark.asyncio
+async def test_a_new_style_srn_beats_a_prn_shaped_photo_login_id(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    """A PRN-shaped STUDENT_PHOTO loginId is only taken as the SRN when no new-style SRN exists."""
+    profile_payload["STUDENT_INFO"].update(SRN=None, LoginId="PES2UG25CS001")
+    profile_payload["STUDENT_PHOTO"]["loginId"] = "PES2202500001"
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
+
+
+@pytest.mark.asyncio
+async def test_a_photo_login_id_that_is_not_an_id_is_ignored(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    profile_payload["STUDENT_INFO"].update(SRN=None, LoginId=None)
+    profile_payload["STUDENT_PHOTO"]["loginId"] = "john.doe@example.com"
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["srn"] is None
+    # The login's PRN still gives the campus
+    assert (profile["prn"], profile["campus"]) == ("PES2202500001", "EC")
+
+
+@pytest.mark.asyncio
+async def test_the_labelled_srn_is_trusted_as_sent(pesu, upstream, make_response, login_payload, profile_payload):
+    """STUDENT_INFO.SRN is the one field PESU labels as the SRN, so an unfamiliar shape is not discarded."""
+    profile_payload["STUDENT_INFO"]["SRN"] = "PES2UG25CSE001"
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert (profile["srn"], profile["campusCode"]) == ("PES2UG25CSE001", 2)

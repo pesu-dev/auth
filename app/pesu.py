@@ -30,7 +30,7 @@ from app.metrics.collector import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Mapping
+    from collections.abc import AsyncIterator, Callable, Mapping
 
 ProfileField = Literal[
     "name",
@@ -99,9 +99,14 @@ PROGRAM_NAMES = {
 # What upstream sends for a value it does not have. "NA" is what the web portal showed for a student
 # with no current class; it is a placeholder, not a value, so it is treated like a missing one.
 MISSING_VALUES = frozenset({"", "NA"})
-# A PRN is "PES", the campus digit, the admission year and a serial number, all digits. An SRN carries
-# letters (PES2UG25CS026), so this tells the two apart when upstream puts either under "loginId".
+# A PRN is "PES", the campus digit, the year of joining and a 5-digit number: PES1201800001.
+# An SRN is "PES", the campus digit, the program (UG, PG, ...), the last two digits of the year of
+# joining, the branch and a 3-digit number: PES2UG25CS001. Students who joined before SRNs were
+# introduced have an SRN that is their PRN. So the shapes never collide: an all-digit ID is always
+# the student's PRN, and one with letters is always their SRN.
 PRN_PATTERN = re.compile(r"PES\d{10}")
+SRN_PATTERN = re.compile(r"PES\d[A-Z]{2}\d{2}[A-Z]{2}\d{3}")
+# The campus digit is in the same place in both
 CAMPUS_CODE_PATTERN = re.compile(r"PES(\d)")
 
 
@@ -211,7 +216,10 @@ class _Semester(_UpstreamModel):
 class _Student(_UpstreamModel):
     """The student, merged from the blocks of the profile response."""
 
+    # Kept apart rather than merged: either may hold the PRN or the SRN, and which is which is
+    # decided by shape when the profile is built (see PRN_PATTERN)
     login_id: str | None = None
+    photo_login_id: str | None = None
     srn: str | None = None
     name: str | None = None
     first_name: str | None = None
@@ -289,9 +297,9 @@ class _ProfileResponse(_UpstreamModel):
         info = self.info or _StudentInfo()
         photo = self.photo or _StudentPhoto()
         return _Student(
-            login_id=info.login_id or photo.login_id,
-            # STUDENT_PHOTO has no separate SRN; its loginId is the SRN for current students
-            srn=info.srn or photo.login_id,
+            login_id=info.login_id,
+            photo_login_id=photo.login_id,
+            srn=info.srn,
             name=info.name or photo.name,
             first_name=info.first_name or photo.first_name,
             middle_name=info.middle_name,
@@ -490,6 +498,33 @@ def _as_prn(login_id: str | None) -> str | None:
     if login_id is not None and PRN_PATTERN.fullmatch(login_id):
         return login_id
     return None
+
+
+def _as_srn(login_id: str | None) -> str | None:
+    """Return a login ID only if it is a new-style SRN, the kind with letters.
+
+    Args:
+        login_id (str | None): A login ID from upstream, which may be a PRN or an SRN.
+
+    Returns:
+        str | None: The login ID if it has the shape of a new-style SRN, otherwise None.
+    """
+    if login_id is not None and SRN_PATTERN.fullmatch(login_id):
+        return login_id
+    return None
+
+
+def _first(convert: Callable[[str | None], str | None], *values: str | None) -> str | None:
+    """Return the first value that a converter accepts.
+
+    Args:
+        convert (Callable[[str | None], str | None]): Returns the value if it is acceptable, else None.
+        *values (str | None): The candidates, in order of preference.
+
+    Returns:
+        str | None: The first accepted value, or None if there is none.
+    """
+    return next((accepted for value in values if (accepted := convert(value)) is not None), None)
 
 
 def _date_from_epoch_ms(milliseconds: int | None) -> str | None:
@@ -715,10 +750,19 @@ class PESUAcademy:
         Returns:
             dict[str, Any]: The profile, with every field; None where upstream had no value.
         """
-        srn = student.srn
-        # Upstream uses "loginId" for the PRN and, for some students, for the SRN; only a PRN is kept
-        prn = _as_prn(user.login_id) or _as_prn(student.login_id)
-        # The SRN is preferred because every current student has one; older students may only have a PRN
+        # PESU puts the PRN or the SRN under "loginId" in each block, so they are told apart by shape.
+        # The one field labelled as the SRN comes first, as sent. Then any new-style SRN, which cannot
+        # be anything else. Last, STUDENT_PHOTO's loginId if it is a PRN: that block's loginId is the
+        # SRN, and an older student's SRN is their PRN.
+        srn = (
+            student.srn
+            or _first(_as_srn, student.photo_login_id, user.login_id, student.login_id)
+            or _first(_as_prn, student.photo_login_id)
+        )
+        # Any PRN-shaped ID is the PRN, wherever it is: a new-style SRN always has letters, and an older
+        # student's SRN is their PRN anyway
+        prn = _first(_as_prn, user.login_id, student.login_id, student.photo_login_id, student.srn)
+        # The SRN's campus digit is the same as the PRN's; the SRN comes first as the ID PESU labels
         campus_code, campus = self._campus(srn or prn, username)
         return {
             # The name as registered, which is what the web portal showed. The login response only

@@ -20,13 +20,20 @@ class ProfileModel(BaseModel):
     prn: str | None = Field(
         None,
         title="PRN",
-        description="PRN of the user. Null when PESU Academy does not return one.",
+        description=(
+            "PRN of the user: PES, the campus digit, the year of joining and a 5-digit number. Null when "
+            "PESU Academy does not return one."
+        ),
         json_schema_extra={"example": "PES1202000001"},
     )
     srn: str | None = Field(
         None,
         title="SRN",
-        description="SRN of the user.",
+        description=(
+            "SRN of the user: PES, the campus digit, the program, the last two digits of the year of joining, "
+            "the branch and a 3-digit number. For students who joined before SRNs were introduced, it is the "
+            "same as their PRN."
+        ),
         json_schema_extra={"example": "PES1UG20CS001"},
     )
     program: str | None = Field(

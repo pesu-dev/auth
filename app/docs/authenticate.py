@@ -12,7 +12,7 @@ authenticate_docs = ApiDocs(
                         "basic_srn_auth": {
                             "summary": "Simple Authentication",
                             "description": "Simple authentication using username without requesting profile data",
-                            "value": {"username": "PES1201800001", "password": "mySecurePassword123", "profile": False},
+                            "value": {"username": "PES1UG20CS001", "password": "mySecurePassword123", "profile": False},
                         },
                         "email_auth_with_profile": {
                             "summary": "Authentication with Full Profile",

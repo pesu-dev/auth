@@ -79,11 +79,20 @@ def check_live_profile(expected_profile):
     import re
     from datetime import date
 
-    from app.pesu import PROGRAM_NAMES, PESUAcademy, _normalise_program
+    from app.pesu import PRN_PATTERN, PROGRAM_NAMES, SRN_PATTERN, PESUAcademy, _normalise_program
 
     def check(profile):
         assert list(profile) == PESUAcademy.DEFAULT_FIELDS
         assert {field: profile[field] for field in expected_profile} == expected_profile
+        # An older account's SRN is its PRN; a newer one's SRN is the new format. Either way both IDs
+        # carry the same campus digit.
+        ok = profile["prn"] is None or PRN_PATTERN.fullmatch(profile["prn"]) is not None
+        assert ok, "prn does not have the shape of a PRN"
+        srn = profile["srn"] or ""
+        ok = PRN_PATTERN.fullmatch(srn) is not None or SRN_PATTERN.fullmatch(srn) is not None
+        assert ok, "srn has neither the old nor the new shape"
+        ok = profile["prn"] is None or profile["prn"][3] == srn[3]
+        assert ok, "prn and srn name different campuses"
         for field in ("firstName", "middleName", "lastName", "institute"):
             ok = profile[field] is None or (isinstance(profile[field], str) and profile[field].strip() == profile[field])
             assert ok, f"{field} is not a trimmed string or null"
