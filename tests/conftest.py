@@ -1,4 +1,5 @@
 import os
+import re
 
 import pytest
 from dotenv import load_dotenv
@@ -122,7 +123,12 @@ def check_live_profile(expected_profile, check_live_fields):
     Every field must equal its TEST_* value (see check_live_fields), in the documented order. The
     IDs are also checked for shape, which does not depend on the variables at all.
     """
-    from app.pesu import PRN_PATTERN, SRN_PATTERN, PESUAcademy
+    from app.pesu import PESUAcademy
+
+    # The service returns the IDs as PESU labels them, without checking their format; the live tests
+    # do check it, so that a change to PESU's ID formats is noticed
+    prn_pattern = re.compile(r"PES\d{10}")
+    srn_pattern = re.compile(r"PES\d[A-Z]{2}\d{2}[A-Z]{2}\d{3}")
 
     def check(profile):
         assert list(profile) == PESUAcademy.DEFAULT_FIELDS
@@ -130,10 +136,10 @@ def check_live_profile(expected_profile, check_live_fields):
         check_live_fields(profile, PESUAcademy.DEFAULT_FIELDS)
         # An older account's SRN is its PRN; a newer one's SRN is the new format. Either way both IDs
         # carry the same campus digit.
-        ok = profile["prn"] is None or PRN_PATTERN.fullmatch(profile["prn"]) is not None
+        ok = profile["prn"] is None or prn_pattern.fullmatch(profile["prn"]) is not None
         assert ok, "prn does not have the shape of a PRN"
         srn = profile["srn"] or ""
-        ok = PRN_PATTERN.fullmatch(srn) is not None or SRN_PATTERN.fullmatch(srn) is not None
+        ok = prn_pattern.fullmatch(srn) is not None or srn_pattern.fullmatch(srn) is not None
         assert ok, "srn has neither the old nor the new shape"
         ok = profile["prn"] is None or profile["prn"][3] == srn[3]
         assert ok, "prn and srn name different campuses"

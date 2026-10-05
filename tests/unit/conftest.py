@@ -10,7 +10,9 @@ import pytest
 # The personal fields this service must never keep or log -- photo, parents, address -- are
 # included so tests can prove they are dropped. The IDs are where PESU has been seen to put them for
 # a student whose PRN and SRN differ: the PRN under the login's loginId, STUDENT_INFO's LoginId and
-# USER_ROLE's LoginId, the SRN under STUDENT_INFO's SRN and STUDENT_PHOTO's loginId.
+# USER_ROLE's LoginId, the SRN under STUDENT_INFO's SRN and STUDENT_PHOTO's loginId. The profile is
+# built from STUDENT_INFO; the login response's copies of the same details are only there to prove
+# they are not used.
 LOGIN_PAYLOAD = {
     "mobileJsonObject": {
         "userId": "00000000-0000-0000-0000-000000000000",
@@ -77,8 +79,8 @@ PROFILE_PAYLOAD = {
         "BranchId": 3,
         "BranchAbbreviation": "CSE",
         "Branch": "Computer Science and Engineering",
-        "ClassName": None,
-        "SectionName": None,
+        "ClassName": "Sem-4, Section C",
+        "SectionName": "Section C",
     },
     # Deliberately out of order: the latest semester is chosen by batchClassOrder, not position
     "STUDENT_SEMESTERS": [

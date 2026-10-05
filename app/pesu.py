@@ -40,7 +40,7 @@ from app.metrics.collector import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable, Mapping
+    from collections.abc import AsyncIterator, Mapping
 
 ProfileField = Literal[
     "name",
@@ -81,18 +81,13 @@ CAMPUS_NAMES = {"1": "RR", "2": "EC"}
 # PESU stores a date of birth as the epoch milliseconds of midnight IST on that day. Read in UTC, the
 # same instant is 18:30 on the day before, so the timezone is what makes the date right.
 IST = timezone(timedelta(hours=5, minutes=30))
-ISO_DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
 # What upstream sends for a value it does not have. "NA" is what the web portal showed for a student
 # with no current class; it is a placeholder, not a value, so it is treated like a missing one.
 MISSING_VALUES = frozenset({"", "NA"})
-# A PRN is "PES", the campus digit, the year of joining and a 5-digit number: PES1201800001.
-# An SRN is "PES", the campus digit, the program (UG, PG, ...), the last two digits of the year of
-# joining, the branch and a 3-digit number: PES2UG25CS001. Students who joined before SRNs were
-# introduced have an SRN that is their PRN. So the shapes never collide: an all-digit ID is always
-# the student's PRN, and one with letters is always their SRN.
-PRN_PATTERN = re.compile(r"PES\d{10}")
-SRN_PATTERN = re.compile(r"PES\d[A-Z]{2}\d{2}[A-Z]{2}\d{3}")
-# The campus digit is in the same place in both
+# A PRN is "PES", the campus digit, the year of joining and a 5-digit number: PES1201800001. An SRN is
+# "PES", the campus digit, the program (UG, PG, ...), the last two digits of the year of joining, the
+# branch and a 3-digit number: PES2UG25CS001. Students who joined before SRNs were introduced have an SRN
+# that is their PRN. Either way, the campus digit is in the same place.
 CAMPUS_CODE_PATTERN = re.compile(r"PES(\d)")
 
 
@@ -158,19 +153,14 @@ Secondary = WrapValidator(_none_if_invalid)
 
 
 class _LoginUser(_UpstreamModel):
-    """The student as described by the login response's `mobileJsonObject`."""
+    """The student as described by the login response's `mobileJsonObject`.
+
+    Only the success marker is read. The profile comes entirely from the profile response, so the login
+    response's copies of the same details (some of them partial: its "name" is the first name only) are
+    never mixed into it.
+    """
 
     login: str | None = None
-    # The first name only, despite the key
-    name: str | None = None
-    email: str | None = None
-    phone: str | None = None
-    program: str | None = None
-    class_name: str | None = Field(None, alias="className")
-    section_name: str | None = Field(None, alias="sectionName")
-    login_id: str | None = Field(None, alias="loginId")
-    # Already a YYYY-MM-DD string here, unlike the profile response's timestamp
-    date_of_birth: Annotated[str | None, Secondary] = Field(None, alias="dateofBirth")
 
 
 class _LoginResponse(_UpstreamModel):
@@ -182,9 +172,13 @@ class _LoginResponse(_UpstreamModel):
 
 
 class _StudentInfo(_UpstreamModel):
-    """The student as described by the profile response's `STUDENT_INFO`."""
+    """The student as described by the profile response's `STUDENT_INFO`, the source of every field it has.
 
-    login_id: str | None = Field(None, alias="LoginId")
+    For students whose PRN and SRN differ, PESU sends the PRN as LoginId and the SRN as SRN; for students
+    who joined before SRNs existed, both hold the same ID.
+    """
+
+    prn: str | None = Field(None, alias="LoginId")
     srn: str | None = Field(None, alias="SRN")
     name: str | None = Field(None, alias="NameAsInSSLC")
     first_name: Annotated[str | None, Secondary] = Field(None, alias="FirstName")
@@ -201,22 +195,10 @@ class _StudentInfo(_UpstreamModel):
 
 
 class _StudentPhoto(_UpstreamModel):
-    """The student as described by the profile response's `STUDENT_PHOTO`, a subset of `STUDENT_INFO`."""
+    """The profile response's `STUDENT_PHOTO`, read only for what STUDENT_INFO does not have."""
 
-    login_id: str | None = Field(None, alias="loginId")
-    name: str | None = Field(None, alias="nameAsInSSLC")
-    first_name: Annotated[str | None, Secondary] = Field(None, alias="firstName")
-    email: str | None = Field(None, alias="email")
-    mobile: str | None = Field(None, alias="mobile")
     institute: Annotated[str | None, Secondary] = Field(None, alias="instituteName")
     gender: Annotated[str | None, Secondary] = None
-    date_of_birth: Annotated[int | None, Secondary] = Field(None, alias="dateOfBirth")
-
-
-class _UserRole(_UpstreamModel):
-    """The profile response's `USER_ROLE` block, read only for the PRN it carries."""
-
-    login_id: Annotated[str | None, Secondary] = Field(None, alias="LoginId")
 
 
 class _Semester(_UpstreamModel):
@@ -228,31 +210,12 @@ class _Semester(_UpstreamModel):
 
 
 class _Student(_UpstreamModel):
-    """The student, merged from the blocks of the profile response."""
+    """The student, from the blocks of the profile response."""
 
-    # Kept apart rather than merged, and told apart by shape when the profile is built (see
-    # PRN_PATTERN). For students whose PRN and SRN differ, PESU has been seen to send the PRN as
-    # STUDENT_INFO's LoginId and USER_ROLE's LoginId, and the SRN as STUDENT_INFO's SRN and
-    # STUDENT_PHOTO's loginId. For older students all of them are the same ID.
-    login_id: str | None = None
-    role_login_id: str | None = None
-    photo_login_id: str | None = None
-    srn: str | None = None
-    name: str | None = None
-    first_name: str | None = None
-    middle_name: str | None = None
-    last_name: str | None = None
-    email: str | None = None
-    mobile: str | None = None
-    program: str | None = None
-    branch: str | None = None
-    branch_short_code: str | None = None
-    class_name: str | None = None
-    section_name: str | None = None
+    info: _StudentInfo
     institute: str | None = None
-    roll_number: int | None = None
     gender: str | None = None
-    date_of_birth: int | None = None
+    roll_number: int | None = None
 
 
 class _ErrorEnvelope(_UpstreamModel):
@@ -278,15 +241,11 @@ class _ProfileResponse(_UpstreamModel):
     """The profile (dispatcher) response."""
 
     message: str = Field(alias="MESSAGE")
-    # STUDENT_INFO has been seen on every response so far, but the examples recorded in issue #233
-    # and PR #152 show only STUDENT_PHOTO. Requiring it would turn every profile request for such a
-    # student into a 422, so either block will do and the profile is built from what is there.
     info: _StudentInfo | None = Field(None, alias="STUDENT_INFO")
-    photo: _StudentPhoto | None = Field(None, alias="STUDENT_PHOTO")
-    # Secondary, like the semesters: a USER_ROLE or STUDENT_SEMESTERS of an unexpected shape -- PESU
+    # Secondary, like the semesters: a STUDENT_PHOTO or STUDENT_SEMESTERS of an unexpected shape -- PESU
     # sends {} for an empty block, for one -- is dropped rather than failing the profile. Each semester
     # is too, so one malformed entry does not cost the others.
-    role: Annotated[_UserRole | None, Secondary] = Field(None, alias="USER_ROLE")
+    photo: Annotated[_StudentPhoto | None, Secondary] = Field(None, alias="STUDENT_PHOTO")
     semesters: Annotated[list[Annotated[_Semester | None, Secondary]] | None, Secondary] = Field(
         None,
         alias="STUDENT_SEMESTERS",
@@ -294,50 +253,35 @@ class _ProfileResponse(_UpstreamModel):
 
     @model_validator(mode="after")
     def _has_student(self) -> _ProfileResponse:
-        """Reject a response that describes no student at all.
+        """Reject a response whose STUDENT_INFO describes no student.
 
-        A block counts only if it holds a value. PESU sends `{}` for an empty block (PLACEMENT_DETAILS
-        is one), and since every field is optional, `{}` -- or a block of only unknown or null keys --
-        would otherwise parse into an all-empty block and pass as a profile.
+        STUDENT_INFO is where every core field comes from, and nothing stands in for it. A block counts
+        only if it holds a value: PESU sends `{}` for an empty block (PLACEMENT_DETAILS is one), and
+        since every field is optional, `{}` -- or a block of only unknown or null keys -- would otherwise
+        parse into an all-empty block and pass as a profile.
 
         Returns:
             _ProfileResponse: The response, unchanged.
 
         Raises:
-            ValueError: If neither STUDENT_INFO nor STUDENT_PHOTO holds any student data.
+            ValueError: If STUDENT_INFO is missing or holds no student data.
         """
-        if not _has_values(self.info) and not _has_values(self.photo):
-            raise ValueError("neither STUDENT_INFO nor STUDENT_PHOTO holds any student data")
+        if not _has_values(self.info):
+            raise ValueError("STUDENT_INFO holds no student data")
         return self
 
     def student(self) -> _Student:
-        """Merge the student blocks, filling STUDENT_INFO's gaps from STUDENT_PHOTO.
+        """Gather the student from the blocks of the response.
 
         Returns:
             _Student: The student details.
         """
-        info = self.info or _StudentInfo()
         photo = self.photo or _StudentPhoto()
         return _Student(
-            login_id=info.login_id,
-            role_login_id=(self.role or _UserRole()).login_id,
-            photo_login_id=photo.login_id,
-            srn=info.srn,
-            name=info.name or photo.name,
-            first_name=info.first_name or photo.first_name,
-            middle_name=info.middle_name,
-            last_name=info.last_name,
-            email=info.email or photo.email,
-            mobile=info.mobile or photo.mobile,
-            program=info.program,
-            branch=info.branch,
-            branch_short_code=info.branch_short_code,
-            class_name=info.class_name,
-            section_name=info.section_name,
+            info=self.info,
             institute=photo.institute,
-            roll_number=self._current_roll_number(),
             gender=photo.gender,
-            date_of_birth=info.date_of_birth or photo.date_of_birth,
+            roll_number=self._current_roll_number(),
         )
 
     def _current_roll_number(self) -> int | None:
@@ -498,47 +442,6 @@ def _semester_from_class_name(class_name: str | None) -> str | None:
     return class_name.split(",", 1)[0].strip() or None
 
 
-def _as_prn(login_id: str | None) -> str | None:
-    """Return a login ID only if it is a PRN.
-
-    Args:
-        login_id (str | None): A login ID from upstream, which may be a PRN or an SRN.
-
-    Returns:
-        str | None: The login ID if it has the shape of a PRN, otherwise None.
-    """
-    if login_id is not None and PRN_PATTERN.fullmatch(login_id):
-        return login_id
-    return None
-
-
-def _as_srn(login_id: str | None) -> str | None:
-    """Return a login ID only if it is a new-style SRN, the kind with letters.
-
-    Args:
-        login_id (str | None): A login ID from upstream, which may be a PRN or an SRN.
-
-    Returns:
-        str | None: The login ID if it has the shape of a new-style SRN, otherwise None.
-    """
-    if login_id is not None and SRN_PATTERN.fullmatch(login_id):
-        return login_id
-    return None
-
-
-def _first(convert: Callable[[str | None], str | None], *values: str | None) -> str | None:
-    """Return the first value that a converter accepts.
-
-    Args:
-        convert (Callable[[str | None], str | None]): Returns the value if it is acceptable, else None.
-        *values (str | None): The candidates, in order of preference.
-
-    Returns:
-        str | None: The first accepted value, or None if there is none.
-    """
-    return next((accepted for value in values if (accepted := convert(value)) is not None), None)
-
-
 def _date_from_epoch_ms(milliseconds: int | None) -> str | None:
     """Turn PESU's date-of-birth timestamp into an ISO date.
 
@@ -554,20 +457,6 @@ def _date_from_epoch_ms(milliseconds: int | None) -> str | None:
         return datetime.fromtimestamp(milliseconds / 1000, tz=IST).date().isoformat()
     except OverflowError, OSError, ValueError:
         return None
-
-
-def _iso_date(value: str | None) -> str | None:
-    """Return a date string only if it is already YYYY-MM-DD.
-
-    Args:
-        value (str | None): A date string from upstream.
-
-    Returns:
-        str | None: The value, or None if it is missing or in another format.
-    """
-    if value is not None and ISO_DATE_PATTERN.fullmatch(value):
-        return value
-    return None
 
 
 class PESUAcademy:
@@ -713,72 +602,49 @@ class PESUAcademy:
             return None, None
         return int(campus_code), CAMPUS_NAMES[campus_code]
 
-    def _build_profile(self, user: _LoginUser, student: _Student, username: str) -> dict[str, Any]:
-        """Merge the login and profile responses into the profile this API returns.
+    def _build_profile(self, student: _Student, username: str) -> dict[str, Any]:
+        """Build the profile this API returns from the profile response.
 
-        The profile response is the more complete source, so most fields come from there. The login
-        response fills the gaps it has been seen to leave, and is preferred for the class and section,
-        which it reports as the student's current ones.
+        Every field STUDENT_INFO has is taken from STUDENT_INFO alone, as PESU wrote it, or is null: no
+        other block, and not the login response, stands in for a value it lacks. Only what STUDENT_INFO
+        does not have comes from elsewhere: the institute and gender from STUDENT_PHOTO, and the roll
+        number from the latest semester.
 
         Args:
-            user (_LoginUser): The student from the login response.
             student (_Student): The student from the profile response.
             username (str): The username of the user, for logging.
 
         Returns:
             dict[str, Any]: The profile, with every field; None where upstream had no value.
         """
-        # PESU puts the PRN or the SRN under "loginId" in each block, so they are told apart by shape.
-        # The one field labelled as the SRN comes first, as sent. Then any new-style SRN, which cannot
-        # be anything else. Last, STUDENT_PHOTO's loginId if it is a PRN: that block's loginId has been
-        # seen to hold the SRN, and an older student's SRN is their PRN.
-        srn = (
-            student.srn
-            or _first(_as_srn, student.photo_login_id, user.login_id, student.login_id)
-            or _first(_as_prn, student.photo_login_id)
-        )
-        # Any PRN-shaped ID is the PRN, wherever it is: a new-style SRN always has letters, and an older
-        # student's SRN is their PRN anyway. The login's loginId, STUDENT_INFO's LoginId and
-        # USER_ROLE's LoginId have each been seen to hold it.
-        prn = _first(
-            _as_prn,
-            user.login_id,
-            student.login_id,
-            student.role_login_id,
-            student.photo_login_id,
-            student.srn,
-        )
-        # The SRN's campus digit is the same as the PRN's; the SRN comes first as the ID PESU labels
-        campus_code, campus = self._campus(srn or prn, username)
-        # Values are returned as PESU wrote them, or null; none is expanded or stood in for by a related
-        # value (the login's "name" is only the first name, so it is never the full name). The few that
-        # are worked out rather than copied: the PRN and SRN, told apart by shape; the campus, a fixed
-        # mapping of the ID's campus digit; the semester, the part of the class name before the comma;
-        # the roll number, the latest semester's; and the date of birth, converted to YYYY-MM-DD.
+        info = student.info
+        # Worked out rather than copied: the campus, a fixed mapping of the ID's campus digit (the SRN's
+        # and the PRN's are the same); the semester, the part of the class name before the comma; and
+        # the date of birth, converted from a timestamp.
+        campus_code, campus = self._campus(info.srn or info.prn, username)
         return {
             # The name as registered, which is what the web portal showed
-            "name": student.name,
-            "prn": prn,
-            "srn": srn,
+            "name": info.name,
+            "prn": info.prn,
+            "srn": info.srn,
             # The abbreviation PESU sends, such as "B.Tech.": it sends no full name, and a table of them
             # here would be a guess that clients can make better themselves
-            "program": user.program or student.program,
-            "branch": student.branch,
-            "semester": _semester_from_class_name(user.class_name or student.class_name),
-            "section": user.section_name or student.section_name,
-            "email": user.email or student.email,
-            "phone": user.phone or student.mobile,
+            "program": info.program,
+            "branch": info.branch,
+            "semester": _semester_from_class_name(info.class_name),
+            "section": info.section_name,
+            "email": info.email,
+            "phone": info.mobile,
             "campusCode": campus_code,
             "campus": campus,
-            # The login's "name" is the first name too
-            "firstName": student.first_name or user.name,
-            "middleName": student.middle_name,
-            "lastName": student.last_name,
-            "branchShortCode": student.branch_short_code,
+            "firstName": info.first_name,
+            "middleName": info.middle_name,
+            "lastName": info.last_name,
+            "branchShortCode": info.branch_short_code,
             "institute": student.institute,
             "rollNumber": student.roll_number,
             "gender": student.gender,
-            "dateOfBirth": _date_from_epoch_ms(student.date_of_birth) or _iso_date(user.date_of_birth),
+            "dateOfBirth": _date_from_epoch_ms(info.date_of_birth),
         }
 
     async def authenticate(
@@ -829,7 +695,7 @@ class PESUAcademy:
                 if login.access_token is None:
                     raise UpstreamError(f"PESU Academy sent no access token for user={username}.")
                 student = await self._fetch_profile(client, login.access_token, username)
-                result["profile"] = self._build_profile(login.user, student, username)
+                result["profile"] = self._build_profile(student, username)
                 logging.info(f"Complete profile information retrieved for user={username}: {result['profile']}.")
                 # Recorded at the branch itself rather than from the request body, so it reflects
                 # what actually happened: a caller who passes exactly the default field list has

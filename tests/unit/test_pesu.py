@@ -19,7 +19,7 @@ from app.metrics.collector import (
     MetricsCollector,
 )
 from app.models import ProfileModel
-from app.pesu import _CLOSE_TASKS, DISPATCHER_URL, LOGIN_URL, PESUAcademy, _as_prn, _as_srn, _upstream_call
+from app.pesu import _CLOSE_TASKS, DISPATCHER_URL, LOGIN_URL, PESUAcademy, _upstream_call
 
 FULL_PROFILE = {
     "name": "JOHN DOE",
@@ -247,37 +247,46 @@ async def test_a_declined_profile_is_a_fetch_error(pesu, upstream, make_response
 
 
 @pytest.mark.asyncio
-async def test_a_profile_without_student_info_is_built_from_student_photo(
-    pesu, upstream, make_response, login_payload, profile_payload
+@pytest.mark.parametrize("student_info", [None, {}, {"UserId": None, "Unknown": "x"}])
+async def test_a_profile_without_student_info_is_a_parse_error(
+    pesu, upstream, make_response, login_payload, profile_payload, collector, student_info
 ):
-    """The shape recorded in issue #233: only STUDENT_PHOTO, with the SRN under loginId."""
-    del profile_payload["STUDENT_INFO"]
+    """STUDENT_INFO is the source of every core field; nothing else stands in for it."""
+    if student_info is None:
+        del profile_payload["STUDENT_INFO"]
+    else:
+        profile_payload["STUDENT_INFO"] = student_info
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile == {
-        **FULL_PROFILE,
-        # Only STUDENT_INFO has the branch and its short code; the login's "Branch:CSE" is not parsed
-        "branch": None,
-        "branchShortCode": None,
-        "lastName": None,
-    }
+    # STUDENT_PHOTO and the login response still describe the student, and are not used instead
+    with pytest.raises(ProfileParseError):
+        await pesu.authenticate("user", "pass", profile=True)
+    assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="response_structure") == 1.0
 
 
 @pytest.mark.asyncio
-async def test_student_photo_fills_the_gaps_in_student_info(
+async def test_nothing_stands_in_for_a_value_student_info_lacks(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
-    login_payload["mobileJsonObject"].update(email=None, phone=None)
-    profile_payload["STUDENT_INFO"].update(SRN=None, NameAsInSSLC=None, Email=None, Mobile=None)
+    """The login response and STUDENT_PHOTO carry many of the same details; none fills a gap."""
+    for key in (
+        "LoginId", "SRN", "NameAsInSSLC", "FirstName", "Email", "Mobile",
+        "ProgramAbbreviation", "ClassName", "SectionName", "DateOfBirth",
+    ):
+        profile_payload["STUDENT_INFO"][key] = None
+    # Every other source still has a value for each of them
     profile_payload["STUDENT_PHOTO"].update(email="photo@example.com", mobile="5554443332")
+    profile_payload["STUDENT_SEMESTERS"][1]["className"] = "Sem-4"
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile["srn"] == "PES2UG25CS001"
-    assert profile["name"] == "JOHN DOE"
-    assert profile["email"] == "photo@example.com"
-    assert profile["phone"] == "5554443332"
+    for field in (
+        "prn", "srn", "name", "firstName", "email", "phone", "program",
+        "semester", "section", "dateOfBirth", "campusCode", "campus",
+    ):
+        assert profile[field] is None, field
+    # What STUDENT_INFO still has is unaffected
+    assert (profile["lastName"], profile["branchShortCode"]) == ("DOE", "CSE")
 
 
 @pytest.mark.asyncio
@@ -328,16 +337,6 @@ async def test_an_error_envelope_from_the_dispatcher_is_a_fetch_error(
     assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="response_structure") == 0.0
 
 
-@pytest.mark.asyncio
-async def test_one_block_with_data_is_enough(pesu, upstream, make_response, login_payload, profile_payload):
-    profile_payload["STUDENT_INFO"] = {}
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile["srn"] == "PES2UG25CS001"
-    assert profile["name"] == "JOHN DOE"
-
-
 # --- Mapping ---
 
 
@@ -358,9 +357,7 @@ async def test_a_student_without_a_class_has_no_semester_or_section(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
     """What a graduated student looks like: no class, no section, no program or branch either."""
-    user = login_payload["mobileJsonObject"]
-    user.update(className=None, sectionName=None, program=None, branch=None)
-    profile_payload["STUDENT_INFO"].update(ProgramAbbreviation=None, Branch=None)
+    profile_payload["STUDENT_INFO"].update(ClassName=None, SectionName=None, ProgramAbbreviation=None, Branch=None)
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
@@ -386,7 +383,7 @@ async def test_class_and_section_fall_back_to_the_profile_response(
 async def test_a_blank_class_name_has_no_semester(
     pesu, upstream, make_response, login_payload, profile_payload, class_name
 ):
-    login_payload["mobileJsonObject"]["className"] = class_name
+    profile_payload["STUDENT_INFO"]["ClassName"] = class_name
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
@@ -396,7 +393,7 @@ async def test_a_blank_class_name_has_no_semester(
 @pytest.mark.asyncio
 async def test_na_placeholders_are_treated_as_missing(pesu, upstream, make_response, login_payload, profile_payload):
     """The web portal printed "NA" for a student with no class; it is not a semester."""
-    login_payload["mobileJsonObject"].update(className="NA", sectionName=" NA ")
+    profile_payload["STUDENT_INFO"].update(ClassName="NA", SectionName=" NA ")
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
@@ -430,17 +427,27 @@ async def test_contact_details_fall_back_to_the_profile_response(
 
 
 @pytest.mark.asyncio
-async def test_an_srn_under_login_id_is_not_returned_as_the_prn(
-    pesu, upstream, make_response, login_payload, profile_payload
+@pytest.mark.parametrize(
+    ("login_id", "srn"),
+    [
+        ("PES2202500001", "PES2UG25CS001"),  # a student whose PRN and SRN differ
+        ("PES1201800001", "PES1201800001"),  # an older student, whose SRN is their PRN
+        ("PES2UG25CS001", "PES2202500001"),  # swapped: still returned as PESU labels them
+    ],
+)
+async def test_the_prn_and_srn_are_student_infos_login_id_and_srn(
+    pesu, upstream, make_response, login_payload, profile_payload, login_id, srn
 ):
-    login_payload["mobileJsonObject"]["loginId"] = "PES2UG25CS001"
-    profile_payload["STUDENT_INFO"]["LoginId"] = "PES2UG25CS001"
-    profile_payload["USER_ROLE"]["LoginId"] = "PES2UG25CS001"
+    """No format check and no other block: PESU labels these, so they are returned as labelled."""
+    profile_payload["STUDENT_INFO"].update(LoginId=login_id, SRN=srn)
+    # The other places PESU puts an ID hold something else, and are not used
+    login_payload["mobileJsonObject"]["loginId"] = "PES9209900009"
+    profile_payload["USER_ROLE"]["LoginId"] = "PES9209900009"
+    profile_payload["STUDENT_PHOTO"]["loginId"] = "PES9UG99CS009"
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile["prn"] is None
-    assert profile["srn"] == "PES2UG25CS001"
+    assert (profile["prn"], profile["srn"]) == (login_id, srn)
 
 
 @pytest.mark.asyncio
@@ -466,10 +473,8 @@ async def test_an_older_student_whose_prn_is_their_srn(pesu, upstream, make_resp
 
 @pytest.mark.asyncio
 async def test_campus_falls_back_to_the_prn(pesu, upstream, make_response, login_payload, profile_payload):
-    login_payload["mobileJsonObject"]["loginId"] = "PES1202500001"
-    profile_payload["STUDENT_INFO"]["SRN"] = None
-    # Without STUDENT_PHOTO too, since its loginId would otherwise stand in for the SRN
-    del profile_payload["STUDENT_PHOTO"]
+    """The campus digit is the same in both IDs, so the PRN gives the campus when there is no SRN."""
+    profile_payload["STUDENT_INFO"].update(LoginId="PES1202500001", SRN=None)
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
@@ -511,24 +516,12 @@ async def test_the_program_is_returned_as_pesu_writes_it(
     pesu, upstream, make_response, login_payload, profile_payload, collector, program
 ):
     """No expansion: a full name would be our guess, and a wrong guess would be served as fact."""
-    login_payload["mobileJsonObject"]["program"] = program
+    profile_payload["STUDENT_INFO"]["ProgramAbbreviation"] = program
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     assert profile["program"] == program
     assert list(collector.snapshot().samples(PROFILE_PARSE_ERRORS.name)) == []
-
-
-@pytest.mark.asyncio
-async def test_program_falls_back_to_the_profile_response(
-    pesu, upstream, make_response, login_payload, profile_payload
-):
-    login_payload["mobileJsonObject"]["program"] = None
-    profile_payload["STUDENT_INFO"]["ProgramAbbreviation"] = "MCA"
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile["program"] == "MCA"
 
 
 # --- Field filtering ---
@@ -557,7 +550,7 @@ async def test_field_filtering(pesu, upstream, make_response, login_payload, pro
 async def test_a_requested_field_upstream_does_not_have_is_none(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
-    login_payload["mobileJsonObject"]["className"] = None
+    profile_payload["STUDENT_INFO"]["ClassName"] = None
     profile_payload["STUDENT_PHOTO"]["gender"] = ""
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
@@ -719,23 +712,6 @@ async def test_a_retyped_field_we_use_is_a_parse_error(
         await pesu.authenticate("user", "pass", profile=True)
 
     assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="response_structure") == 1.0
-
-
-@pytest.mark.parametrize(
-    ("login_id", "expected"),
-    [
-        ("PES1201800001", "PES1201800001"),  # older PRN, also used as the SRN
-        ("PES2202500001", "PES2202500001"),  # current PRN
-        ("PES2UG25CS001", None),  # an SRN
-        ("PES220250000", None),  # one digit short
-        ("PES22025000011", None),  # one digit long
-        ("pes2202500001", None),  # not how PESU writes it
-        ("john.doe@example.com", None),
-        (None, None),
-    ],
-)
-def test_only_a_prn_shaped_login_id_is_a_prn(login_id, expected):
-    assert _as_prn(login_id) == expected
 
 
 @pytest.mark.asyncio
@@ -984,23 +960,6 @@ async def test_personal_details_are_returned_when_requested(
 
 
 @pytest.mark.asyncio
-async def test_the_date_of_birth_comes_from_student_photo_then_the_login(
-    pesu, upstream, make_response, login_payload, profile_payload
-):
-    profile_payload["STUDENT_INFO"]["DateOfBirth"] = None
-    profile_payload["STUDENT_PHOTO"]["dateOfBirth"] = 1104604200000  # 2005-01-02 IST
-    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
-    from_photo = await pesu.authenticate("user", "pass", profile=True, fields=["dateOfBirth"])
-
-    profile_payload["STUDENT_PHOTO"]["dateOfBirth"] = None
-    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
-    from_login = await pesu.authenticate("user", "pass", profile=True, fields=["dateOfBirth"])
-
-    assert from_photo["profile"] == {"dateOfBirth": "2005-01-02"}
-    assert from_login["profile"] == {"dateOfBirth": "2005-01-01"}
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("timestamp", "login_value"),
     [
@@ -1057,24 +1016,6 @@ async def test_the_roll_number_is_from_the_latest_semester(
 
 
 @pytest.mark.asyncio
-async def test_the_first_name_falls_back_to_student_photo_then_the_login(
-    pesu, upstream, make_response, login_payload, profile_payload
-):
-    profile_payload["STUDENT_INFO"]["FirstName"] = None
-    profile_payload["STUDENT_PHOTO"]["firstName"] = "JOHNNY"
-    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
-    from_photo = await pesu.authenticate("user", "pass", profile=True, fields=["firstName"])
-
-    profile_payload["STUDENT_PHOTO"]["firstName"] = None
-    login_payload["mobileJsonObject"]["name"] = "JON"
-    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
-    from_login = await pesu.authenticate("user", "pass", profile=True, fields=["firstName"])
-
-    assert from_photo["profile"] == {"firstName": "JOHNNY"}
-    assert from_login["profile"] == {"firstName": "JON"}
-
-
-@pytest.mark.asyncio
 async def test_the_branch_code_is_not_taken_from_the_login(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
@@ -1116,89 +1057,6 @@ def test_the_default_fields_are_every_field():
 # joined before SRNs existed have an SRN that is their PRN.
 
 
-@pytest.mark.parametrize(
-    ("login_id", "expected"),
-    [
-        ("PES2UG25CS001", "PES2UG25CS001"),
-        ("PES1PG24EC123", "PES1PG24EC123"),
-        ("PES1201800001", None),  # a PRN
-        ("PES2UG25CSE001", None),  # a three-letter branch
-        ("PES2UG25CS01", None),  # two-digit number
-        ("PES2UG2025CS001", None),  # four-digit year
-        ("pes2ug25cs001", None),  # not how PESU writes it
-        ("john.doe@example.com", None),
-        (None, None),
-    ],
-)
-def test_only_a_new_style_srn_is_an_srn(login_id, expected):
-    assert _as_srn(login_id) == expected
-
-
-@pytest.mark.asyncio
-async def test_the_prn_is_found_in_any_block(pesu, upstream, make_response, login_payload, profile_payload):
-    """Merging the blocks first used to keep STUDENT_INFO's loginId and drop STUDENT_PHOTO's PRN."""
-    del login_payload["mobileJsonObject"]["loginId"]
-    profile_payload["STUDENT_INFO"]["LoginId"] = "PES2UG25CS001"
-    profile_payload["STUDENT_PHOTO"]["loginId"] = "PES2202500001"
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
-
-
-@pytest.mark.asyncio
-async def test_an_older_students_srn_is_also_their_prn(pesu, upstream, make_response, login_payload, profile_payload):
-    """With no loginId anywhere, a PRN-shaped SRN still identifies the PRN, because it is the PRN."""
-    del login_payload["mobileJsonObject"]["loginId"]
-    del profile_payload["STUDENT_PHOTO"]
-    del profile_payload["USER_ROLE"]
-    profile_payload["STUDENT_INFO"].update(LoginId=None, SRN="PES1201800001")
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile["prn"] == profile["srn"] == "PES1201800001"
-
-
-@pytest.mark.asyncio
-async def test_the_srn_falls_back_to_a_new_style_srn_in_the_login(
-    pesu, upstream, make_response, login_payload, profile_payload
-):
-    del profile_payload["STUDENT_PHOTO"]
-    profile_payload["STUDENT_INFO"].update(SRN=None, LoginId="PES2202500001")
-    login_payload["mobileJsonObject"]["loginId"] = "PES2UG25CS001"
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
-
-
-@pytest.mark.asyncio
-async def test_a_new_style_srn_beats_a_prn_shaped_photo_login_id(
-    pesu, upstream, make_response, login_payload, profile_payload
-):
-    """A PRN-shaped STUDENT_PHOTO loginId is only taken as the SRN when no new-style SRN exists."""
-    profile_payload["STUDENT_INFO"].update(SRN=None, LoginId="PES2UG25CS001")
-    profile_payload["STUDENT_PHOTO"]["loginId"] = "PES2202500001"
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
-
-
-@pytest.mark.asyncio
-async def test_a_photo_login_id_that_is_not_an_id_is_ignored(
-    pesu, upstream, make_response, login_payload, profile_payload
-):
-    profile_payload["STUDENT_INFO"].update(SRN=None, LoginId=None)
-    profile_payload["STUDENT_PHOTO"]["loginId"] = "john.doe@example.com"
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile["srn"] is None
-    # The login's PRN still gives the campus
-    assert (profile["prn"], profile["campus"]) == ("PES2202500001", "EC")
-
-
 @pytest.mark.asyncio
 async def test_the_labelled_srn_is_trusted_as_sent(pesu, upstream, make_response, login_payload, profile_payload):
     """STUDENT_INFO.SRN is the one field PESU labels as the SRN, so an unfamiliar shape is not discarded."""
@@ -1207,17 +1065,6 @@ async def test_the_labelled_srn_is_trusted_as_sent(pesu, upstream, make_response
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     assert (profile["srn"], profile["campusCode"]) == ("PES2UG25CSE001", 2)
-
-
-@pytest.mark.asyncio
-async def test_the_prn_is_found_in_user_role(pesu, upstream, make_response, login_payload, profile_payload):
-    """USER_ROLE's LoginId has been seen to hold the PRN, so it is used when the others do not."""
-    del login_payload["mobileJsonObject"]["loginId"]
-    profile_payload["STUDENT_INFO"]["LoginId"] = None
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
 
 
 @pytest.mark.asyncio
@@ -1239,9 +1086,9 @@ async def test_an_empty_or_odd_user_role_is_harmless(pesu, upstream, make_respon
     [
         # PESU's style for an empty block, which a list field would otherwise reject
         ("STUDENT_SEMESTERS", None, {}, {"rollNumber": None}),
-        ("USER_ROLE", None, [], {}),
-        ("STUDENT_INFO", "DateOfBirth", "2005-01-01", {}),  # STUDENT_PHOTO still has the timestamp
-        ("STUDENT_INFO", "FirstName", {"unexpected": True}, {}),  # STUDENT_PHOTO still has the first name
+        ("STUDENT_PHOTO", None, [], {"institute": None, "gender": None}),
+        ("STUDENT_INFO", "DateOfBirth", "2005-01-01", {"dateOfBirth": None}),
+        ("STUDENT_INFO", "FirstName", {"unexpected": True}, {"firstName": None}),
         ("STUDENT_INFO", "MiddleName", ["x"], {}),
         ("STUDENT_INFO", "LastName", {"x": 1}, {"lastName": None}),
         ("STUDENT_INFO", "BranchAbbreviation", [], {"branchShortCode": None}),
@@ -1310,7 +1157,8 @@ async def test_a_malformed_semester_costs_only_itself(
         ("STUDENT_INFO", "SRN", {"x": 1}),
         ("STUDENT_INFO", "NameAsInSSLC", ["JOHN"]),
         ("STUDENT_INFO", "Branch", {"x": 1}),
-        ("STUDENT_PHOTO", "email", ["a@b.c"]),
+        ("STUDENT_INFO", "Email", ["a@b.c"]),
+        ("STUDENT_INFO", "LoginId", {"x": 1}),
     ],
 )
 async def test_a_core_field_of_an_unexpected_shape_is_still_a_parse_error(

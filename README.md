@@ -201,6 +201,11 @@ a student who is not currently in a class (such as one who has graduated) has a 
 student whose PRN PESU Academy does not return has a `null` `prn`. Fields left out by `fields` are not included at all,
 and fields come back in the order of the table below.
 
+Every field is taken from the `STUDENT_INFO` block of PESU Academy's profile response, as PESU Academy sends it, except
+`institute` and `gender` (from `STUDENT_PHOTO`, since `STUDENT_INFO` does not have them), `rollNumber` (from the latest
+semester) and `campusCode`/`campus` (from the campus digit of the SRN, or of the PRN). No other part of the response
+stands in for a value `STUDENT_INFO` lacks, so that field is `null`; a response without `STUDENT_INFO` is a `422`.
+
 The fields from `firstName` onwards came with the move to PESU Academy's mobile API. If PESU Academy ever sends one of
 them in an unexpected shape, that field is `null` and the rest of the profile still comes back; a change to one of the
 fields above them is a `422`.

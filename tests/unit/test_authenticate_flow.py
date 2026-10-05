@@ -103,9 +103,9 @@ def test_a_login_with_the_full_profile(client, pesu_up):
     assert len(pesu_up.requests) == 2
 
 
-def test_a_profile_with_missing_values_returns_null(client, pesu_up, login_payload):
+def test_a_profile_with_missing_values_returns_null(client, pesu_up, profile_payload):
     """What a graduated student looks like on the wire: every field present, the empty ones null."""
-    login_payload["mobileJsonObject"].update(className=None, sectionName="NA")
+    profile_payload["STUDENT_INFO"].update(ClassName=None, SectionName="NA")
 
     profile = _authenticate(client, profile=True).json()["profile"]
 
@@ -114,8 +114,8 @@ def test_a_profile_with_missing_values_returns_null(client, pesu_up, login_paylo
     assert profile["section"] is None
 
 
-def test_requested_fields_only_and_null_when_empty(client, pesu_up, login_payload):
-    login_payload["mobileJsonObject"]["className"] = None
+def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payload):
+    profile_payload["STUDENT_INFO"]["ClassName"] = None
 
     fields = ["semester", "campusCode", "name", "middleName", "rollNumber", "dateOfBirth", "branchShortCode"]
     profile = _authenticate(client, profile=True, fields=fields).json()["profile"]
