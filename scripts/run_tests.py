@@ -1,6 +1,5 @@
-"""Script to run all the tests with coverage."""
-
 #!/usr/bin/env python3
+"""Script to run all the tests with coverage."""
 
 import logging
 import os

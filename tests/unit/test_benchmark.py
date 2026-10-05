@@ -1,6 +1,7 @@
 """Tests for the benchmark scripts in scripts/benchmark/. Nothing here sends a real request."""
 
 import argparse
+import importlib.util
 import re
 import sys
 from pathlib import Path
@@ -11,13 +12,43 @@ import matplotlib
 import pandas as pd
 import pytest
 
-# The scripts import their helper as a sibling module, the way they are run from that directory
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "benchmark"))
 matplotlib.use("Agg")
 
-import analyze_benchmark  # noqa: E402
-import benchmark_requests  # noqa: E402
-import util  # noqa: E402
+BENCHMARK_DIR = Path(__file__).resolve().parents[2] / "scripts" / "benchmark"
+
+
+def _load(name, module_name):
+    spec = importlib.util.spec_from_file_location(module_name, BENCHMARK_DIR / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_scripts():
+    """Load the scripts under names of their own, without putting scripts/benchmark on sys.path.
+
+    They import their helper as a sibling (`from util import ...`), the way they run from that
+    directory. So `util` is registered only while the other two load, then the previous entry, if
+    any, is put back: no other test sees a module called `util` that is not its own.
+    """
+    helper = _load("util", "benchmark_util")
+    previous = sys.modules.get("util")
+    sys.modules["util"] = helper
+    try:
+        return helper, _load("benchmark_requests", "benchmark_requests"), _load("analyze_benchmark", "analyze_benchmark")
+    finally:
+        if previous is None:
+            del sys.modules["util"]
+        else:
+            sys.modules["util"] = previous
+
+
+util, benchmark_requests, analyze_benchmark = _load_scripts()
+
+
+def test_loading_the_scripts_leaves_no_trace():
+    assert str(BENCHMARK_DIR) not in sys.path
+    assert sys.modules.get("util") is not util
 
 # --- util.resolve_output_path ---
 
