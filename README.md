@@ -152,12 +152,12 @@ object, with the user's profile information if requested.
 
 #### Request Parameters
 
-| **Parameter** | **Optional** | **Type**    | **Default** | **Description**                                                                                                                        |
-| ------------- | ------------ | ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `username`    | No           | `str`       |             | The user's SRN, PRN, email address, or phone number                                                                                    |
-| `password`    | No           | `str`       |             | The user's password                                                                                                                    |
-| `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information. This makes a second call to PESU Academy, so it takes longer                                     |
-| `fields`      | Yes          | `list[str]` | `None`      | Which [`ProfileObject`](#profileobject) fields to return. Only used when `profile` is `true`. If not provided, all fields are returned |
+| **Parameter** | **Optional** | **Type**    | **Default** | **Description**                                                                                                                                                                                                     |
+| ------------- | ------------ | ----------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `username`    | No           | `str`       |             | The user's SRN, PRN, email address, or phone number                                                                                                                                                                 |
+| `password`    | No           | `str`       |             | The user's password. It is sent only to PESU Academy, and never stored or logged                                                                                                                                    |
+| `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information. This makes a second call to PESU Academy, so it takes longer                                                                                                                  |
+| `fields`      | Yes          | `list[str]` | `None`      | Which [`ProfileObject`](#profileobject) fields to return. Only used when `profile` is `true`. If not provided, all fields are returned. Fields come back in the table's order, whatever order they are asked for in |
 
 The request body is validated strictly. A missing or empty `username` or `password`, one that is not valid text, a value of the wrong type (such as
 the string `"true"` for `profile`), an unknown key, an empty `fields` list, or an unknown field name is rejected with a
@@ -165,14 +165,14 @@ the string `"true"` for `profile`), an unknown key, an empty `fields` list, or a
 
 #### Responses
 
-| **Code** | **When**                                                                                            |
-| -------- | --------------------------------------------------------------------------------------------------- |
-| `200`    | The credentials are valid. `profile` is included if it was requested                                |
-| `400`    | The request body failed validation, as described above                                              |
-| `401`    | PESU Academy rejected the credentials: a wrong password, or a user that does not exist              |
-| `422`    | PESU Academy's profile response could not be parsed, which means their API changed                  |
-| `500`    | An unexpected failure, rendered by the catch-all handler                                            |
-| `502`    | PESU Academy could not be reached, timed out, or answered the login or profile request unexpectedly |
+| **Code** | **When**                                                                                                                |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `200`    | The credentials are valid. `profile` is included if it was requested                                                    |
+| `400`    | The request body failed validation, as described above                                                                  |
+| `401`    | PESU Academy rejected the credentials: a wrong password, or a user that does not exist                                  |
+| `422`    | PESU Academy's profile response could not be parsed, which means their API changed. Only when the profile was requested |
+| `500`    | An unexpected failure, rendered by the catch-all handler                                                                |
+| `502`    | PESU Academy could not be reached, timed out, or answered the login or profile request unexpectedly                     |
 
 Every error this API renders carries the same `{status, message, timestamp}` body, with `status` set to `false`. The
 only exceptions are an unknown path or an unsupported method, which get the framework's own `404` or `405` with a
@@ -189,7 +189,7 @@ profile data was requested, the response's `profile` key will store a dictionary
 | `status`    | `boolean`       | A flag indicating whether the overall request was successful             |
 | `profile`   | `ProfileObject` | A nested map storing the profile information, returned only if requested |
 | `message`   | `str`           | A message that provides information corresponding to the status          |
-| `timestamp` | `datetime`      | A timezone offset timestamp indicating the time of authentication        |
+| `timestamp` | `datetime`      | The time of the request, as an ISO 8601 timestamp in IST (`+05:30`)      |
 
 ##### `ProfileObject`
 
@@ -198,7 +198,12 @@ If the authentication fails, this field will not be present in the response.
 
 Every requested field is present, and **any field can be `null`** when PESU Academy has no value for it. For example,
 a student who is not currently in a class (such as one who has graduated) has a `null` `semester` and `section`, and a
-student whose PRN PESU Academy does not return has a `null` `prn`. Fields left out by `fields` are not included at all.
+student whose PRN PESU Academy does not return has a `null` `prn`. Fields left out by `fields` are not included at all,
+and fields come back in the order of the table below.
+
+The fields from `firstName` onwards came with the move to PESU Academy's mobile API. If PESU Academy ever sends one of
+them in an unexpected shape, that field is `null` and the rest of the profile still comes back; a change to one of the
+fields above them is a `422`.
 
 | **Field**          | **Type** | **Description**                                                                                                                                                                                                                                                 |
 | ------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -219,12 +224,12 @@ student whose PRN PESU Academy does not return has a `null` `prn`. Fields left o
 | `programShortCode` | `str`    | Abbreviation of the program as PESU Academy writes it, such as `B.Tech.`                                                                                                                                                                                        |
 | `branchShortCode`  | `str`    | Abbreviation of the branch, such as `CSE`                                                                                                                                                                                                                       |
 | `institute`        | `str`    | Full name of the institute and campus, such as `PES University (Ring Road)`                                                                                                                                                                                     |
-| `rollNumber`       | `int`    | Roll number in the current semester, or in the latest one for a student who has graduated                                                                                                                                                                       |
+| `rollNumber`       | `int`    | Roll number in the current semester, or in the last one for a student who has graduated. `null` when that semester has none                                                                                                                                     |
 | `gender`           | `str`    | Gender of the user, as recorded by PESU                                                                                                                                                                                                                         |
 | `dateOfBirth`      | `str`    | Date of birth, as `YYYY-MM-DD`                                                                                                                                                                                                                                  |
 
-Everything else in PESU Academy's responses, such as the photo, addresses, parents' details and marks, is discarded and
-never returned.
+Everything else in PESU Academy's responses, such as the photo, blood group, addresses, parents' details and marks, is
+discarded and never returned, and cannot be requested in `fields`.
 
 ### `/health`
 

@@ -41,21 +41,28 @@ class RequestModel(BaseModel):
     password: str = Field(
         ...,
         title="Password",
-        description="User's password for authentication.",
+        description="User's password. It is sent only to PESU Academy, and never stored or logged.",
         json_schema_extra={"example": "mySecurePassword123"},
     )
 
     profile: bool = Field(
         False,
         title="Profile Flag",
-        description="Whether to fetch the user's profile information.",
+        description=(
+            "Whether to also return the user's profile. Fetching it is a second call to PESU Academy, so the "
+            "request takes longer."
+        ),
         json_schema_extra={"example": True},
     )
 
     fields: list[ProfileField] | None = Field(
         None,
         title="Profile Fields",
-        description="List of profile fields to fetch. If omitted, all default fields will be returned.",
+        description=(
+            "Which profile fields to return, from those listed in ProfileModel; every field when omitted. Only "
+            "used when profile is true. Fields come back in ProfileModel's order, whatever order they are asked "
+            "for in."
+        ),
         json_schema_extra={"example": ["name", "email", "campus", "branch", "semester", "firstName", "rollNumber"]},
     )
 

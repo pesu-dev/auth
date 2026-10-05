@@ -7,7 +7,12 @@ from pydantic.alias_generators import to_camel
 
 
 class ProfileModel(BaseModel):
-    """Model representing the user's profile data returned after successful authentication."""
+    """The user's profile, returned after a successful login when it was requested.
+
+    Every requested field is present. A field PESU Academy has no value for is null, as is one of the
+    fields added with the mobile API (name parts, short codes, institute, roll number, gender, date of
+    birth) if PESU sends it in an unexpected shape.
+    """
 
     model_config = ConfigDict(strict=True, alias_generator=to_camel, populate_by_name=True)
 
@@ -39,7 +44,10 @@ class ProfileModel(BaseModel):
     program: str | None = Field(
         None,
         title="Program",
-        description="Academic program that the user is enrolled in.",
+        description=(
+            "Full name of the academic program the user is enrolled in. A program abbreviation that is not "
+            "recognised is returned as PESU Academy sent it."
+        ),
         json_schema_extra={"example": "Bachelor of Technology"},
     )
     branch: str | None = Field(
@@ -51,13 +59,13 @@ class ProfileModel(BaseModel):
     semester: str | None = Field(
         None,
         title="Semester",
-        description="Current semester the user is pursuing. Null when the user is not in a class.",
+        description="Current semester, such as Sem-4. Null when the user is not in a class.",
         json_schema_extra={"example": "Sem-2"},
     )
     section: str | None = Field(
         None,
         title="Section",
-        description="Section the user belongs to. Null when the user is not in a class.",
+        description="Current section, such as Section C. Null when the user is not in a class.",
         json_schema_extra={"example": "Section C"},
     )
     email: str | None = Field(
@@ -75,13 +83,15 @@ class ProfileModel(BaseModel):
     campus_code: Literal[1, 2] | None = Field(
         None,
         title="Campus Code",
-        description="Numeric code representing the campus (1 for RR, 2 for EC).",
+        description=(
+            "Code of the campus, 1 for RR and 2 for EC, worked out from the SRN (or the PRN when there is no SRN)."
+        ),
         json_schema_extra={"example": 1},
     )
     campus: str | None = Field(
         None,
         title="Campus",
-        description="Abbreviation of the campus name.",
+        description="Abbreviation of the campus: RR or EC.",
         json_schema_extra={"example": "RR"},
     )
     first_name: str | None = Field(
@@ -111,7 +121,7 @@ class ProfileModel(BaseModel):
     branch_short_code: str | None = Field(
         None,
         title="Branch Short Code",
-        description="Abbreviation of the branch.",
+        description="Abbreviation of the branch, such as CSE.",
         json_schema_extra={"example": "CSE"},
     )
     institute: str | None = Field(
@@ -123,7 +133,10 @@ class ProfileModel(BaseModel):
     roll_number: int | None = Field(
         None,
         title="Roll Number",
-        description="Roll number in the user's current (or latest) semester.",
+        description=(
+            "Roll number in the user's current semester, or their last one if they have graduated. Null when "
+            "that semester has none."
+        ),
         json_schema_extra={"example": 27},
     )
     gender: str | None = Field(

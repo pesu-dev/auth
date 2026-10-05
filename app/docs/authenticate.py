@@ -11,12 +11,17 @@ authenticate_docs = ApiDocs(
                     "examples": {
                         "basic_srn_auth": {
                             "summary": "Simple Authentication",
-                            "description": "Simple authentication using username without requesting profile data",
+                            "description": "Authentication with an SRN, without requesting the profile",
                             "value": {"username": "PES1UG20CS001", "password": "mySecurePassword123", "profile": False},
+                        },
+                        "basic_prn_auth": {
+                            "summary": "Authentication with a PRN",
+                            "description": "Authentication with a PRN, without requesting the profile",
+                            "value": {"username": "PES1202000001", "password": "mySecurePassword123"},
                         },
                         "email_auth_with_profile": {
                             "summary": "Authentication with Full Profile",
-                            "description": "Authentication using username and requesting all profile data",
+                            "description": "Authentication with an email address, requesting every profile field",
                             "value": {
                                 "username": "johndoe@gmail.com",
                                 "password": "mySecurePassword123",
@@ -25,7 +30,7 @@ authenticate_docs = ApiDocs(
                         },
                         "phone_auth_selective_fields": {
                             "summary": "Authentication with Selected Fields",
-                            "description": "Authentication using username and requesting specific profile data fields",
+                            "description": "Authentication with a phone number, requesting only some profile fields",
                             "value": {
                                 "username": "1234567890",
                                 "password": "mySecurePassword123",
@@ -55,6 +60,11 @@ authenticate_docs = ApiDocs(
                         },
                         "authentication_with_profile": {
                             "summary": "Authentication with Full Profile",
+                            "description": (
+                                "Every field is always present. A field PESU Academy has no value for is null: "
+                                "for example semester and section for a student who is not in a class, or "
+                                "middleName for one who has none."
+                            ),
                             "value": {
                                 "status": True,
                                 "message": "Login successful.",
@@ -85,6 +95,7 @@ authenticate_docs = ApiDocs(
                         },
                         "authentication_with_selected_fields": {
                             "summary": "Authentication with Selected Fields",
+                            "description": "Only the requested fields, in the order the full profile lists them.",
                             "value": {
                                 "status": True,
                                 "message": "Login successful.",
@@ -105,7 +116,10 @@ authenticate_docs = ApiDocs(
             },
         },
         400: {
-            "description": "Bad Request - Invalid request data",
+            "description": (
+                "Bad Request - The request body failed validation: a missing, empty or invalid username or "
+                "password, a value of the wrong type, an unknown key, or an unknown profile field."
+            ),
             "model": ResponseModel,
             "content": {
                 "application/json": {
@@ -118,7 +132,9 @@ authenticate_docs = ApiDocs(
             },
         },
         401: {
-            "description": "Unauthorized - Invalid credentials",
+            "description": (
+                "Unauthorized - PESU Academy rejected the credentials: a wrong password, or a user that does not exist."
+            ),
             "model": ResponseModel,
             "content": {
                 "application/json": {
@@ -131,7 +147,10 @@ authenticate_docs = ApiDocs(
             },
         },
         422: {
-            "description": "Unprocessable entity - The profile response from PESU Academy could not be parsed",
+            "description": (
+                "Unprocessable Entity - PESU Academy's profile response could not be parsed, which means their API "
+                "changed. Only when the profile was requested."
+            ),
             "model": ResponseModel,
             "content": {
                 "application/json": {
@@ -157,7 +176,10 @@ authenticate_docs = ApiDocs(
             },
         },
         502: {
-            "description": "Bad Gateway - External service error",
+            "description": (
+                "Bad Gateway - PESU Academy could not be reached, timed out, or answered the login or profile request "
+                "unexpectedly."
+            ),
             "model": ResponseModel,
             "content": {
                 "application/json": {

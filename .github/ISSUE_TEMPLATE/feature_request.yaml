@@ -15,7 +15,7 @@ body:
     id: summary
     attributes:
       label: 📌 Feature Summary
-      placeholder: e.g. "Add support for fetching date of birth from PESU Academy"
+      placeholder: e.g. "Report the API version on /health"
     validations:
       required: true
 

@@ -269,13 +269,23 @@ async def readme() -> RedirectResponse:
     tags=["Authentication"],
 )
 async def authenticate(payload: RequestModel) -> JSONResponse:
-    """Authenticate a user using their PESU credentials via the PESU Academy service.
+    """Authenticate a user with their PESU credentials, and optionally return their profile.
+
+    The credentials are checked by signing in to PESU Academy. They are sent only there, and the
+    password is never stored or logged.
 
     Request body parameters:
     - username (str): The user's SRN, PRN, email address, or phone number.
     - password (str): The user's password.
-    - profile (bool, optional): Flag indicating whether to retrieve the user's profile information.
-    - fields (List[str], optional): Specific profile fields to include in the response.
+    - profile (bool, optional): Whether to also return the user's profile. Fetching it is a second
+      call to PESU Academy, so the request takes longer. Defaults to false.
+    - fields (List[str], optional): Which profile fields to return, from those listed in
+      `ProfileModel`; every field when omitted. Only used when `profile` is true. Fields come back in
+      `ProfileModel`'s order, whatever order they are asked for in, and an unknown name is a 400.
+
+    Every requested profile field is in the response. A field PESU Academy has no value for is
+    `null`, as is one of the fields added with the mobile API (name parts, short codes, institute,
+    roll number, gender, date of birth) if PESU sends it in an unexpected shape.
     """
     current_time = datetime.datetime.now(IST)
     # Input has already been validated by the RequestModel
