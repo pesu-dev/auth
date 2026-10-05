@@ -119,9 +119,11 @@ projects.
 
 1. **Configure your test credentials:**
    Open the `.env` file and replace the example values with the details of a PESU Academy account you can test with.
-   Each variable is documented in `.env.example`. The `TEST_*` profile values must match exactly what the API returns
-   for that account; set `TEST_SEMESTER` and `TEST_SECTION` to `NA` if the account is not currently in a class, since
-   the API then returns `null` for both. The file is gitignored: never commit it or paste its values anywhere.
+   Each variable is documented in `.env.example`. There is a `TEST_*` variable for every profile field, and the live
+   tests compare each one exactly with what the API returns for that account. Set a variable to `NA` when the account
+   has no value for that field (for example `TEST_MIDDLE_NAME`, or `TEST_SEMESTER` and `TEST_SECTION` if the account is
+   not currently in a class), since the API then returns `null`. CI reads the same variables from the repository's
+   secrets. The file is gitignored: never commit it or paste its values anywhere.
 
 ### Pre-commit Hooks
 

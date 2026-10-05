@@ -106,6 +106,15 @@ jobs:
       TEST_PHONE: ${{ secrets.TEST_PHONE }}
       TEST_CAMPUS: ${{ secrets.TEST_CAMPUS }}
       TEST_CAMPUS_CODE: ${{ secrets.TEST_CAMPUS_CODE }}
+      TEST_FIRST_NAME: ${{ secrets.TEST_FIRST_NAME }}
+      TEST_MIDDLE_NAME: ${{ secrets.TEST_MIDDLE_NAME }}
+      TEST_LAST_NAME: ${{ secrets.TEST_LAST_NAME }}
+      TEST_PROGRAM_SHORT_CODE: ${{ secrets.TEST_PROGRAM_SHORT_CODE }}
+      TEST_BRANCH_SHORT_CODE: ${{ secrets.TEST_BRANCH_SHORT_CODE }}
+      TEST_INSTITUTE: ${{ secrets.TEST_INSTITUTE }}
+      TEST_ROLL_NUMBER: ${{ secrets.TEST_ROLL_NUMBER }}
+      TEST_GENDER: ${{ secrets.TEST_GENDER }}
+      TEST_DATE_OF_BIRTH: ${{ secrets.TEST_DATE_OF_BIRTH }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
