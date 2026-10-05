@@ -233,7 +233,7 @@ def test_integration_authenticate_password_with_surrounding_whitespace(client):
     assert data["status"] is False
     assert "Could not validate request data" not in data.get("message", "")
 
-    
+
 def test_integration_authenticate_profile_wrong_type(client):
     payload = {
         "username": "username",
