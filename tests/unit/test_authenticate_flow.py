@@ -28,15 +28,13 @@ FULL_PROFILE = {
     "semester": "Sem-4",
     "section": "Section C",
     "email": "john.doe@example.com",
-    "phone": "9876543210",
+    "mobile": "9876543210",
     "campusCode": 2,
-    "campus": "EC",
+    "campus": "PES University (Electronic City)",
     "firstName": "JOHN",
     "middleName": None,
     "lastName": "DOE",
     "branchShortCode": "CSE",
-    "institute": "PES University (Electronic City)",
-    "rollNumber": 27,
     "gender": "Male",
     "dateOfBirth": "2005-01-01",
 }
@@ -117,16 +115,16 @@ def test_a_profile_with_missing_values_returns_null(client, pesu_up, profile_pay
 def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payload):
     profile_payload["STUDENT_INFO"]["ClassName"] = None
 
-    fields = ["semester", "campusCode", "name", "middleName", "rollNumber", "dateOfBirth", "branchShortCode"]
+    fields = ["semester", "campusCode", "name", "middleName", "mobile", "dateOfBirth", "branchShortCode"]
     profile = _authenticate(client, profile=True, fields=fields).json()["profile"]
 
     assert profile == {
         "name": "JOHN DOE",
         "semester": None,
         "campusCode": 2,
+        "mobile": "9876543210",
         "middleName": None,
         "branchShortCode": "CSE",
-        "rollNumber": 27,
         "dateOfBirth": "2005-01-01",
     }
     # On the wire, in the documented order
@@ -134,7 +132,7 @@ def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payl
 
 
 def test_fields_without_profile_return_no_profile(client, pesu_up):
-    body = _authenticate(client, profile=False, fields=["name", "gender", "rollNumber"]).json()
+    body = _authenticate(client, profile=False, fields=["name", "gender", "mobile"]).json()
 
     assert "profile" not in body
     assert len(pesu_up.requests) == 1

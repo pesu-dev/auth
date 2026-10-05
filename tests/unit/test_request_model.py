@@ -93,8 +93,8 @@ def test_validate_fields_multiple_invalid_fields():
 
 
 def test_validate_fields_valid_fields():
-    model = RequestModel(username="testuser", password="testpass", fields=["name", "email", "rollNumber", "dateOfBirth"])
-    assert model.fields == ["name", "email", "rollNumber", "dateOfBirth"]
+    model = RequestModel(username="testuser", password="testpass", fields=["name", "email", "mobile", "dateOfBirth"])
+    assert model.fields == ["name", "email", "mobile", "dateOfBirth"]
 
 
 def test_validate_every_profile_field_is_accepted():
@@ -179,7 +179,7 @@ def test_validate_deprecated_campus_code_in_fields_rejected():
 
 @pytest.mark.parametrize(
     "field",
-    ["first_name", "middle_name", "last_name", "branch_short_code", "roll_number", "date_of_birth"],
+    ["first_name", "middle_name", "last_name", "branch_short_code", "date_of_birth", "campus_code"],
 )
 def test_validate_snake_case_new_fields_rejected(field):
     """Fields are camelCase on the wire, like campusCode; the snake_case form is an unknown field."""
@@ -190,7 +190,7 @@ def test_validate_snake_case_new_fields_rejected(field):
     assert "fields.0" in str(exc_info.value)
 
 
-@pytest.mark.parametrize("field", ["bloodGroup", "photo", "profilePicture", "programShortCode"])
+@pytest.mark.parametrize("field", ["bloodGroup", "photo", "profilePicture", "programShortCode", "phone", "institute", "rollNumber"])
 def test_validate_fields_the_api_does_not_return_rejected(field):
     """Data in PESU's response that the API deliberately does not return cannot be requested."""
     with pytest.raises(ValidationError) as exc_info:

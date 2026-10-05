@@ -176,7 +176,7 @@ async def test_field_filtering_is_recorded_at_the_branch(
         make_response(json=payload) for _ in range(3) for payload in (login_payload, profile_payload)
     ]
 
-    await pesu.authenticate("u", "p", profile=True, fields=["name", "rollNumber"])
+    await pesu.authenticate("u", "p", profile=True, fields=["name", "mobile"])
     await pesu.authenticate("u", "p", profile=True, fields=None)
     await pesu.authenticate("u", "p", profile=True, fields=list(pesu.DEFAULT_FIELDS))
 

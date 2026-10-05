@@ -30,15 +30,13 @@ FULL_PROFILE = {
     "semester": "Sem-4",
     "section": "Section C",
     "email": "john.doe@example.com",
-    "phone": "9876543210",
+    "mobile": "9876543210",
     "campusCode": 2,
-    "campus": "EC",
+    "campus": "PES University (Electronic City)",
     "firstName": "JOHN",
     "middleName": None,
     "lastName": "DOE",
     "branchShortCode": "CSE",
-    "institute": "PES University (Electronic City)",
-    "rollNumber": 27,
     "gender": "Male",
     # Midnight IST on 2005-01-01; read in UTC it would be 2004-12-31
     "dateOfBirth": "2005-01-01",
@@ -275,14 +273,15 @@ async def test_nothing_stands_in_for_a_value_student_info_lacks(
     ):
         profile_payload["STUDENT_INFO"][key] = None
     # Every other source still has a value for each of them
-    profile_payload["STUDENT_PHOTO"].update(email="photo@example.com", mobile="5554443332")
-    profile_payload["STUDENT_SEMESTERS"][1]["className"] = "Sem-4"
+    profile_payload["STUDENT_PHOTO"].update(
+        loginId="PES2UG25CS001", nameAsInSSLC="JOHN DOE", email="photo@example.com", mobile="5554443332"
+    )
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     for field in (
-        "prn", "srn", "name", "firstName", "email", "phone", "program",
-        "semester", "section", "dateOfBirth", "campusCode", "campus",
+        "prn", "srn", "name", "firstName", "email", "mobile", "program",
+        "semester", "section", "dateOfBirth",
     ):
         assert profile[field] is None, field
     # What STUDENT_INFO still has is unaffected
@@ -379,7 +378,21 @@ async def test_class_and_section_fall_back_to_the_profile_response(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("class_name", ["", "   ", ", Section C"])
+@pytest.mark.parametrize("class_name", ["Sem-8", "Sem-4, Section C", "Minor Course (Even Sem)"])
+async def test_the_semester_is_the_class_name_as_sent(
+    pesu, upstream, make_response, login_payload, profile_payload, class_name
+):
+    """Not parsed: whatever PESU sends as STUDENT_INFO's ClassName is the semester."""
+    profile_payload["STUDENT_INFO"]["ClassName"] = class_name
+    login_payload["mobileJsonObject"]["className"] = "Sem-1, Section A"
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["semester"] == class_name
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("class_name", ["", "   ", "NA", None])
 async def test_a_blank_class_name_has_no_semester(
     pesu, upstream, make_response, login_payload, profile_payload, class_name
 ):
@@ -403,27 +416,25 @@ async def test_na_placeholders_are_treated_as_missing(pesu, upstream, make_respo
 
 @pytest.mark.asyncio
 async def test_blank_values_are_treated_as_missing(pesu, upstream, make_response, login_payload, profile_payload):
-    login_payload["mobileJsonObject"].update(email="", phone="  ")
+    profile_payload["STUDENT_INFO"].update(Email="", Mobile="  ")
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    # Filled from the profile response instead of returned as empty strings
-    assert profile["email"] == "john.doe@example.com"
-    assert profile["phone"] == "9876543210"
+    # Null rather than empty strings
+    assert profile["email"] is None
+    assert profile["mobile"] is None
 
 
 @pytest.mark.asyncio
-async def test_contact_details_fall_back_to_the_profile_response(
+async def test_a_numeric_mobile_number_is_returned_as_text(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
-    login_payload["mobileJsonObject"].update(email=None, phone=None)
-    profile_payload["STUDENT_INFO"].update(Email="other@example.com", Mobile=9998887776)
+    profile_payload["STUDENT_INFO"]["Mobile"] = 9998887776
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile["email"] == "other@example.com"
     # A number upstream is still a string here, as the model requires
-    assert profile["phone"] == "9998887776"
+    assert profile["mobile"] == "9998887776"
 
 
 @pytest.mark.asyncio
@@ -451,63 +462,58 @@ async def test_the_prn_and_srn_are_student_infos_login_id_and_srn(
 
 
 @pytest.mark.asyncio
-async def test_prn_falls_back_to_the_profile_response(pesu, upstream, make_response, login_payload, profile_payload):
-    del login_payload["mobileJsonObject"]["loginId"]
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile["prn"] == "PES2202500001"
-
-
-@pytest.mark.asyncio
 async def test_an_older_student_whose_prn_is_their_srn(pesu, upstream, make_response, login_payload, profile_payload):
     """Students admitted before SRNs existed have the PRN in both places."""
-    login_payload["mobileJsonObject"]["loginId"] = "PES1201800001"
     profile_payload["STUDENT_INFO"].update(LoginId="PES1201800001", SRN="PES1201800001")
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     assert profile["prn"] == profile["srn"] == "PES1201800001"
-    assert (profile["campusCode"], profile["campus"]) == (1, "RR")
 
 
 @pytest.mark.asyncio
-async def test_campus_falls_back_to_the_prn(pesu, upstream, make_response, login_payload, profile_payload):
-    """The campus digit is the same in both IDs, so the PRN gives the campus when there is no SRN."""
-    profile_payload["STUDENT_INFO"].update(LoginId="PES1202500001", SRN=None)
+@pytest.mark.parametrize(
+    ("institute", "campus_code"),
+    [("PES University (Ring Road)", 1), ("PES University (Electronic City)", 2)],
+)
+async def test_the_campus_is_the_institute_name_and_the_code_is_mapped_from_it(
+    pesu, upstream, make_response, login_payload, profile_payload, collector, institute, campus_code
+):
+    profile_payload["STUDENT_PHOTO"]["instituteName"] = institute
+    # Not read from the IDs: a campus digit that disagrees changes nothing
+    profile_payload["STUDENT_INFO"].update(LoginId="PES9202500001", SRN="PES9UG25CS001")
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert (profile["campusCode"], profile["campus"]) == (1, "RR")
+    assert (profile["campusCode"], profile["campus"]) == (campus_code, institute)
+    assert list(collector.snapshot().samples(PROFILE_PARSE_ERRORS.name)) == []
 
 
 @pytest.mark.asyncio
-async def test_no_identifier_means_no_campus(pesu, upstream, make_response, login_payload, profile_payload):
-    del login_payload["mobileJsonObject"]["loginId"]
+async def test_no_ids_means_null_ids(pesu, upstream, make_response, login_payload, profile_payload):
     profile_payload["STUDENT_INFO"].update(LoginId=None, SRN=None)
-    del profile_payload["STUDENT_PHOTO"]
-    del profile_payload["USER_ROLE"]
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    for field in ("prn", "srn", "campusCode", "campus"):
-        assert profile[field] is None
+    assert (profile["prn"], profile["srn"]) == (None, None)
+    # The campus does not come from the IDs
+    assert (profile["campusCode"], profile["campus"]) == (2, "PES University (Electronic City)")
 
 
 @pytest.mark.asyncio
-async def test_an_unknown_campus_code_is_counted_not_fatal(
+async def test_an_unknown_campus_name_is_returned_and_counted(
     pesu, upstream, make_response, login_payload, profile_payload, collector, caplog
 ):
-    profile_payload["STUDENT_INFO"]["SRN"] = "PES3UG25CS001"
+    profile_payload["STUDENT_PHOTO"]["instituteName"] = "PES University (Hanumanthanagar)"
 
     with caplog.at_level("WARNING"):
         profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile["srn"] == "PES3UG25CS001"
-    assert profile["campus"] is None
+    # The name is still PESU's answer; only the code, which this service maps, is unknown
+    assert profile["campus"] == "PES University (Hanumanthanagar)"
     assert profile["campusCode"] is None
     assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="unknown_campus_code") == 1.0
-    assert "Unknown campus code: 3" in caplog.text
+    assert "Unknown institute name: PES University (Hanumanthanagar)" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -531,15 +537,15 @@ async def test_the_program_is_returned_as_pesu_writes_it(
 async def test_field_filtering(pesu, upstream, make_response, login_payload, profile_payload):
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    fields = ["dateOfBirth", "name", "rollNumber", "campus", "middleName", "branchShortCode"]
+    fields = ["dateOfBirth", "name", "mobile", "campus", "middleName", "branchShortCode"]
     result = await pesu.authenticate("user", "pass", profile=True, fields=fields)
 
     assert result["profile"] == {
         "name": "JOHN DOE",
-        "campus": "EC",
+        "mobile": "9876543210",
+        "campus": "PES University (Electronic City)",
         "middleName": None,
         "branchShortCode": "CSE",
-        "rollNumber": 27,
         "dateOfBirth": "2005-01-01",
     }
     # In the documented order, whatever order they were asked for in
@@ -555,15 +561,15 @@ async def test_a_requested_field_upstream_does_not_have_is_none(
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
     result = await pesu.authenticate(
-        "user", "pass", profile=True, fields=["semester", "srn", "middleName", "gender", "institute"]
+        "user", "pass", profile=True, fields=["semester", "srn", "middleName", "gender", "campus"]
     )
 
     # Requested, so present; no value, so None
     assert result["profile"] == {
         "srn": "PES2UG25CS001",
         "semester": None,
+        "campus": "PES University (Electronic City)",
         "middleName": None,
-        "institute": "PES University (Electronic City)",
         "gender": None,
     }
 
@@ -720,14 +726,14 @@ async def test_duplicate_requested_fields_are_returned_once(
 ):
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    result = await pesu.authenticate("user", "pass", profile=True, fields=["name", "rollNumber", "name", "rollNumber"])
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["name", "mobile", "name", "mobile"])
 
-    assert result["profile"] == {"name": "JOHN DOE", "rollNumber": 27}
+    assert result["profile"] == {"name": "JOHN DOE", "mobile": "9876543210"}
 
 
 @pytest.mark.asyncio
 async def test_fields_without_a_profile_are_ignored(pesu, login_ok):
-    result = await pesu.authenticate("user", "pass", profile=False, fields=["name", "rollNumber", "dateOfBirth"])
+    result = await pesu.authenticate("user", "pass", profile=False, fields=["name", "mobile", "dateOfBirth"])
 
     assert "profile" not in result
     login_ok.assert_awaited_once()
@@ -833,10 +839,10 @@ async def test_a_timeout_is_an_upstream_error(pesu, wire, collector):
 @pytest.mark.asyncio
 async def test_concurrent_logins_do_not_share_anything(pesu, upstream, make_response, login_payload, profile_payload):
     """Two students logging in at once each get their own token, profile and client."""
-    # token, SRN, name, first name, roll number, date of birth (midnight IST)
+    # token, SRN, name, first name, campus, date of birth (midnight IST)
     students = {
-        "alice": ("TOKEN-ALICE", "PES1UG25CS001", "ALICE A", "ALICE", 11, 1078425000000),
-        "bob": ("TOKEN-BOB", "PES2UG25EC002", "BOB B", "BOB", 42, 1069266600000),
+        "alice": ("TOKEN-ALICE", "PES1UG25CS001", "ALICE A", "ALICE", "PES University (Ring Road)", 1078425000000),
+        "bob": ("TOKEN-BOB", "PES2UG25EC002", "BOB B", "BOB", "PES University (Electronic City)", 1069266600000),
     }
     tokens = {details[0]: student for student, details in students.items()}
 
@@ -848,7 +854,7 @@ async def test_concurrent_logins_do_not_share_anything(pesu, upstream, make_resp
             body = {**login_payload, "accessToken": students[student][0]}
             return make_response(json=body)
         student = tokens[headers["Authorization"].removeprefix("Bearer ")]
-        _, srn, name, first_name, roll_number, date_of_birth = students[student]
+        _, srn, name, first_name, campus, date_of_birth = students[student]
         info = {
             **profile_payload["STUDENT_INFO"],
             "SRN": srn,
@@ -856,12 +862,12 @@ async def test_concurrent_logins_do_not_share_anything(pesu, upstream, make_resp
             "FirstName": first_name,
             "DateOfBirth": date_of_birth,
         }
-        semesters = [{"studentRollNo": roll_number, "batchClassOrder": 1}]
-        return make_response(json={**profile_payload, "STUDENT_INFO": info, "STUDENT_SEMESTERS": semesters})
+        photo = {**profile_payload["STUDENT_PHOTO"], "instituteName": campus}
+        return make_response(json={**profile_payload, "STUDENT_INFO": info, "STUDENT_PHOTO": photo})
 
     upstream.side_effect = respond
 
-    fields = ["name", "srn", "campus", "firstName", "rollNumber", "dateOfBirth"]
+    fields = ["name", "srn", "campusCode", "campus", "firstName", "dateOfBirth"]
     alice, bob = await asyncio.gather(
         pesu.authenticate("alice", "pass", profile=True, fields=fields),
         pesu.authenticate("bob", "pass", profile=True, fields=fields),
@@ -870,17 +876,17 @@ async def test_concurrent_logins_do_not_share_anything(pesu, upstream, make_resp
     assert alice["profile"] == {
         "name": "ALICE A",
         "srn": "PES1UG25CS001",
-        "campus": "RR",
+        "campusCode": 1,
+        "campus": "PES University (Ring Road)",
         "firstName": "ALICE",
-        "rollNumber": 11,
         "dateOfBirth": "2004-03-05",
     }
     assert bob["profile"] == {
         "name": "BOB B",
         "srn": "PES2UG25EC002",
-        "campus": "EC",
+        "campusCode": 2,
+        "campus": "PES University (Electronic City)",
         "firstName": "BOB",
-        "rollNumber": 42,
         "dateOfBirth": "2003-11-20",
     }
 
@@ -992,30 +998,6 @@ async def test_a_date_of_birth_before_1970(pesu, upstream, make_response, login_
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("semesters", "roll_number"),
-    [
-        ([], None),
-        (None, None),
-        # An earlier semester's roll number is not the current one
-        ([{"studentRollNo": None, "batchClassOrder": 2}, {"studentRollNo": 5, "batchClassOrder": 1}], None),
-        ([{"studentRollNo": 8, "batchClassOrder": None}, {"studentRollNo": 5, "batchClassOrder": 1}], 5),
-        ([{"studentRollNo": "14", "batchClassOrder": "3"}], 14),
-    ],
-    ids=["no semesters", "null semesters", "latest has no roll", "unordered entry", "numbers as text"],
-)
-async def test_the_roll_number_is_from_the_latest_semester(
-    pesu, upstream, make_response, login_payload, profile_payload, semesters, roll_number
-):
-    profile_payload["STUDENT_SEMESTERS"] = semesters
-    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
-
-    result = await pesu.authenticate("user", "pass", profile=True, fields=["rollNumber"])
-
-    assert result["profile"] == {"rollNumber": roll_number}
-
-
-@pytest.mark.asyncio
 async def test_the_branch_code_is_not_taken_from_the_login(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
@@ -1030,16 +1012,18 @@ async def test_the_branch_code_is_not_taken_from_the_login(
 
 
 @pytest.mark.asyncio
-async def test_without_student_photo_there_is_no_institute_or_gender(
+async def test_without_student_photo_there_is_no_campus_or_gender(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
     del profile_payload["STUDENT_PHOTO"]
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    result = await pesu.authenticate("user", "pass", profile=True, fields=["institute", "gender", "dateOfBirth"])
+    result = await pesu.authenticate(
+        "user", "pass", profile=True, fields=["campusCode", "campus", "gender", "dateOfBirth"]
+    )
 
-    # The date of birth is in STUDENT_INFO too
-    assert result["profile"] == {"institute": None, "gender": None, "dateOfBirth": "2005-01-01"}
+    # The date of birth is in STUDENT_INFO
+    assert result["profile"] == {"campusCode": None, "campus": None, "gender": None, "dateOfBirth": "2005-01-01"}
 
 
 def test_the_default_fields_are_every_field():
@@ -1064,7 +1048,7 @@ async def test_the_labelled_srn_is_trusted_as_sent(pesu, upstream, make_response
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert (profile["srn"], profile["campusCode"]) == ("PES2UG25CSE001", 2)
+    assert profile["srn"] == "PES2UG25CSE001"
 
 
 @pytest.mark.asyncio
@@ -1084,15 +1068,11 @@ async def test_an_empty_or_odd_user_role_is_harmless(pesu, upstream, make_respon
 @pytest.mark.parametrize(
     ("block", "key", "value", "affected"),
     [
-        # PESU's style for an empty block, which a list field would otherwise reject
-        ("STUDENT_SEMESTERS", None, {}, {"rollNumber": None}),
-        ("STUDENT_PHOTO", None, [], {"institute": None, "gender": None}),
         ("STUDENT_INFO", "DateOfBirth", "2005-01-01", {"dateOfBirth": None}),
         ("STUDENT_INFO", "FirstName", {"unexpected": True}, {"firstName": None}),
         ("STUDENT_INFO", "MiddleName", ["x"], {}),
         ("STUDENT_INFO", "LastName", {"x": 1}, {"lastName": None}),
         ("STUDENT_INFO", "BranchAbbreviation", [], {"branchShortCode": None}),
-        ("STUDENT_PHOTO", "instituteName", {"x": 1}, {"institute": None}),
         ("STUDENT_PHOTO", "gender", ["Male"], {"gender": None}),
     ],
 )
@@ -1128,36 +1108,13 @@ async def test_a_login_date_of_birth_of_an_unexpected_shape_does_not_fail_the_lo
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("index", "entry", "roll_number"),
-    [
-        # Not a semester at all: skipped, and the latest (Sem-4) is untouched
-        (0, "garbage", 27),
-        # The latest, with no usable roll number: there is no current one
-        (1, {"studentRollNo": "27A", "batchClassOrder": 2027010199}, None),
-        # The latest, with no usable order: it cannot be placed in time, so Sem-3 is the latest left
-        (1, {"studentRollNo": 27, "batchClassOrder": "soon"}, 12),
-    ],
-)
-async def test_a_malformed_semester_costs_only_itself(
-    pesu, upstream, make_response, login_payload, profile_payload, index, entry, roll_number
-):
-    """The fixture's semesters are Sem-3 (12), Sem-4 (27, the latest) and Sem-2 (9)."""
-    profile_payload["STUDENT_SEMESTERS"][index] = entry
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile["rollNumber"] == roll_number
-    assert profile["srn"] == "PES2UG25CS001"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
     ("block", "key", "value"),
     [
         ("STUDENT_INFO", "SRN", {"x": 1}),
         ("STUDENT_INFO", "NameAsInSSLC", ["JOHN"]),
         ("STUDENT_INFO", "Branch", {"x": 1}),
         ("STUDENT_INFO", "Email", ["a@b.c"]),
+        ("STUDENT_PHOTO", "instituteName", {"x": 1}),
         ("STUDENT_INFO", "LoginId", {"x": 1}),
     ],
 )
@@ -1181,7 +1138,7 @@ async def test_blood_group_is_never_returned(pesu, upstream, make_response, logi
     assert "BLOODGROUPSECRET" not in str(profile)
 
 
-ORIGINAL_FIELDS = ["name", "prn", "srn", "program", "branch", "semester", "section", "email", "phone", "campusCode", "campus"]
+ORIGINAL_FIELDS = ["name", "prn", "srn", "program", "branch", "semester", "section", "email", "mobile", "campusCode", "campus"]
 
 
 def test_the_live_tests_request_every_new_field(new_profile_fields):

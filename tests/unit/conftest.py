@@ -79,10 +79,11 @@ PROFILE_PAYLOAD = {
         "BranchId": 3,
         "BranchAbbreviation": "CSE",
         "Branch": "Computer Science and Engineering",
-        "ClassName": "Sem-4, Section C",
+        # The semester alone; the login response's className adds the section
+        "ClassName": "Sem-4",
         "SectionName": "Section C",
     },
-    # Deliberately out of order: the latest semester is chosen by batchClassOrder, not position
+    # Not read: there for realism, and to prove a profile does not depend on it
     "STUDENT_SEMESTERS": [
         {"studentId": "00000000-0000-0000-0000-000000000000", "studentRollNo": 12, "className": "Sem-3", "batchClassOrder": 2026071499},
         {"studentId": "00000000-0000-0000-0000-000000000000", "studentRollNo": 27, "className": "Sem-4", "batchClassOrder": 2027010199},

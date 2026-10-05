@@ -10,8 +10,8 @@ class ProfileModel(BaseModel):
     """The user's profile, returned after a successful login when it was requested.
 
     Every requested field is present. A field PESU Academy has no value for is null, as is one of the
-    fields added with the mobile API (name parts, branch short code, institute, roll number, gender, date of
-    birth) if PESU sends it in an unexpected shape.
+    fields added with the mobile API (name parts, branch short code, gender, date of birth) if PESU sends it
+    in an unexpected shape.
     """
 
     model_config = ConfigDict(strict=True, alias_generator=to_camel, populate_by_name=True)
@@ -59,7 +59,10 @@ class ProfileModel(BaseModel):
     semester: str | None = Field(
         None,
         title="Semester",
-        description="Current semester, such as Sem-4. Null when the user is not in a class.",
+        description=(
+            "Current semester, as PESU Academy writes it, such as Sem-4. Null when PESU Academy has none, as "
+            "for a user who is not in a class."
+        ),
         json_schema_extra={"example": "Sem-2"},
     )
     section: str | None = Field(
@@ -74,25 +77,26 @@ class ProfileModel(BaseModel):
         description="Email address registered with PESU.",
         json_schema_extra={"example": "johndoe@gmail.com"},
     )
-    phone: str | None = Field(
+    mobile: str | None = Field(
         None,
-        title="Phone Number",
-        description="Phone number registered with PESU.",
+        title="Mobile Number",
+        description="Mobile number registered with PESU.",
         json_schema_extra={"example": "1234567890"},
     )
     campus_code: Literal[1, 2] | None = Field(
         None,
         title="Campus Code",
         description=(
-            "Code of the campus, 1 for RR and 2 for EC, worked out from the SRN (or the PRN when there is no SRN)."
+            "Code of the campus: 1 for PES University (Ring Road), 2 for PES University (Electronic City). Null "
+            "for a campus whose name is not one of those."
         ),
         json_schema_extra={"example": 1},
     )
     campus: str | None = Field(
         None,
         title="Campus",
-        description="Abbreviation of the campus: RR or EC.",
-        json_schema_extra={"example": "RR"},
+        description="Name of the campus's institute, as PESU Academy writes it.",
+        json_schema_extra={"example": "PES University (Ring Road)"},
     )
     first_name: str | None = Field(
         None,
@@ -117,21 +121,6 @@ class ProfileModel(BaseModel):
         title="Branch Short Code",
         description="Abbreviation of the branch, such as CSE.",
         json_schema_extra={"example": "CSE"},
-    )
-    institute: str | None = Field(
-        None,
-        title="Institute",
-        description="Full name of the institute and campus.",
-        json_schema_extra={"example": "PES University (Ring Road)"},
-    )
-    roll_number: int | None = Field(
-        None,
-        title="Roll Number",
-        description=(
-            "Roll number in the user's current semester, or their last one if they have graduated. Null when "
-            "that semester has none."
-        ),
-        json_schema_extra={"example": 27},
     )
     gender: str | None = Field(
         None,

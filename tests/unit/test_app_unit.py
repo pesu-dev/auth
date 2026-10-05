@@ -46,7 +46,7 @@ def test_a_profile_field_without_a_value_is_null(mock_authenticate, client):
             "section": None,
             "campusCode": 1,
             "middleName": None,
-            "rollNumber": 27,
+            "mobile": "1234567890",
             "dateOfBirth": "2002-01-31",
             "gender": None,
         },
@@ -62,7 +62,7 @@ def test_a_profile_field_without_a_value_is_null(mock_authenticate, client):
         "section": None,
         "campusCode": 1,
         "middleName": None,
-        "rollNumber": 27,
+        "mobile": "1234567890",
         "dateOfBirth": "2002-01-31",
         "gender": None,
     }

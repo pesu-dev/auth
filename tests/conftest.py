@@ -19,20 +19,18 @@ PROFILE_VARIABLES = {
     "semester": "TEST_SEMESTER",
     "section": "TEST_SECTION",
     "email": "TEST_EMAIL",
-    "phone": "TEST_PHONE",
+    "mobile": "TEST_PHONE",
     "campusCode": "TEST_CAMPUS_CODE",
     "campus": "TEST_CAMPUS",
     "firstName": "TEST_FIRST_NAME",
     "middleName": "TEST_MIDDLE_NAME",
     "lastName": "TEST_LAST_NAME",
     "branchShortCode": "TEST_BRANCH_SHORT_CODE",
-    "institute": "TEST_INSTITUTE",
-    "rollNumber": "TEST_ROLL_NUMBER",
     "gender": "TEST_GENDER",
     "dateOfBirth": "TEST_DATE_OF_BIRTH",
 }
 # Variables hold strings; these fields are integers in the API
-INTEGER_FIELDS = ("campusCode", "rollNumber")
+INTEGER_FIELDS = ("campusCode",)
 
 
 @pytest.fixture
@@ -87,8 +85,6 @@ NEW_PROFILE_FIELDS = [
     "middleName",
     "lastName",
     "branchShortCode",
-    "institute",
-    "rollNumber",
     "gender",
     "dateOfBirth",
 ]

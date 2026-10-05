@@ -286,8 +286,8 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
       `ProfileModel`'s order, whatever order they are asked for in, and an unknown name is a 400.
 
     Every requested profile field is in the response. A field PESU Academy has no value for is
-    `null`, as is one of the fields added with the mobile API (name parts, branch short code, institute,
-    roll number, gender, date of birth) if PESU sends it in an unexpected shape.
+    `null`, as is one of the fields added with the mobile API (name parts, branch short code, gender, date
+    of birth) if PESU sends it in an unexpected shape.
     """
     current_time = datetime.datetime.now(IST)
     # Input has already been validated by the RequestModel

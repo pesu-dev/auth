@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -51,15 +50,13 @@ ProfileField = Literal[
     "semester",
     "section",
     "email",
-    "phone",
+    "mobile",
     "campusCode",
     "campus",
     "firstName",
     "middleName",
     "lastName",
     "branchShortCode",
-    "institute",
-    "rollNumber",
     "gender",
     "dateOfBirth",
 ]
@@ -77,18 +74,16 @@ LOGIN_FORM = {"j_appId": "YES", "instId": "1,6,7,14"}
 PROFILE_FORM = {"action": "27", "mode": "1", "menuId": "11172"}
 UPSTREAM_TIMEOUT_SECONDS = 10.0
 
-CAMPUS_NAMES = {"1": "RR", "2": "EC"}
+# The campus code for each campus's institute name, as PESU writes it. The codes are the campus digit
+# in the student's PRN and SRN, which is what this API has always returned. Checked against students
+# of both campuses.
+CAMPUS_CODES = {"PES University (Ring Road)": 1, "PES University (Electronic City)": 2}
 # PESU stores a date of birth as the epoch milliseconds of midnight IST on that day. Read in UTC, the
 # same instant is 18:30 on the day before, so the timezone is what makes the date right.
 IST = timezone(timedelta(hours=5, minutes=30))
 # What upstream sends for a value it does not have. "NA" is what the web portal showed for a student
 # with no current class; it is a placeholder, not a value, so it is treated like a missing one.
 MISSING_VALUES = frozenset({"", "NA"})
-# A PRN is "PES", the campus digit, the year of joining and a 5-digit number: PES1201800001. An SRN is
-# "PES", the campus digit, the program (UG, PG, ...), the last two digits of the year of joining, the
-# branch and a 3-digit number: PES2UG25CS001. Students who joined before SRNs were introduced have an SRN
-# that is their PRN. Either way, the campus digit is in the same place.
-CAMPUS_CODE_PATTERN = re.compile(r"PES(\d)")
 
 
 # Strong references to in-flight client closes. A close that outlives the coroutine which asked
@@ -148,7 +143,7 @@ def _none_if_invalid(value: Any, handler: ValidatorFunctionWrapHandler, info: Va
 
 # For the fields that add to a profile rather than make one. If PESU changes the shape of one of
 # these, that field is null and the rest of the profile still comes back; the core fields (name, IDs,
-# program, branch, class, contact details) stay strict, so a change to them is still a 422.
+# program, branch, class, contact details, campus) stay strict, so a change to them is still a 422.
 Secondary = WrapValidator(_none_if_invalid)
 
 
@@ -197,16 +192,9 @@ class _StudentInfo(_UpstreamModel):
 class _StudentPhoto(_UpstreamModel):
     """The profile response's `STUDENT_PHOTO`, read only for what STUDENT_INFO does not have."""
 
-    institute: Annotated[str | None, Secondary] = Field(None, alias="instituteName")
+    # The campus, such as "PES University (Ring Road)"
+    institute: str | None = Field(None, alias="instituteName")
     gender: Annotated[str | None, Secondary] = None
-
-
-class _Semester(_UpstreamModel):
-    """One of the student's semesters, from the profile response's `STUDENT_SEMESTERS`."""
-
-    roll_number: Annotated[int | None, Secondary] = Field(None, alias="studentRollNo")
-    # Orders the semesters chronologically; the list itself is not guaranteed to be in order
-    order: Annotated[int | None, Secondary] = Field(None, alias="batchClassOrder")
 
 
 class _Student(_UpstreamModel):
@@ -215,7 +203,6 @@ class _Student(_UpstreamModel):
     info: _StudentInfo
     institute: str | None = None
     gender: str | None = None
-    roll_number: int | None = None
 
 
 class _ErrorEnvelope(_UpstreamModel):
@@ -242,14 +229,7 @@ class _ProfileResponse(_UpstreamModel):
 
     message: str = Field(alias="MESSAGE")
     info: _StudentInfo | None = Field(None, alias="STUDENT_INFO")
-    # Secondary, like the semesters: a STUDENT_PHOTO or STUDENT_SEMESTERS of an unexpected shape -- PESU
-    # sends {} for an empty block, for one -- is dropped rather than failing the profile. Each semester
-    # is too, so one malformed entry does not cost the others.
-    photo: Annotated[_StudentPhoto | None, Secondary] = Field(None, alias="STUDENT_PHOTO")
-    semesters: Annotated[list[Annotated[_Semester | None, Secondary]] | None, Secondary] = Field(
-        None,
-        alias="STUDENT_SEMESTERS",
-    )
+    photo: _StudentPhoto | None = Field(None, alias="STUDENT_PHOTO")
 
     @model_validator(mode="after")
     def _has_student(self) -> _ProfileResponse:
@@ -277,27 +257,7 @@ class _ProfileResponse(_UpstreamModel):
             _Student: The student details.
         """
         photo = self.photo or _StudentPhoto()
-        return _Student(
-            info=self.info,
-            institute=photo.institute,
-            gender=photo.gender,
-            roll_number=self._current_roll_number(),
-        )
-
-    def _current_roll_number(self) -> int | None:
-        """Get the roll number from the student's latest semester.
-
-        Roll numbers change from one semester to the next, so only the most recent one is current. If the
-        latest semester has no usable roll number, there is no current one: an earlier semester's would
-        be wrong rather than missing.
-
-        Returns:
-            int | None: The latest semester's roll number, or None if it has none or there are no semesters.
-        """
-        semesters = [s for s in self.semesters or () if s is not None and s.order is not None]
-        if not semesters:
-            return None
-        return max(semesters, key=lambda semester: semester.order).roll_number
+        return _Student(info=self.info, institute=photo.institute, gender=photo.gender)
 
 
 @asynccontextmanager
@@ -426,20 +386,6 @@ def _error_envelope_status(content: bytes) -> int | None:
     except ValidationError:
         return None
     return envelope.status if envelope.status != 200 else None
-
-
-def _semester_from_class_name(class_name: str | None) -> str | None:
-    """Get the semester from a class name such as "Sem-4, Section C".
-
-    Args:
-        class_name (str | None): The class name from upstream.
-
-    Returns:
-        str | None: The part before the comma ("Sem-4"), or None if there is none.
-    """
-    if class_name is None:
-        return None
-    return class_name.split(",", 1)[0].strip() or None
 
 
 def _date_from_epoch_ms(milliseconds: int | None) -> str | None:
@@ -581,34 +527,31 @@ class PESUAcademy:
             raise ProfileFetchError(f"PESU Academy did not return a profile for user={username}.")
         return parsed.student()
 
-    def _campus(self, identifier: str | None, username: str) -> tuple[int | None, str | None]:
-        """Work out the campus from the digit after "PES" in an SRN or PRN.
+    def _campus_code(self, institute: str | None, username: str) -> int | None:
+        """Get the campus code for a campus's institute name.
 
         Args:
-            identifier (str | None): The SRN or PRN.
+            institute (str | None): The institute name from upstream, such as "PES University (Ring Road)".
             username (str): The username of the user, for logging.
 
         Returns:
-            tuple[int | None, str | None]: The campus code and abbreviation, or (None, None).
+            int | None: The campus code, or None if there is no institute name or it is not a known one.
         """
-        if identifier is None or not (match := CAMPUS_CODE_PATTERN.match(identifier)):
-            return None, None
-        campus_code = match.group(1)
-        if campus_code not in CAMPUS_NAMES:
-            # Not fatal -- the profile is returned without a campus -- but it means the SRN or PRN
-            # format has changed, which nothing else would surface.
+        if institute is None:
+            return None
+        if (campus_code := CAMPUS_CODES.get(institute)) is None:
+            # Not fatal -- the campus is still returned as PESU named it -- but it means a campus, or the
+            # way PESU writes its name, is new, which nothing else would surface.
             self._metrics.increment(PROFILE_PARSE_ERRORS, reason="unknown_campus_code")
-            logging.warning(f"Unknown campus code: {campus_code} parsed from {identifier} for user={username}")
-            return None, None
-        return int(campus_code), CAMPUS_NAMES[campus_code]
+            logging.warning(f"Unknown institute name: {institute} for user={username}")
+        return campus_code
 
     def _build_profile(self, student: _Student, username: str) -> dict[str, Any]:
         """Build the profile this API returns from the profile response.
 
         Every field STUDENT_INFO has is taken from STUDENT_INFO alone, as PESU wrote it, or is null: no
         other block, and not the login response, stands in for a value it lacks. Only what STUDENT_INFO
-        does not have comes from elsewhere: the institute and gender from STUDENT_PHOTO, and the roll
-        number from the latest semester.
+        does not have comes from elsewhere: the campus and gender, from STUDENT_PHOTO.
 
         Args:
             student (_Student): The student from the profile response.
@@ -618,10 +561,8 @@ class PESUAcademy:
             dict[str, Any]: The profile, with every field; None where upstream had no value.
         """
         info = student.info
-        # Worked out rather than copied: the campus, a fixed mapping of the ID's campus digit (the SRN's
-        # and the PRN's are the same); the semester, the part of the class name before the comma; and
-        # the date of birth, converted from a timestamp.
-        campus_code, campus = self._campus(info.srn or info.prn, username)
+        # Worked out rather than copied: the campus code, a fixed mapping of the campus's name, and the
+        # date of birth, converted from a timestamp
         return {
             # The name as registered, which is what the web portal showed
             "name": info.name,
@@ -631,18 +572,18 @@ class PESUAcademy:
             # here would be a guess that clients can make better themselves
             "program": info.program,
             "branch": info.branch,
-            "semester": _semester_from_class_name(info.class_name),
+            # Such as "Sem-4". The login response's className adds the section ("Sem-4, Section C"),
+            # but STUDENT_INFO's is the semester alone.
+            "semester": info.class_name,
             "section": info.section_name,
             "email": info.email,
-            "phone": info.mobile,
-            "campusCode": campus_code,
-            "campus": campus,
+            "mobile": info.mobile,
+            "campusCode": self._campus_code(student.institute, username),
+            "campus": student.institute,
             "firstName": info.first_name,
             "middleName": info.middle_name,
             "lastName": info.last_name,
             "branchShortCode": info.branch_short_code,
-            "institute": student.institute,
-            "rollNumber": student.roll_number,
             "gender": student.gender,
             "dateOfBirth": _date_from_epoch_ms(info.date_of_birth),
         }

@@ -63,7 +63,7 @@ class RequestModel(BaseModel):
             "used when profile is true. Fields come back in ProfileModel's order, whatever order they are asked "
             "for in."
         ),
-        json_schema_extra={"example": ["name", "email", "campus", "branch", "semester", "firstName", "rollNumber"]},
+        json_schema_extra={"example": ["name", "email", "campus", "branch", "semester", "firstName", "mobile"]},
     )
 
     @field_validator("username")
