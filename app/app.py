@@ -219,6 +219,8 @@ async def health() -> JSONResponse:
 
 @app.get(
     "/metrics",
+    # Named like the other routes; the default would come from the function name, "Metrics Endpoint"
+    summary="Metrics",
     # The response type depends on ?fmt, so it cannot be declared once. Both shapes are documented
     # in responses= instead, which is what Swagger renders anyway.
     response_model=None,

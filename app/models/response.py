@@ -9,7 +9,11 @@ from app.models import ProfileModel
 
 
 class ResponseModel(BaseModel):
-    """Model representing the response after a student's authentication request."""
+    """The body of every /authenticate response, and of every error this API renders.
+
+    On success, status is true and profile is present if it was requested. On an error, status is
+    false, the message says what went wrong, and there is no profile.
+    """
 
     model_config = ConfigDict(strict=True, alias_generator=to_camel, populate_by_name=True)
 
