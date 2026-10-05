@@ -205,28 +205,27 @@ The fields from `firstName` onwards came with the move to PESU Academy's mobile 
 them in an unexpected shape, that field is `null` and the rest of the profile still comes back; a change to one of the
 fields above them is a `422`.
 
-| **Field**          | **Type** | **Description**                                                                                                                                                                                                                                                 |
-| ------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`             | `str`    | Full name of the user, as registered with PESU                                                                                                                                                                                                                  |
-| `prn`              | `str`    | PRN of the user: `PES`, the campus digit, the year of joining and a 5-digit number, such as `PES1202000001`                                                                                                                                                     |
-| `srn`              | `str`    | SRN of the user: `PES`, the campus digit, the program (`UG`, `PG`, ...), the last two digits of the year of joining, the branch and a 3-digit number, such as `PES1UG20CS001`. For students who joined before SRNs were introduced, it is the same as their PRN |
-| `program`          | `str`    | Full name of the academic program, such as `Bachelor of Technology`. An unrecognised one is returned as PESU sent it                                                                                                                                            |
-| `branch`           | `str`    | Full name of the branch, such as `Computer Science and Engineering`                                                                                                                                                                                             |
-| `semester`         | `str`    | Current semester, such as `Sem-4`                                                                                                                                                                                                                               |
-| `section`          | `str`    | Current section, such as `Section C`                                                                                                                                                                                                                            |
-| `email`            | `str`    | Email address registered with PESU                                                                                                                                                                                                                              |
-| `phone`            | `str`    | Phone number registered with PESU                                                                                                                                                                                                                               |
-| `campusCode`       | `int`    | `1` for RR or `2` for EC, worked out from the SRN (or from the PRN when there is no SRN)                                                                                                                                                                        |
-| `campus`           | `str`    | `RR` or `EC`, the abbreviation of the campus                                                                                                                                                                                                                    |
-| `firstName`        | `str`    | First name of the user                                                                                                                                                                                                                                          |
-| `middleName`       | `str`    | Middle name of the user, or `null` if they have none                                                                                                                                                                                                            |
-| `lastName`         | `str`    | Last name of the user                                                                                                                                                                                                                                           |
-| `programShortCode` | `str`    | Abbreviation of the program as PESU Academy writes it, such as `B.Tech.`                                                                                                                                                                                        |
-| `branchShortCode`  | `str`    | Abbreviation of the branch, such as `CSE`                                                                                                                                                                                                                       |
-| `institute`        | `str`    | Full name of the institute and campus, such as `PES University (Ring Road)`                                                                                                                                                                                     |
-| `rollNumber`       | `int`    | Roll number in the current semester, or in the last one for a student who has graduated. `null` when that semester has none                                                                                                                                     |
-| `gender`           | `str`    | Gender of the user, as recorded by PESU                                                                                                                                                                                                                         |
-| `dateOfBirth`      | `str`    | Date of birth, as `YYYY-MM-DD`                                                                                                                                                                                                                                  |
+| **Field**         | **Type** | **Description**                                                                                                                                                                                                                                                 |
+| ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`            | `str`    | Full name of the user, as registered with PESU                                                                                                                                                                                                                  |
+| `prn`             | `str`    | PRN of the user: `PES`, the campus digit, the year of joining and a 5-digit number, such as `PES1202000001`                                                                                                                                                     |
+| `srn`             | `str`    | SRN of the user: `PES`, the campus digit, the program (`UG`, `PG`, ...), the last two digits of the year of joining, the branch and a 3-digit number, such as `PES1UG20CS001`. For students who joined before SRNs were introduced, it is the same as their PRN |
+| `program`         | `str`    | Academic program, as PESU Academy writes it, such as `B.Tech.`. PESU Academy sends no full name                                                                                                                                                                 |
+| `branch`          | `str`    | Full name of the branch, such as `Computer Science and Engineering`                                                                                                                                                                                             |
+| `semester`        | `str`    | Current semester, such as `Sem-4`                                                                                                                                                                                                                               |
+| `section`         | `str`    | Current section, such as `Section C`                                                                                                                                                                                                                            |
+| `email`           | `str`    | Email address registered with PESU                                                                                                                                                                                                                              |
+| `phone`           | `str`    | Phone number registered with PESU                                                                                                                                                                                                                               |
+| `campusCode`      | `int`    | `1` for RR or `2` for EC, worked out from the SRN (or from the PRN when there is no SRN)                                                                                                                                                                        |
+| `campus`          | `str`    | `RR` or `EC`, the abbreviation of the campus                                                                                                                                                                                                                    |
+| `firstName`       | `str`    | First name of the user                                                                                                                                                                                                                                          |
+| `middleName`      | `str`    | Middle name of the user, or `null` if they have none                                                                                                                                                                                                            |
+| `lastName`        | `str`    | Last name of the user                                                                                                                                                                                                                                           |
+| `branchShortCode` | `str`    | Abbreviation of the branch, such as `CSE`                                                                                                                                                                                                                       |
+| `institute`       | `str`    | Full name of the institute and campus, such as `PES University (Ring Road)`                                                                                                                                                                                     |
+| `rollNumber`      | `int`    | Roll number in the current semester, or in the last one for a student who has graduated. `null` when that semester has none                                                                                                                                     |
+| `gender`          | `str`    | Gender of the user, as recorded by PESU                                                                                                                                                                                                                         |
+| `dateOfBirth`     | `str`    | Date of birth, as `YYYY-MM-DD`                                                                                                                                                                                                                                  |
 
 Everything else in PESU Academy's responses, such as the photo, blood group, addresses, parents' details and marks, is
 discarded and never returned, and cannot be requested in `fields`.
@@ -348,7 +347,7 @@ A few definitions that are easy to assume wrongly:
 | `authentication_requests_total{profile}` | Authentication requests, split by whether profile data was asked for                                                                                                                                                                                                                              |
 | `authentication_results_total{result}`   | Attempts by outcome: `success` or `failure`. Deliberately only those two — `errors_total` already names the exception class, and recording the reason here too would put one fact in two places. This family exists for the login **success rate**, where success and failure share a denominator |
 | `profile_field_filtering_total{enabled}` | Profile fetches, split by whether the caller narrowed the returned fields. Recorded where the branch is taken, so a caller passing exactly the default list counts as `false`                                                                                                                     |
-| `profile_parse_errors_total{reason}`     | Profile response problems by what broke: `response_structure` (the response could not be parsed, a `422`), `unknown_program` (a program abbreviation with no known full name), `unknown_campus_code`. These mean PESU Academy's API changed                                                       |
+| `profile_parse_errors_total{reason}`     | Profile response problems by what broke: `response_structure` (the response could not be parsed, a `422`) or `unknown_campus_code` (an SRN or PRN with a campus digit other than 1 or 2). These mean PESU Academy's API changed                                                                   |
 
 **Upstream (PESU Academy)**
 
@@ -425,7 +424,7 @@ pesu_auth_profile_field_filtering_total{enabled="false"} 90
 pesu_auth_profile_field_filtering_total{enabled="true"} 40
 # HELP pesu_auth_profile_parse_errors_total Profile response parse failures, by what could not be parsed or mapped.
 # TYPE pesu_auth_profile_parse_errors_total counter
-pesu_auth_profile_parse_errors_total{reason="unknown_program"} 3
+pesu_auth_profile_parse_errors_total{reason="unknown_campus_code"} 3
 # HELP pesu_auth_validation_errors_total Request validation failures, by the field that failed.
 # TYPE pesu_auth_validation_errors_total counter
 pesu_auth_validation_errors_total{field="password"} 4
@@ -588,7 +587,7 @@ which is `null` rather than absent when nothing has been recorded yet, so the sh
     "true": 40
   },
   "profileParseErrors": {
-    "unknown_program": 3
+    "unknown_campus_code": 3
   },
   "upstream": {
     "login": {
@@ -718,7 +717,7 @@ print(response.json())
     "name": "Johnny Blaze",
     "prn": "PES1202000001",
     "srn": "PES1UG20CS001",
-    "program": "Bachelor of Technology",
+    "program": "B.Tech.",
     "branch": "Computer Science and Engineering",
     "semester": "Sem-4",
     "section": "Section C",
@@ -729,7 +728,6 @@ print(response.json())
     "firstName": "Johnny",
     "middleName": null,
     "lastName": "Blaze",
-    "programShortCode": "B.Tech.",
     "branchShortCode": "CSE",
     "institute": "PES University (Ring Road)",
     "rollNumber": 27,

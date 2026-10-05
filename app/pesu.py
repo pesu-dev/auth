@@ -57,7 +57,6 @@ ProfileField = Literal[
     "firstName",
     "middleName",
     "lastName",
-    "programShortCode",
     "branchShortCode",
     "institute",
     "rollNumber",
@@ -83,28 +82,6 @@ CAMPUS_NAMES = {"1": "RR", "2": "EC"}
 # same instant is 18:30 on the day before, so the timezone is what makes the date right.
 IST = timezone(timedelta(hours=5, minutes=30))
 ISO_DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
-# The mobile API only returns the program's abbreviation, but the API has always returned the full
-# name, which is what callers display. Keys are normalised by _normalise_program. "B.Tech." has been
-# checked against the full name the web portal shows; the rest are the standard expansions.
-PROGRAM_NAMES = {
-    "B.TECH": "Bachelor of Technology",
-    "M.TECH": "Master of Technology",
-    "B.ARCH": "Bachelor of Architecture",
-    "M.ARCH": "Master of Architecture",
-    "B.DES": "Bachelor of Design",
-    "BBA": "Bachelor of Business Administration",
-    "MBA": "Master of Business Administration",
-    "BCA": "Bachelor of Computer Applications",
-    "MCA": "Master of Computer Applications",
-    "B.COM": "Bachelor of Commerce",
-    "M.COM": "Master of Commerce",
-    "B.SC": "Bachelor of Science",
-    "M.SC": "Master of Science",
-    "B.PHARM": "Bachelor of Pharmacy",
-    "M.PHARM": "Master of Pharmacy",
-    "PHARM.D": "Doctor of Pharmacy",
-    "PH.D": "Doctor of Philosophy",
-}
 # What upstream sends for a value it does not have. "NA" is what the web portal showed for a student
 # with no current class; it is a placeholder, not a value, so it is treated like a missing one.
 MISSING_VALUES = frozenset({"", "NA"})
@@ -189,8 +166,6 @@ class _LoginUser(_UpstreamModel):
     email: str | None = None
     phone: str | None = None
     program: str | None = None
-    # Prefixed, as in "Branch:CSE"
-    branch: Annotated[str | None, Secondary] = None
     class_name: str | None = Field(None, alias="className")
     section_name: str | None = Field(None, alias="sectionName")
     login_id: str | None = Field(None, alias="loginId")
@@ -523,18 +498,6 @@ def _semester_from_class_name(class_name: str | None) -> str | None:
     return class_name.split(",", 1)[0].strip() or None
 
 
-def _normalise_program(program: str) -> str:
-    """Normalise a program abbreviation for lookup, so "B.Tech." and "B.TECH" are the same key.
-
-    Args:
-        program (str): The abbreviation from upstream.
-
-    Returns:
-        str: The abbreviation upper-cased, without whitespace or a trailing full stop.
-    """
-    return "".join(program.split()).upper().rstrip(".")
-
-
 def _as_prn(login_id: str | None) -> str | None:
     """Return a login ID only if it is a PRN.
 
@@ -605,20 +568,6 @@ def _iso_date(value: str | None) -> str | None:
     if value is not None and ISO_DATE_PATTERN.fullmatch(value):
         return value
     return None
-
-
-def _branch_code(branch: str | None) -> str | None:
-    """Get the branch code from the login response's prefixed branch, such as "Branch:CSE".
-
-    Args:
-        branch (str | None): The branch from the login response.
-
-    Returns:
-        str | None: The code without its prefix, or None if there is none.
-    """
-    if branch is None:
-        return None
-    return branch.removeprefix("Branch:").strip() or None
 
 
 class PESUAcademy:
@@ -743,26 +692,6 @@ class PESUAcademy:
             raise ProfileFetchError(f"PESU Academy did not return a profile for user={username}.")
         return parsed.student()
 
-    def _program_name(self, program: str | None, username: str) -> str | None:
-        """Expand a program abbreviation to its full name.
-
-        Args:
-            program (str | None): The abbreviation from upstream, such as "B.Tech.".
-            username (str): The username of the user, for logging.
-
-        Returns:
-            str | None: The full name, or the abbreviation itself if it is not a known one.
-        """
-        if program is None:
-            return None
-        if full_name := PROGRAM_NAMES.get(_normalise_program(program)):
-            return full_name
-        # Not fatal: the abbreviation is still the right program, just not the form callers expect.
-        # Counted so that a program missing from PROGRAM_NAMES shows up before anyone reports it.
-        self._metrics.increment(PROFILE_PARSE_ERRORS, reason="unknown_program")
-        logging.warning(f"Unknown program: {program} for user={username}")
-        return program
-
     def _campus(self, identifier: str | None, username: str) -> tuple[int | None, str | None]:
         """Work out the campus from the digit after "PES" in an SRN or PRN.
 
@@ -821,13 +750,17 @@ class PESUAcademy:
         )
         # The SRN's campus digit is the same as the PRN's; the SRN comes first as the ID PESU labels
         campus_code, campus = self._campus(srn or prn, username)
+        # Every field is a value PESU sent, or null; nothing is guessed. The name, program and branch code
+        # in particular are returned as PESU wrote them, with no fallback that could stand in for them
+        # wrongly (the login's "name" is only the first name, for one).
         return {
-            # The name as registered, which is what the web portal showed. The login response only
-            # has the first name, so it is the fallback.
-            "name": student.name or user.name,
+            # The name as registered, which is what the web portal showed
+            "name": student.name,
             "prn": prn,
             "srn": srn,
-            "program": self._program_name(user.program or student.program, username),
+            # The abbreviation PESU sends, such as "B.Tech.": it sends no full name, and a table of them
+            # here would be a guess that clients can make better themselves
+            "program": user.program or student.program,
             "branch": student.branch,
             "semester": _semester_from_class_name(user.class_name or student.class_name),
             "section": user.section_name or student.section_name,
@@ -839,8 +772,7 @@ class PESUAcademy:
             "firstName": student.first_name or user.name,
             "middleName": student.middle_name,
             "lastName": student.last_name,
-            "programShortCode": user.program or student.program,
-            "branchShortCode": student.branch_short_code or _branch_code(user.branch),
+            "branchShortCode": student.branch_short_code,
             "institute": student.institute,
             "rollNumber": student.roll_number,
             "gender": student.gender,

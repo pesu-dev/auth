@@ -337,7 +337,7 @@ class MetricsModel(BaseModel):
         ...,
         title="Profile Parse Errors",
         description="Profile response parse failures keyed by what could not be parsed or mapped.",
-        json_schema_extra={"example": {"unknown_program": 3}},
+        json_schema_extra={"example": {"unknown_campus_code": 3}},
     )
 
     upstream: dict[str, UpstreamOperationModel] = Field(

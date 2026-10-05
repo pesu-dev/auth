@@ -392,7 +392,7 @@ def test_integration_authenticate_removed_kycas_fields_rejected(client):
 
 @pytest.mark.parametrize(
     "field",
-    ["first_name", "middle_name", "last_name", "program_short_code", "branch_short_code", "roll_number", "date_of_birth"],
+    ["first_name", "middle_name", "last_name", "branch_short_code", "roll_number", "date_of_birth"],
 )
 def test_integration_authenticate_snake_case_new_fields_rejected(client, field):
     """Fields are camelCase on the wire, like campusCode; the snake_case form is a 400."""
@@ -406,7 +406,7 @@ def test_integration_authenticate_snake_case_new_fields_rejected(client, field):
     assert "body.fields.0" in data["message"]
 
 
-@pytest.mark.parametrize("field", ["bloodGroup", "photo", "profilePicture"])
+@pytest.mark.parametrize("field", ["bloodGroup", "photo", "profilePicture", "programShortCode"])
 def test_integration_authenticate_fields_the_api_does_not_return_rejected(client, field):
     """PESU sends these, but the API does not return them, so asking for one is a 400."""
     payload = {"username": "username", "password": "password", "profile": True, "fields": [field]}

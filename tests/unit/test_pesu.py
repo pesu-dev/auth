@@ -25,7 +25,7 @@ FULL_PROFILE = {
     "name": "JOHN DOE",
     "prn": "PES2202500001",
     "srn": "PES2UG25CS001",
-    "program": "Bachelor of Technology",
+    "program": "B.Tech.",
     "branch": "Computer Science and Engineering",
     "semester": "Sem-4",
     "section": "Section C",
@@ -36,7 +36,6 @@ FULL_PROFILE = {
     "firstName": "JOHN",
     "middleName": None,
     "lastName": "DOE",
-    "programShortCode": "B.Tech.",
     "branchShortCode": "CSE",
     "institute": "PES University (Electronic City)",
     "rollNumber": 27,
@@ -258,9 +257,9 @@ async def test_a_profile_without_student_info_is_built_from_student_photo(
 
     assert profile == {
         **FULL_PROFILE,
-        # Only STUDENT_INFO has the full branch name; the login's "Branch:CSE" is an abbreviation,
-        # which still gives the short code
+        # Only STUDENT_INFO has the branch and its short code; the login's "Branch:CSE" is not parsed
         "branch": None,
+        "branchShortCode": None,
         "lastName": None,
     }
 
@@ -343,13 +342,15 @@ async def test_one_block_with_data_is_enough(pesu, upstream, make_response, logi
 
 
 @pytest.mark.asyncio
-async def test_name_falls_back_to_the_login_name(pesu, upstream, make_response, login_payload, profile_payload):
+async def test_without_the_full_name_the_name_is_null(pesu, upstream, make_response, login_payload, profile_payload):
+    """The login's name is the first name only, so it is not passed off as the full name."""
     profile_payload["STUDENT_INFO"]["NameAsInSSLC"] = None
     profile_payload["STUDENT_PHOTO"]["nameAsInSSLC"] = None
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile["name"] == "JOHN"
+    assert profile["name"] is None
+    assert profile["firstName"] == "JOHN"
 
 
 @pytest.mark.asyncio
@@ -505,15 +506,17 @@ async def test_an_unknown_campus_code_is_counted_not_fatal(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("program", ["B.Tech.", "B.Tech", "B.TECH", "b.tech.", " B. Tech. "])
-async def test_program_abbreviations_are_expanded(
-    pesu, upstream, make_response, login_payload, profile_payload, program
+@pytest.mark.parametrize("program", ["B.Tech.", "M.Tech", "MCA", "B.Sc.(Hons)"])
+async def test_the_program_is_returned_as_pesu_writes_it(
+    pesu, upstream, make_response, login_payload, profile_payload, collector, program
 ):
+    """No expansion: a full name would be our guess, and a wrong guess would be served as fact."""
     login_payload["mobileJsonObject"]["program"] = program
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile["program"] == "Bachelor of Technology"
+    assert profile["program"] == program
+    assert list(collector.snapshot().samples(PROFILE_PARSE_ERRORS.name)) == []
 
 
 @pytest.mark.asyncio
@@ -525,19 +528,7 @@ async def test_program_falls_back_to_the_profile_response(
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile["program"] == "Master of Computer Applications"
-
-
-@pytest.mark.asyncio
-async def test_an_unknown_program_is_returned_as_is_and_counted(
-    pesu, upstream, make_response, login_payload, profile_payload, collector
-):
-    login_payload["mobileJsonObject"]["program"] = "B.Sc.(Hons)"
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile["program"] == "B.Sc.(Hons)"
-    assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="unknown_program") == 1.0
+    assert profile["program"] == "MCA"
 
 
 # --- Field filtering ---
@@ -547,14 +538,14 @@ async def test_an_unknown_program_is_returned_as_is_and_counted(
 async def test_field_filtering(pesu, upstream, make_response, login_payload, profile_payload):
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    fields = ["dateOfBirth", "name", "rollNumber", "campus", "middleName", "programShortCode"]
+    fields = ["dateOfBirth", "name", "rollNumber", "campus", "middleName", "branchShortCode"]
     result = await pesu.authenticate("user", "pass", profile=True, fields=fields)
 
     assert result["profile"] == {
         "name": "JOHN DOE",
         "campus": "EC",
         "middleName": None,
-        "programShortCode": "B.Tech.",
+        "branchShortCode": "CSE",
         "rollNumber": 27,
         "dateOfBirth": "2005-01-01",
     }
@@ -1084,33 +1075,17 @@ async def test_the_first_name_falls_back_to_student_photo_then_the_login(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("login_branch", "expected"),
-    [("Branch:ECE", "ECE"), ("AIML", "AIML"), ("Branch:", None), (None, None)],
-)
-async def test_the_branch_code_falls_back_to_the_login(
-    pesu, upstream, make_response, login_payload, profile_payload, login_branch, expected
+async def test_the_branch_code_is_not_taken_from_the_login(
+    pesu, upstream, make_response, login_payload, profile_payload
 ):
+    """The login's "Branch:CSE" is not parsed: without BranchAbbreviation the code is null."""
     profile_payload["STUDENT_INFO"]["BranchAbbreviation"] = None
-    login_payload["mobileJsonObject"]["branch"] = login_branch
+    login_payload["mobileJsonObject"]["branch"] = "Branch:ECE"
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
     result = await pesu.authenticate("user", "pass", profile=True, fields=["branchShortCode"])
 
-    assert result["profile"] == {"branchShortCode": expected}
-
-
-@pytest.mark.asyncio
-async def test_the_program_code_is_returned_as_pesu_writes_it(
-    pesu, upstream, make_response, login_payload, profile_payload
-):
-    login_payload["mobileJsonObject"]["program"] = None
-    profile_payload["STUDENT_INFO"]["ProgramAbbreviation"] = "M.Tech"
-    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
-
-    result = await pesu.authenticate("user", "pass", profile=True, fields=["program", "programShortCode"])
-
-    assert result["profile"] == {"program": "Master of Technology", "programShortCode": "M.Tech"}
+    assert result["profile"] == {"branchShortCode": None}
 
 
 @pytest.mark.asyncio
@@ -1269,7 +1244,7 @@ async def test_an_empty_or_odd_user_role_is_harmless(pesu, upstream, make_respon
         ("STUDENT_INFO", "FirstName", {"unexpected": True}, {}),  # STUDENT_PHOTO still has the first name
         ("STUDENT_INFO", "MiddleName", ["x"], {}),
         ("STUDENT_INFO", "LastName", {"x": 1}, {"lastName": None}),
-        ("STUDENT_INFO", "BranchAbbreviation", [], {}),  # the login's "Branch:CSE" still gives it
+        ("STUDENT_INFO", "BranchAbbreviation", [], {"branchShortCode": None}),
         ("STUDENT_PHOTO", "instituteName", {"x": 1}, {"institute": None}),
         ("STUDENT_PHOTO", "gender", ["Male"], {"gender": None}),
     ],

@@ -146,14 +146,14 @@ def test_single_label_families_collapse_to_mappings(collector):
     collector.increment(FAILURES_BY_FAULT, fault="client")
     collector.increment(VALIDATION_ERRORS, field="username")
     collector.increment(AUTHENTICATION_RESULTS, result="failure")
-    collector.increment(PROFILE_PARSE_ERRORS, reason="unknown_program")
+    collector.increment(PROFILE_PARSE_ERRORS, reason="unknown_campus_code")
     collector.increment(HTTP_CLIENTS, event="created")
 
     model = MetricsModel.from_snapshot(collector.snapshot())
     assert model.failures_by_fault == {"client": 1}
     assert model.validation_errors_by_field == {"username": 1}
     assert model.authentication_results == {"failure": 1}
-    assert model.profile_parse_errors == {"unknown_program": 1}
+    assert model.profile_parse_errors == {"unknown_campus_code": 1}
     assert model.http_clients == {"created": 1}
 
 

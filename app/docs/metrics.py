@@ -48,7 +48,7 @@ pesu_auth_authentication_results_total{result="failure"} 169
 pesu_auth_profile_field_filtering_total{enabled="false"} 90
 # HELP pesu_auth_profile_parse_errors_total Profile response parse failures, by what could not be parsed or mapped.
 # TYPE pesu_auth_profile_parse_errors_total counter
-pesu_auth_profile_parse_errors_total{reason="unknown_program"} 3
+pesu_auth_profile_parse_errors_total{reason="unknown_campus_code"} 3
 # HELP pesu_auth_validation_errors_total Request validation failures, by the field that failed.
 # TYPE pesu_auth_validation_errors_total counter
 pesu_auth_validation_errors_total{field="password"} 4
@@ -119,7 +119,7 @@ _JSON_EXAMPLE = {
     "validationErrorsByField": {"password": 4, "username": 8},
     "authenticationResults": {"failure": 169, "success": 604},
     "profileFieldFiltering": {"false": 90, "true": 40},
-    "profileParseErrors": {"unknown_program": 3},
+    "profileParseErrors": {"unknown_campus_code": 3},
     "upstream": {
         "login": {
             "success": 771,

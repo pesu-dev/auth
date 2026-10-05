@@ -10,7 +10,7 @@ class ProfileModel(BaseModel):
     """The user's profile, returned after a successful login when it was requested.
 
     Every requested field is present. A field PESU Academy has no value for is null, as is one of the
-    fields added with the mobile API (name parts, short codes, institute, roll number, gender, date of
+    fields added with the mobile API (name parts, branch short code, institute, roll number, gender, date of
     birth) if PESU sends it in an unexpected shape.
     """
 
@@ -45,10 +45,10 @@ class ProfileModel(BaseModel):
         None,
         title="Program",
         description=(
-            "Full name of the academic program the user is enrolled in. A program abbreviation that is not "
-            "recognised is returned as PESU Academy sent it."
+            "Academic program the user is enrolled in, as PESU Academy writes it: an abbreviation such as "
+            "B.Tech. PESU Academy sends no full name, so none is made up here."
         ),
-        json_schema_extra={"example": "Bachelor of Technology"},
+        json_schema_extra={"example": "B.Tech."},
     )
     branch: str | None = Field(
         None,
@@ -111,12 +111,6 @@ class ProfileModel(BaseModel):
         title="Last Name",
         description="Last name of the user.",
         json_schema_extra={"example": "Doe"},
-    )
-    program_short_code: str | None = Field(
-        None,
-        title="Program Short Code",
-        description="Abbreviation of the program, as PESU Academy writes it.",
-        json_schema_extra={"example": "B.Tech."},
     )
     branch_short_code: str | None = Field(
         None,
