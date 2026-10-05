@@ -205,6 +205,12 @@ class _StudentPhoto(_UpstreamModel):
     date_of_birth: int | None = Field(None, alias="dateOfBirth")
 
 
+class _UserRole(_UpstreamModel):
+    """The profile response's `USER_ROLE` block, read only for the PRN it carries."""
+
+    login_id: str | None = Field(None, alias="LoginId")
+
+
 class _Semester(_UpstreamModel):
     """One of the student's semesters, from the profile response's `STUDENT_SEMESTERS`."""
 
@@ -216,9 +222,12 @@ class _Semester(_UpstreamModel):
 class _Student(_UpstreamModel):
     """The student, merged from the blocks of the profile response."""
 
-    # Kept apart rather than merged: either may hold the PRN or the SRN, and which is which is
-    # decided by shape when the profile is built (see PRN_PATTERN)
+    # Kept apart rather than merged, and told apart by shape when the profile is built (see
+    # PRN_PATTERN). For students whose PRN and SRN differ, PESU has been seen to send the PRN as
+    # STUDENT_INFO's LoginId and USER_ROLE's LoginId, and the SRN as STUDENT_INFO's SRN and
+    # STUDENT_PHOTO's loginId. For older students all of them are the same ID.
     login_id: str | None = None
+    role_login_id: str | None = None
     photo_login_id: str | None = None
     srn: str | None = None
     name: str | None = None
@@ -267,6 +276,7 @@ class _ProfileResponse(_UpstreamModel):
     # student into a 422, so either block will do and the profile is built from what is there.
     info: _StudentInfo | None = Field(None, alias="STUDENT_INFO")
     photo: _StudentPhoto | None = Field(None, alias="STUDENT_PHOTO")
+    role: _UserRole | None = Field(None, alias="USER_ROLE")
     # Optional like the blocks above: a student with no semesters yet must not turn into a 422
     semesters: list[_Semester] | None = Field(None, alias="STUDENT_SEMESTERS")
 
@@ -298,6 +308,7 @@ class _ProfileResponse(_UpstreamModel):
         photo = self.photo or _StudentPhoto()
         return _Student(
             login_id=info.login_id,
+            role_login_id=(self.role or _UserRole()).login_id,
             photo_login_id=photo.login_id,
             srn=info.srn,
             name=info.name or photo.name,
@@ -752,16 +763,24 @@ class PESUAcademy:
         """
         # PESU puts the PRN or the SRN under "loginId" in each block, so they are told apart by shape.
         # The one field labelled as the SRN comes first, as sent. Then any new-style SRN, which cannot
-        # be anything else. Last, STUDENT_PHOTO's loginId if it is a PRN: that block's loginId is the
-        # SRN, and an older student's SRN is their PRN.
+        # be anything else. Last, STUDENT_PHOTO's loginId if it is a PRN: that block's loginId has been
+        # seen to hold the SRN, and an older student's SRN is their PRN.
         srn = (
             student.srn
             or _first(_as_srn, student.photo_login_id, user.login_id, student.login_id)
             or _first(_as_prn, student.photo_login_id)
         )
         # Any PRN-shaped ID is the PRN, wherever it is: a new-style SRN always has letters, and an older
-        # student's SRN is their PRN anyway
-        prn = _first(_as_prn, user.login_id, student.login_id, student.photo_login_id, student.srn)
+        # student's SRN is their PRN anyway. The login's loginId, STUDENT_INFO's LoginId and
+        # USER_ROLE's LoginId have each been seen to hold it.
+        prn = _first(
+            _as_prn,
+            user.login_id,
+            student.login_id,
+            student.role_login_id,
+            student.photo_login_id,
+            student.srn,
+        )
         # The SRN's campus digit is the same as the PRN's; the SRN comes first as the ID PESU labels
         campus_code, campus = self._campus(srn or prn, username)
         return {

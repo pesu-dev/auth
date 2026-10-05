@@ -437,6 +437,7 @@ async def test_an_srn_under_login_id_is_not_returned_as_the_prn(
 ):
     login_payload["mobileJsonObject"]["loginId"] = "PES2UG25CS001"
     profile_payload["STUDENT_INFO"]["LoginId"] = "PES2UG25CS001"
+    profile_payload["USER_ROLE"]["LoginId"] = "PES2UG25CS001"
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
@@ -482,6 +483,7 @@ async def test_no_identifier_means_no_campus(pesu, upstream, make_response, logi
     del login_payload["mobileJsonObject"]["loginId"]
     profile_payload["STUDENT_INFO"].update(LoginId=None, SRN=None)
     del profile_payload["STUDENT_PHOTO"]
+    del profile_payload["USER_ROLE"]
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
@@ -1135,6 +1137,7 @@ async def test_an_older_students_srn_is_also_their_prn(pesu, upstream, make_resp
     """With no loginId anywhere, a PRN-shaped SRN still identifies the PRN, because it is the PRN."""
     del login_payload["mobileJsonObject"]["loginId"]
     del profile_payload["STUDENT_PHOTO"]
+    del profile_payload["USER_ROLE"]
     profile_payload["STUDENT_INFO"].update(LoginId=None, SRN="PES1201800001")
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
@@ -1190,3 +1193,24 @@ async def test_the_labelled_srn_is_trusted_as_sent(pesu, upstream, make_response
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     assert (profile["srn"], profile["campusCode"]) == ("PES2UG25CSE001", 2)
+
+
+@pytest.mark.asyncio
+async def test_the_prn_is_found_in_user_role(pesu, upstream, make_response, login_payload, profile_payload):
+    """USER_ROLE's LoginId has been seen to hold the PRN, so it is used when the others do not."""
+    del login_payload["mobileJsonObject"]["loginId"]
+    profile_payload["STUDENT_INFO"]["LoginId"] = None
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", [None, {}, {"LoginId": "NA"}, {"LoginId": 12345}])
+async def test_an_empty_or_odd_user_role_is_harmless(pesu, upstream, make_response, login_payload, profile_payload, role):
+    profile_payload["USER_ROLE"] = role
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")

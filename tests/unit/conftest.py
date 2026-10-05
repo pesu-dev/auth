@@ -8,7 +8,9 @@ import pytest
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).
 # The personal fields this service must never keep or log -- photo, parents, address -- are
-# included so tests can prove they are dropped.
+# included so tests can prove they are dropped. The IDs are where PESU has been seen to put them for
+# a student whose PRN and SRN differ: the PRN under the login's loginId, STUDENT_INFO's LoginId and
+# USER_ROLE's LoginId, the SRN under STUDENT_INFO's SRN and STUDENT_PHOTO's loginId.
 LOGIN_PAYLOAD = {
     "mobileJsonObject": {
         "userId": "00000000-0000-0000-0000-000000000000",
@@ -38,6 +40,12 @@ PROFILE_PAYLOAD = {
     "MESSAGE": "SUCCESS_Record found Successfully",
     "image": "",
     "PLACEMENT_DETAILS": {},
+    "USER_ROLE": {
+        "LoginId": "PES2202500001",
+        "UserId": "00000000-0000-0000-0000-000000000000",
+        "UserTypeId": "2",
+        "UserRoleId": "3",
+    },
     "STUDENT_PHOTO": {
         "loginId": "PES2UG25CS001",
         "nameAsInSSLC": "JOHN DOE",
