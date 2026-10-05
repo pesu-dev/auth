@@ -65,7 +65,7 @@ PROFILE_PAYLOAD = {
         "LastName": "DOE",
         "NameAsInSSLC": "JOHN DOE",
         "DateOfBirth": 1104517800000,
-        "BloodGroup": "O+",
+        "BloodGroup": "BLOODGROUPSECRET",
         "SSLCMarksObtained": "MARKSSECRET",
         "Email": "john.doe@example.com",
         "Mobile": "9876543210",
@@ -99,6 +99,7 @@ SECRETS = (
     "ADDRESSSECRET",
     "1112223334",
     "MARKSSECRET",
+    "BLOODGROUPSECRET",
     "CGPASECRET",
 )
 

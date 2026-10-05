@@ -138,9 +138,3 @@ class ProfileModel(BaseModel):
         description="Date of birth of the user, as YYYY-MM-DD.",
         json_schema_extra={"example": "2002-01-31"},
     )
-    blood_group: str | None = Field(
-        None,
-        title="Blood Group",
-        description="Blood group of the user.",
-        json_schema_extra={"example": "O+"},
-    )

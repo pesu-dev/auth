@@ -6,6 +6,26 @@ from pydantic.alias_generators import to_camel
 from app.pesu import ProfileField
 
 
+def _require_valid_text(value: str, label: str) -> None:
+    """Reject a string that cannot be sent to PESU Academy.
+
+    JSON can carry an unpaired surrogate (an escaped code point from U+D800 to U+DFFF), which decodes
+    into a str that cannot be encoded as UTF-8. Left alone it fails while the login request is built,
+    as a 500 for what is the caller's mistake.
+
+    Args:
+        value (str): The value to check.
+        label (str): The field's name, for the error message. The value itself is never included.
+
+    Raises:
+        ValueError: If the value cannot be encoded as UTF-8.
+    """
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        raise ValueError(f"{label} contains characters that are not valid text.") from None
+
+
 class RequestModel(BaseModel):
     """Model representing the student's authentication request."""
 
@@ -42,19 +62,21 @@ class RequestModel(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
-        """Validate that username is not empty after stripping whitespace."""
+        """Validate that username is valid text and not empty after stripping whitespace."""
         v = v.strip()
         if not v:
             raise ValueError("Username cannot be empty.")
+        _require_valid_text(v, "Username")
         return v
 
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        """Validate that password is not empty after stripping whitespace."""
+        """Validate that password is valid text and not empty after stripping whitespace."""
         v = v.strip()
         if not v:
             raise ValueError("Password cannot be empty.")
+        _require_valid_text(v, "Password")
         return v
 
     @field_validator("fields")

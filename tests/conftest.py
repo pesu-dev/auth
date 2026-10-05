@@ -113,8 +113,6 @@ def check_live_profile(expected_profile):
         except (TypeError, ValueError):
             ok = False
         assert ok, "dateOfBirth is not a plausible YYYY-MM-DD date"
-        ok = profile["bloodGroup"] is not None and re.fullmatch(r"(A|B|AB|O)[+-]", profile["bloodGroup"]) is not None
-        assert ok, "bloodGroup is not a blood group"
         if expected_short_code := os.getenv("TEST_BRANCH_SHORT_CODE"):
             assert profile["branchShortCode"] == expected_short_code
         else:

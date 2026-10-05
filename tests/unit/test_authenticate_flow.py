@@ -5,6 +5,7 @@ receives -- status code, body and headers -- for each thing PESU Academy can do,
 and logs record it.
 """
 
+import json
 from datetime import datetime, timedelta
 
 import httpx2
@@ -39,7 +40,6 @@ FULL_PROFILE = {
     "rollNumber": 27,
     "gender": "Male",
     "dateOfBirth": "2005-01-01",
-    "bloodGroup": "O+",
 }
 
 
@@ -226,25 +226,20 @@ def test_the_upstream_error_text_is_not_forwarded(client, wire, caplog):
 
 def test_personal_details_are_in_the_default_profile(client, pesu_up):
     default = _authenticate(client, profile=True).json()["profile"]
-    requested = _authenticate(client, profile=True, fields=["srn", "gender", "dateOfBirth", "bloodGroup"]).json()
+    requested = _authenticate(client, profile=True, fields=["srn", "gender", "dateOfBirth"]).json()
 
-    assert (default["gender"], default["dateOfBirth"], default["bloodGroup"]) == ("Male", "2005-01-01", "O+")
-    assert requested["profile"] == {
-        "srn": "PES2UG25CS001",
-        "gender": "Male",
-        "dateOfBirth": "2005-01-01",
-        "bloodGroup": "O+",
-    }
+    assert (default["gender"], default["dateOfBirth"]) == ("Male", "2005-01-01")
+    assert requested["profile"] == {"srn": "PES2UG25CS001", "gender": "Male", "dateOfBirth": "2005-01-01"}
 
 
 def test_personal_details_are_null_when_pesu_has_none(client, pesu_up, profile_payload, login_payload):
-    profile_payload["STUDENT_INFO"].update(DateOfBirth=None, BloodGroup="NA")
+    profile_payload["STUDENT_INFO"]["DateOfBirth"] = None
     profile_payload["STUDENT_PHOTO"].update(gender="", dateOfBirth=None)
     login_payload["mobileJsonObject"]["dateofBirth"] = None
 
-    profile = _authenticate(client, profile=True, fields=["gender", "dateOfBirth", "bloodGroup"]).json()["profile"]
+    profile = _authenticate(client, profile=True, fields=["gender", "dateOfBirth"]).json()["profile"]
 
-    assert profile == {"gender": None, "dateOfBirth": None, "bloodGroup": None}
+    assert profile == {"gender": None, "dateOfBirth": None}
 
 
 def test_an_unknown_field_name_is_still_rejected(client, pesu_up):
@@ -252,3 +247,25 @@ def test_an_unknown_field_name_is_still_rejected(client, pesu_up):
 
     assert "fields.0" in body["message"]
     assert pesu_up.requests == []
+
+
+def test_blood_group_cannot_be_requested(client, pesu_up):
+    body = _assert_error_body(_authenticate(client, profile=True, fields=["bloodGroup"]), 400)
+
+    assert "fields.0" in body["message"]
+    assert pesu_up.requests == []
+
+
+@pytest.mark.parametrize("field", ["username", "password"])
+def test_text_that_cannot_be_encoded_is_a_400(client, wire, caplog, field):
+    """An unpaired surrogate decodes from JSON but cannot be sent on; it is the caller's error, not a 500."""
+    body = {"username": "user", "password": "pass"}
+    raw = json.dumps(body).replace(f'"{body[field]}"', '"\\ud800abc"').encode()
+
+    with caplog.at_level("WARNING"):
+        response = client.post("/authenticate", content=raw, headers={"content-type": "application/json"})
+
+    result = _assert_error_body(response, 400)
+    assert f"{field.capitalize()} contains characters that are not valid text" in result["message"]
+    assert wire.requests == []
+    assert not [r for r in caplog.records if r.levelname == "ERROR"]

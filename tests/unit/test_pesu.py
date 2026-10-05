@@ -43,7 +43,6 @@ FULL_PROFILE = {
     "gender": "Male",
     # Midnight IST on 2005-01-01; read in UTC it would be 2004-12-31
     "dateOfBirth": "2005-01-01",
-    "bloodGroup": "O+",
 }
 
 
@@ -263,8 +262,6 @@ async def test_a_profile_without_student_info_is_built_from_student_photo(
         # which still gives the short code
         "branch": None,
         "lastName": None,
-        # Only in STUDENT_INFO
-        "bloodGroup": None,
     }
 
 
@@ -934,7 +931,7 @@ async def test_an_upstream_call_without_a_status_records_no_status(collector, si
 
 # --- Profile details beyond the core fields ---
 
-PERSONAL_FIELDS = ["gender", "dateOfBirth", "bloodGroup"]
+PERSONAL_FIELDS = ["gender", "dateOfBirth"]
 
 
 @pytest.mark.asyncio
@@ -950,7 +947,6 @@ async def test_personal_details_are_returned_when_requested(
         "gender": "Male",
         # Midnight IST on 2005-01-01; read in UTC it would be 2004-12-31
         "dateOfBirth": "2005-01-01",
-        "bloodGroup": "O+",
     }
 
 
@@ -1009,13 +1005,14 @@ async def test_a_date_of_birth_before_1970(pesu, upstream, make_response, login_
     [
         ([], None),
         (None, None),
-        ([{"studentRollNo": None, "batchClassOrder": 2}, {"studentRollNo": 5, "batchClassOrder": 1}], 5),
+        # An earlier semester's roll number is not the current one
+        ([{"studentRollNo": None, "batchClassOrder": 2}, {"studentRollNo": 5, "batchClassOrder": 1}], None),
         ([{"studentRollNo": 8, "batchClassOrder": None}, {"studentRollNo": 5, "batchClassOrder": 1}], 5),
         ([{"studentRollNo": "14", "batchClassOrder": "3"}], 14),
     ],
     ids=["no semesters", "null semesters", "latest has no roll", "unordered entry", "numbers as text"],
 )
-async def test_the_roll_number_is_from_the_latest_usable_semester(
+async def test_the_roll_number_is_from_the_latest_semester(
     pesu, upstream, make_response, login_payload, profile_payload, semesters, roll_number
 ):
     profile_payload["STUDENT_SEMESTERS"] = semesters
@@ -1214,3 +1211,108 @@ async def test_an_empty_or_odd_user_role_is_harmless(pesu, upstream, make_respon
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
+
+
+# --- Secondary fields fail soft ---
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("block", "key", "value", "affected"),
+    [
+        # PESU's style for an empty block, which a list field would otherwise reject
+        ("STUDENT_SEMESTERS", None, {}, {"rollNumber": None}),
+        ("USER_ROLE", None, [], {}),
+        ("STUDENT_INFO", "DateOfBirth", "2005-01-01", {}),  # STUDENT_PHOTO still has the timestamp
+        ("STUDENT_INFO", "FirstName", {"unexpected": True}, {}),  # STUDENT_PHOTO still has the first name
+        ("STUDENT_INFO", "MiddleName", ["x"], {}),
+        ("STUDENT_INFO", "LastName", {"x": 1}, {"lastName": None}),
+        ("STUDENT_INFO", "BranchAbbreviation", [], {}),  # the login's "Branch:CSE" still gives it
+        ("STUDENT_PHOTO", "instituteName", {"x": 1}, {"institute": None}),
+        ("STUDENT_PHOTO", "gender", ["Male"], {"gender": None}),
+    ],
+)
+async def test_a_secondary_field_of_an_unexpected_shape_is_dropped(
+    pesu, upstream, make_response, login_payload, profile_payload, caplog, block, key, value, affected
+):
+    """Only that field is lost; the rest of the profile still comes back."""
+    if key is None:
+        profile_payload[block] = value
+    else:
+        profile_payload[block][key] = value
+
+    with caplog.at_level("WARNING"):
+        profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile == {**FULL_PROFILE, **affected}
+    # The field is named in the log, but never its value
+    assert "Ignored an unexpected value" in caplog.text
+    assert "unexpected': True" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_secondary_login_fields_of_an_unexpected_shape_do_not_fail_the_login(
+    pesu, upstream, make_response, login_payload, profile_payload
+):
+    login_payload["mobileJsonObject"].update(branch={"x": 1}, dateofBirth=["2005-01-01"])
+    profile_payload["STUDENT_INFO"]["BranchAbbreviation"] = None
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["branchShortCode"] is None
+    # STUDENT_INFO's timestamp still gives the date of birth
+    assert profile["dateOfBirth"] == "2005-01-01"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("index", "entry", "roll_number"),
+    [
+        # Not a semester at all: skipped, and the latest (Sem-4) is untouched
+        (0, "garbage", 27),
+        # The latest, with no usable roll number: there is no current one
+        (1, {"studentRollNo": "27A", "batchClassOrder": 2027010199}, None),
+        # The latest, with no usable order: it cannot be placed in time, so Sem-3 is the latest left
+        (1, {"studentRollNo": 27, "batchClassOrder": "soon"}, 12),
+    ],
+)
+async def test_a_malformed_semester_costs_only_itself(
+    pesu, upstream, make_response, login_payload, profile_payload, index, entry, roll_number
+):
+    """The fixture's semesters are Sem-3 (12), Sem-4 (27, the latest) and Sem-2 (9)."""
+    profile_payload["STUDENT_SEMESTERS"][index] = entry
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["rollNumber"] == roll_number
+    assert profile["srn"] == "PES2UG25CS001"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("block", "key", "value"),
+    [
+        ("STUDENT_INFO", "SRN", {"x": 1}),
+        ("STUDENT_INFO", "NameAsInSSLC", ["JOHN"]),
+        ("STUDENT_INFO", "Branch", {"x": 1}),
+        ("STUDENT_PHOTO", "email", ["a@b.c"]),
+    ],
+)
+async def test_a_core_field_of_an_unexpected_shape_is_still_a_parse_error(
+    pesu, upstream, make_response, login_payload, profile_payload, block, key, value
+):
+    """A change to a field a profile cannot do without is PESU's API changing, so it stays a 422."""
+    profile_payload[block][key] = value
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    with pytest.raises(ProfileParseError):
+        await pesu.authenticate("user", "pass", profile=True)
+
+
+@pytest.mark.asyncio
+async def test_blood_group_is_never_returned(pesu, upstream, make_response, login_payload, profile_payload):
+    """PESU sends a blood group; it is not authentication data, so it is not read at all."""
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert "bloodGroup" not in profile
+    assert "BLOODGROUPSECRET" not in str(profile)

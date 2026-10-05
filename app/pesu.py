@@ -8,10 +8,20 @@ import re
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, Literal, get_args
+from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args
 
 import httpx2
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    ValidationInfo,
+    ValidatorFunctionWrapHandler,
+    WrapValidator,
+    field_validator,
+    model_validator,
+)
 
 from app.exceptions.authentication import (
     AuthenticationError,
@@ -53,7 +63,6 @@ ProfileField = Literal[
     "rollNumber",
     "gender",
     "dateOfBirth",
-    "bloodGroup",
 ]
 
 # The mobile app's API is undocumented. Every value below was read off the app's own traffic and can
@@ -120,8 +129,8 @@ class _UpstreamModel(BaseModel):
     """Base for the response shapes read from PESU Academy.
 
     Only the fields this service returns are declared; everything else is dropped as the response is
-    parsed. Those responses also carry the student's photo, addresses, marks and their parents'
-    contact details. Never holding them means no log line, exception or repr can leak them.
+    parsed. Those responses also carry the student's photo, blood group, addresses, marks and their
+    parents' contact details. Never holding them means no log line, exception or repr can leak them.
     """
 
     model_config = ConfigDict(extra="ignore", coerce_numbers_to_str=True)
@@ -146,6 +155,31 @@ class _UpstreamModel(BaseModel):
         return value
 
 
+def _none_if_invalid(value: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo) -> Any:  # noqa: ANN401
+    """Validate a secondary field, turning a value of an unexpected shape into None.
+
+    Args:
+        value (Any): The raw value from the response.
+        handler (ValidatorFunctionWrapHandler): The field's own validation.
+        info (ValidationInfo): Which field is being validated.
+
+    Returns:
+        Any: The validated value, or None if it did not validate.
+    """
+    try:
+        return handler(value)
+    except ValidationError:
+        # The field's name only: the value is from a response full of personal data
+        logging.warning(f"Ignored an unexpected value for {info.field_name} in a PESU Academy response.")
+        return None
+
+
+# For the fields that add to a profile rather than make one. If PESU changes the shape of one of
+# these, that field is null and the rest of the profile still comes back; the core fields (name, IDs,
+# program, branch, class, contact details) stay strict, so a change to them is still a 422.
+Secondary = WrapValidator(_none_if_invalid)
+
+
 class _LoginUser(_UpstreamModel):
     """The student as described by the login response's `mobileJsonObject`."""
 
@@ -156,12 +190,12 @@ class _LoginUser(_UpstreamModel):
     phone: str | None = None
     program: str | None = None
     # Prefixed, as in "Branch:CSE"
-    branch: str | None = None
+    branch: Annotated[str | None, Secondary] = None
     class_name: str | None = Field(None, alias="className")
     section_name: str | None = Field(None, alias="sectionName")
     login_id: str | None = Field(None, alias="loginId")
     # Already a YYYY-MM-DD string here, unlike the profile response's timestamp
-    date_of_birth: str | None = Field(None, alias="dateofBirth")
+    date_of_birth: Annotated[str | None, Secondary] = Field(None, alias="dateofBirth")
 
 
 class _LoginResponse(_UpstreamModel):
@@ -178,18 +212,17 @@ class _StudentInfo(_UpstreamModel):
     login_id: str | None = Field(None, alias="LoginId")
     srn: str | None = Field(None, alias="SRN")
     name: str | None = Field(None, alias="NameAsInSSLC")
-    first_name: str | None = Field(None, alias="FirstName")
-    middle_name: str | None = Field(None, alias="MiddleName")
-    last_name: str | None = Field(None, alias="LastName")
+    first_name: Annotated[str | None, Secondary] = Field(None, alias="FirstName")
+    middle_name: Annotated[str | None, Secondary] = Field(None, alias="MiddleName")
+    last_name: Annotated[str | None, Secondary] = Field(None, alias="LastName")
     email: str | None = Field(None, alias="Email")
     mobile: str | None = Field(None, alias="Mobile")
     program: str | None = Field(None, alias="ProgramAbbreviation")
     branch: str | None = Field(None, alias="Branch")
-    branch_short_code: str | None = Field(None, alias="BranchAbbreviation")
+    branch_short_code: Annotated[str | None, Secondary] = Field(None, alias="BranchAbbreviation")
     class_name: str | None = Field(None, alias="ClassName")
     section_name: str | None = Field(None, alias="SectionName")
-    date_of_birth: int | None = Field(None, alias="DateOfBirth")
-    blood_group: str | None = Field(None, alias="BloodGroup")
+    date_of_birth: Annotated[int | None, Secondary] = Field(None, alias="DateOfBirth")
 
 
 class _StudentPhoto(_UpstreamModel):
@@ -197,26 +230,26 @@ class _StudentPhoto(_UpstreamModel):
 
     login_id: str | None = Field(None, alias="loginId")
     name: str | None = Field(None, alias="nameAsInSSLC")
-    first_name: str | None = Field(None, alias="firstName")
+    first_name: Annotated[str | None, Secondary] = Field(None, alias="firstName")
     email: str | None = Field(None, alias="email")
     mobile: str | None = Field(None, alias="mobile")
-    institute: str | None = Field(None, alias="instituteName")
-    gender: str | None = None
-    date_of_birth: int | None = Field(None, alias="dateOfBirth")
+    institute: Annotated[str | None, Secondary] = Field(None, alias="instituteName")
+    gender: Annotated[str | None, Secondary] = None
+    date_of_birth: Annotated[int | None, Secondary] = Field(None, alias="dateOfBirth")
 
 
 class _UserRole(_UpstreamModel):
     """The profile response's `USER_ROLE` block, read only for the PRN it carries."""
 
-    login_id: str | None = Field(None, alias="LoginId")
+    login_id: Annotated[str | None, Secondary] = Field(None, alias="LoginId")
 
 
 class _Semester(_UpstreamModel):
     """One of the student's semesters, from the profile response's `STUDENT_SEMESTERS`."""
 
-    roll_number: int | None = Field(None, alias="studentRollNo")
+    roll_number: Annotated[int | None, Secondary] = Field(None, alias="studentRollNo")
     # Orders the semesters chronologically; the list itself is not guaranteed to be in order
-    order: int | None = Field(None, alias="batchClassOrder")
+    order: Annotated[int | None, Secondary] = Field(None, alias="batchClassOrder")
 
 
 class _Student(_UpstreamModel):
@@ -245,7 +278,6 @@ class _Student(_UpstreamModel):
     roll_number: int | None = None
     gender: str | None = None
     date_of_birth: int | None = None
-    blood_group: str | None = None
 
 
 class _ErrorEnvelope(_UpstreamModel):
@@ -276,9 +308,14 @@ class _ProfileResponse(_UpstreamModel):
     # student into a 422, so either block will do and the profile is built from what is there.
     info: _StudentInfo | None = Field(None, alias="STUDENT_INFO")
     photo: _StudentPhoto | None = Field(None, alias="STUDENT_PHOTO")
-    role: _UserRole | None = Field(None, alias="USER_ROLE")
-    # Optional like the blocks above: a student with no semesters yet must not turn into a 422
-    semesters: list[_Semester] | None = Field(None, alias="STUDENT_SEMESTERS")
+    # Secondary, like the semesters: a USER_ROLE or STUDENT_SEMESTERS of an unexpected shape -- PESU
+    # sends {} for an empty block, for one -- is dropped rather than failing the profile. Each semester
+    # is too, so one malformed entry does not cost the others.
+    role: Annotated[_UserRole | None, Secondary] = Field(None, alias="USER_ROLE")
+    semesters: Annotated[list[Annotated[_Semester | None, Secondary]] | None, Secondary] = Field(
+        None,
+        alias="STUDENT_SEMESTERS",
+    )
 
     @model_validator(mode="after")
     def _has_student(self) -> _ProfileResponse:
@@ -326,18 +363,19 @@ class _ProfileResponse(_UpstreamModel):
             roll_number=self._current_roll_number(),
             gender=photo.gender,
             date_of_birth=info.date_of_birth or photo.date_of_birth,
-            blood_group=info.blood_group,
         )
 
     def _current_roll_number(self) -> int | None:
         """Get the roll number from the student's latest semester.
 
-        Roll numbers change from one semester to the next, so only the most recent one is current.
+        Roll numbers change from one semester to the next, so only the most recent one is current. If the
+        latest semester has no usable roll number, there is no current one: an earlier semester's would
+        be wrong rather than missing.
 
         Returns:
-            int | None: The roll number, or None if there are no semesters with one.
+            int | None: The latest semester's roll number, or None if it has none or there are no semesters.
         """
-        semesters = [s for s in self.semesters or () if s.order is not None and s.roll_number is not None]
+        semesters = [s for s in self.semesters or () if s is not None and s.order is not None]
         if not semesters:
             return None
         return max(semesters, key=lambda semester: semester.order).roll_number
@@ -807,7 +845,6 @@ class PESUAcademy:
             "rollNumber": student.roll_number,
             "gender": student.gender,
             "dateOfBirth": _date_from_epoch_ms(student.date_of_birth) or _iso_date(user.date_of_birth),
-            "bloodGroup": student.blood_group,
         }
 
     async def authenticate(

@@ -159,7 +159,7 @@ object, with the user's profile information if requested.
 | `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information. This makes a second call to PESU Academy, so it takes longer                                     |
 | `fields`      | Yes          | `list[str]` | `None`      | Which [`ProfileObject`](#profileobject) fields to return. Only used when `profile` is `true`. If not provided, all fields are returned |
 
-The request body is validated strictly. A missing or empty `username` or `password`, a value of the wrong type (such as
+The request body is validated strictly. A missing or empty `username` or `password`, one that is not valid text, a value of the wrong type (such as
 the string `"true"` for `profile`), an unknown key, an empty `fields` list, or an unknown field name is rejected with a
 `400`.
 
@@ -222,7 +222,6 @@ student whose PRN PESU Academy does not return has a `null` `prn`. Fields left o
 | `rollNumber`       | `int`    | Roll number in the current semester, or in the latest one for a student who has graduated                                                                                                                                                                       |
 | `gender`           | `str`    | Gender of the user, as recorded by PESU                                                                                                                                                                                                                         |
 | `dateOfBirth`      | `str`    | Date of birth, as `YYYY-MM-DD`                                                                                                                                                                                                                                  |
-| `bloodGroup`       | `str`    | Blood group, such as `O+`                                                                                                                                                                                                                                       |
 
 Everything else in PESU Academy's responses, such as the photo, addresses, parents' details and marks, is discarded and
 never returned.
@@ -730,8 +729,7 @@ print(response.json())
     "institute": "PES University (Ring Road)",
     "rollNumber": 27,
     "gender": "Male",
-    "dateOfBirth": "2002-01-31",
-    "bloodGroup": "O+"
+    "dateOfBirth": "2002-01-31"
   },
   "message": "Login successful.",
   "timestamp": "2024-07-28T22:30:10.103368+05:30"

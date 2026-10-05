@@ -80,7 +80,6 @@ authenticate_docs = ApiDocs(
                                     "rollNumber": 27,
                                     "gender": "Male",
                                     "dateOfBirth": "2002-01-31",
-                                    "bloodGroup": "O+",
                                 },
                             },
                         },
