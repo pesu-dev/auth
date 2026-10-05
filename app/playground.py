@@ -1,6 +1,6 @@
-"""Redesigned UI"""
+"""HTML for the interactive PESUAuth API Explorer."""
 
-PLAYGROUND_HTML = r'''<!doctype html>
+PLAYGROUND_HTML = r"""<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -376,6 +376,15 @@ PLAYGROUND_HTML = r'''<!doctype html>
         font-size: 12px;
         line-height: 1.5;
       }
+      .schema {
+        margin: 8px 0 0;
+        font-size: 12px;
+        white-space: pre;
+        overflow-x: auto;
+      }
+      details.response-code summary {
+        cursor: pointer;
+      }
       .responses {
         display: flex;
         gap: 7px;
@@ -684,7 +693,14 @@ PLAYGROUND_HTML = r'''<!doctype html>
             title="GitHub"
             ><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path
-                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.26 5.67.41.35.78 1.05.78 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.2.66.8.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55
+                  0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7
+                  1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25
+                  3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28
+                  1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8
+                  0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0
+                  4.41-2.69 5.38-5.26 5.67.41.35.78 1.05.78 2.12 0 1.53-.01 2.76-.01 3.14 0
+                  .3.2.66.8.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"
               /></svg
           ></a>
         </nav>
@@ -723,7 +739,8 @@ PLAYGROUND_HTML = r'''<!doctype html>
               >
                 <circle cx="12" cy="12" r="4" />
                 <path
-                  d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"
+                  d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93
+                    19.07l1.42-1.42M17.66 6.34l1.41-1.41"
                 />
               </svg>
             </button>
@@ -808,14 +825,18 @@ PLAYGROUND_HTML = r'''<!doctype html>
               </button>
             </div>
             <div id="queryFields"></div>
-            <label for="auth">Bearer token</label
-            ><input
-              id="auth"
-              class="control"
-              type="password"
-              autocomplete="off"
-              placeholder="Optional"
-            /><label for="body">Request body</label
+            <div id="authWrap">
+              <label for="auth">Bearer token</label
+              ><input
+                id="auth"
+                class="control"
+                type="password"
+                autocomplete="off"
+                placeholder="Token"
+              />
+            </div>
+            <p id="noAuth" class="empty">No authentication required.</p>
+            <label for="body">Request body</label
             ><textarea id="body" spellcheck="false" aria-label="Request body">
 {}</textarea
             ><button id="sendBtn" class="action" type="button">
@@ -889,10 +910,39 @@ PLAYGROUND_HTML = r'''<!doctype html>
         if (s.type === "array") return `array<${schemaType(s.items || {})}>`;
         return s.type || s.$ref?.split("/").pop() || "object";
       }
-      function resolveSchema(s = {}) {
-        if (!s.$ref) return s;
-        const name = s.$ref.split("/").pop();
-        return state.spec?.components?.schemas?.[name] || s;
+      function resolveSchema(s = {}, depth = 0) {
+        while (s && s.$ref && depth < 10) {
+          const name = s.$ref.split("/").pop();
+          const next = state.spec?.components?.schemas?.[name];
+          if (!next) break;
+          s = { title: name, ...next };
+          depth++;
+        }
+        return s || {};
+      }
+      function needsAuth(op) {
+        return (op.security || state.spec?.security || []).length > 0;
+      }
+      function schemaTree(schema, indent = "  ", depth = 0) {
+        const s = resolveSchema(schema);
+        const variants = s.anyOf || s.oneOf;
+        if (variants) {
+          const real = variants.filter((v) => v.type !== "null");
+          if (real.length === 1) return schemaTree(real[0], indent, depth);
+        }
+        if (s.type === "array")
+          return `array<${schemaTree(s.items || {}, indent, depth)}>`;
+        if (!s.properties || depth > 3) return s.format || s.type || s.title || "any";
+        const req = s.required || [];
+        const pad = indent.repeat(depth + 1);
+        const lines = Object.entries(s.properties).map(
+          ([k, v]) =>
+            `${pad}${k}${req.includes(k) ? "" : "?"}: ${schemaTree(v, indent, depth + 1)}`,
+        );
+        return `{\n${lines.join("\n")}\n${indent.repeat(depth)}}`;
+      }
+      function responseSchema(r) {
+        return r?.content?.["application/json"]?.schema || null;
       }
       function exampleForSchema(schema = {}) {
         schema = resolveSchema(schema);
@@ -947,7 +997,9 @@ PLAYGROUND_HTML = r'''<!doctype html>
           ? rows
               .map(
                 (r) =>
-                  `<div class="field-row"><code>${esc(r.name)}</code><span>${esc(r.type)}${r.required ? " *" : ""}</span><p>${esc(r.description)}</p></div>`,
+                  `<div class="field-row"><code>${esc(r.name)}</code>` +
+                  `<span>${esc(r.type)}${r.required ? " *" : ""}</span>` +
+                  `<p>${esc(r.description)}</p></div>`,
               )
               .join("")
           : '<p class="empty">No input parameters.</p>';
@@ -958,16 +1010,29 @@ PLAYGROUND_HTML = r'''<!doctype html>
           .filter((p) => p.in === "query")
           .map(
             (p, i) =>
-              `${encodeURIComponent(p.name)}=${encodeURIComponent(p.schema?.default ?? p.schema?.enum?.[0] ?? `value${i + 1}`)}`,
+              `${encodeURIComponent(p.name)}=` +
+              encodeURIComponent(
+                p.schema?.default ?? p.schema?.enum?.[0] ?? `value${i + 1}`,
+              ),
           )
           .join("&");
-        let curl = `curl -X ${method.toUpperCase()} '${location.origin}${path}${query ? "?" + query : ""}'`;
+        const url = `${location.origin}${path}${query ? "?" + query : ""}`;
+        let curl = `curl -X ${method.toUpperCase()} '${url}'`;
+        if (needsAuth(op))
+          curl += ` \\\n  -H 'Authorization: Bearer <token>'`;
         if (example !== null)
           curl += ` \\\n  -H 'Content-Type: application/json' \\\n  -d '${JSON.stringify(example)}'`;
         return curl;
       }
       function markdownFor(path, method, op) {
-        return `\`\`\`bash\n${curlExample(path, method, op)}\n\`\`\``;
+        return [
+          "### Authentication",
+          needsAuth(op) ? "Bearer token, when the server requires one." : "None required.",
+          "### Example request",
+          "```bash",
+          curlExample(path, method, op),
+          "```",
+        ].join("\n");
       }
       function renderMarkdown(md) {
         let html = "",
@@ -1014,7 +1079,9 @@ PLAYGROUND_HTML = r'''<!doctype html>
         $("queryFields").innerHTML = params
           .map(
             (p) =>
-              `<label for="q-${esc(p.name)}">${esc(p.name)}${p.required ? " *" : ""}</label><input id="q-${esc(p.name)}" data-query="${esc(p.name)}" class="control" placeholder="${esc(p.schema?.default ?? p.schema?.enum?.[0] ?? "")}">`,
+              `<label for="q-${esc(p.name)}">${esc(p.name)}${p.required ? " *" : ""}</label>` +
+              `<input id="q-${esc(p.name)}" data-query="${esc(p.name)}" class="control" ` +
+              `placeholder="${esc(p.schema?.default ?? p.schema?.enum?.[0] ?? "")}">`,
           )
           .join("");
       }
@@ -1041,11 +1108,20 @@ PLAYGROUND_HTML = r'''<!doctype html>
         $("pathTitle").textContent = path;
         renderFields(op);
         $("responses").innerHTML = Object.entries(op.responses || {})
-          .map(
-            ([code, r]) =>
-              `<span class="response-code">${esc(code)} · ${esc(r.description || "Response")}</span>`,
-          )
+          .map(([code, r]) => {
+            const label = `${esc(code)} · ${esc(r.description || "Response")}`;
+            const schema = responseSchema(r);
+            if (!schema) return `<span class="response-code">${label}</span>`;
+            const name = resolveSchema(schema).title || "Response";
+            return (
+              `<details class="response-code"><summary>${label}</summary>` +
+              `<pre class="schema">${esc(name)} ${esc(schemaTree(schema))}</pre></details>`
+            );
+          })
           .join("");
+        const auth = needsAuth(op);
+        $("authWrap").hidden = !auth;
+        $("noAuth").hidden = auth;
         $("explanation").innerHTML = renderMarkdown(
           markdownFor(path, method, op),
         );
@@ -1085,7 +1161,9 @@ PLAYGROUND_HTML = r'''<!doctype html>
             const b = document.createElement("button");
             b.type = "button";
             b.className = "endpoint";
-            b.innerHTML = `<span class="method ${e.method}">${e.method.toUpperCase()}</span><span class="path">${esc(e.path)}</span>`;
+            b.innerHTML =
+              `<span class="method ${e.method}">${e.method.toUpperCase()}</span>` +
+              `<span class="path">${esc(e.path)}</span>`;
             b.onclick = () => selectEndpoint(e.path, e.method, e.op, b, i);
             $("endpoints").appendChild(b);
             if (i === Math.min(state.selectedIndex, endpoints.length - 1))
@@ -1116,7 +1194,7 @@ PLAYGROUND_HTML = r'''<!doctype html>
             if (el.value) url.searchParams.set(el.dataset.query, el.value);
           });
           const headers = {};
-          if ($("auth").value)
+          if (needsAuth(state.operation) && $("auth").value)
             headers.Authorization = `Bearer ${$("auth").value}`;
           const opts = { method: state.method.toUpperCase(), headers };
           if (
@@ -1242,4 +1320,4 @@ PLAYGROUND_HTML = r'''<!doctype html>
       load();
     </script>
   </body>
-</html>'''
+</html>"""

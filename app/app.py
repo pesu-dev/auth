@@ -110,6 +110,7 @@ app = FastAPI(
     description="A simple and lightweight API to authenticate PESU credentials using PESU Academy",
     version=version("pesu-auth"),
     docs_url=None,
+    redoc_url=None,
     lifespan=lifespan,
     openapi_tags=[
         {
