@@ -68,15 +68,18 @@ async def test_authenticate_success_username_srn(pesu_academy: PESUAcademy):
 
 @pytest.mark.secret_required
 @pytest.mark.asyncio
-async def test_authenticate_with_specific_profile_fields(pesu_academy: PESUAcademy, expected_profile):
-    fields = ["prn", "branch", "campus"]
+async def test_authenticate_with_specific_profile_fields(
+    pesu_academy: PESUAcademy, check_live_fields, new_profile_fields
+):
+    # Some of the original fields, and every field added with the mobile API
+    fields = ["prn", "branch", "campus", *new_profile_fields]
     result = await pesu_academy.authenticate(
         os.getenv("TEST_EMAIL"), os.getenv("TEST_PASSWORD"), profile=True, fields=fields
     )
 
     assert result["status"] is True
     assert "Login successful" in result["message"]
-    assert result["profile"] == {field: expected_profile[field] for field in fields}
+    check_live_fields(result["profile"], fields)
 
 
 @pytest.mark.secret_required
@@ -89,7 +92,6 @@ async def test_authenticate_with_all_profile_fields(pesu_academy: PESUAcademy, c
     assert result["status"] is True
     assert "Login successful" in result["message"]
     check_live_profile(result["profile"])
-
 
 
 @pytest.mark.asyncio

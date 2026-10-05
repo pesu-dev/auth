@@ -30,7 +30,7 @@ authenticate_docs = ApiDocs(
                                 "username": "1234567890",
                                 "password": "mySecurePassword123",
                                 "profile": True,
-                                "fields": ["name", "email", "campus", "branch", "semester"],
+                                "fields": ["name", "email", "campus", "branch", "semester", "firstName", "rollNumber"],
                             },
                         },
                     }
@@ -95,6 +95,8 @@ authenticate_docs = ApiDocs(
                                     "semester": "Sem-2",
                                     "email": "johndoe@gmail.com",
                                     "campus": "RR",
+                                    "firstName": "John",
+                                    "rollNumber": 27,
                                 },
                             },
                         },

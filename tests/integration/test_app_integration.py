@@ -84,8 +84,9 @@ def test_integration_authenticate_success_username_srn(client):
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_with_specific_profile_fields(client, expected_profile):
-    fields = ["prn", "branch", "campus", "name"]
+def test_integration_authenticate_with_specific_profile_fields(client, check_live_fields, new_profile_fields):
+    # Some of the original fields, and every field added with the mobile API
+    fields = ["prn", "branch", "campus", "name", *new_profile_fields]
     payload = {
         "username": os.getenv("TEST_EMAIL"),
         "password": os.getenv("TEST_PASSWORD"),
@@ -99,7 +100,7 @@ def test_integration_authenticate_with_specific_profile_fields(client, expected_
     assert data["status"] is True
     assert "timestamp" in data
     assert data["message"] == "Login successful."
-    assert data["profile"] == {field: expected_profile[field] for field in fields}
+    check_live_fields(data["profile"], fields)
 
 
 @pytest.mark.secret_required
@@ -387,3 +388,31 @@ def test_integration_authenticate_removed_kycas_fields_rejected(client):
         assert data["status"] is False
         assert "Could not validate request data" in data["message"]
         assert "body.fields.0" in data["message"]
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["first_name", "middle_name", "last_name", "program_short_code", "branch_short_code", "roll_number", "date_of_birth"],
+)
+def test_integration_authenticate_snake_case_new_fields_rejected(client, field):
+    """Fields are camelCase on the wire, like campusCode; the snake_case form is a 400."""
+    payload = {"username": "username", "password": "password", "profile": True, "fields": [field]}
+
+    response = client.post("/authenticate", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] is False
+    assert "Could not validate request data" in data["message"]
+    assert "body.fields.0" in data["message"]
+
+
+@pytest.mark.parametrize("field", ["bloodGroup", "photo", "profilePicture"])
+def test_integration_authenticate_fields_the_api_does_not_return_rejected(client, field):
+    """PESU sends these, but the API does not return them, so asking for one is a 400."""
+    payload = {"username": "username", "password": "password", "profile": True, "fields": [field]}
+
+    response = client.post("/authenticate", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] is False
+    assert "body.fields.0" in data["message"]

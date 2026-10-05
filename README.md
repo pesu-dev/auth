@@ -761,8 +761,9 @@ curl -X POST http://localhost:5000/authenticate \
 
 #### Requesting specific fields
 
-Pass `fields` to receive only some of the profile. A requested field that the user has no value for is `null` — here,
-a student who has graduated and is no longer in a class.
+Pass `fields` to receive only some of the profile, in any order; they come back in the order of the table above. A
+requested field that the user has no value for is `null` — here, a student who has graduated and is no longer in a
+class, and has no middle name. Their roll number is the one from their last semester.
 
 ```bash
 curl -X POST http://localhost:5000/authenticate \
@@ -771,7 +772,7 @@ curl -X POST http://localhost:5000/authenticate \
     "username": "your SRN, PRN, email or phone number here",
     "password": "your password here",
     "profile": true,
-    "fields": ["name", "srn", "semester", "campus"]
+    "fields": ["name", "srn", "semester", "campus", "middleName", "rollNumber"]
 }'
 ```
 
@@ -784,7 +785,9 @@ curl -X POST http://localhost:5000/authenticate \
     "name": "Johnny Blaze",
     "srn": "PES1UG20CS001",
     "semester": null,
-    "campus": "RR"
+    "campus": "RR",
+    "middleName": null,
+    "rollNumber": 27
   }
 }
 ```

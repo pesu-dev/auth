@@ -40,14 +40,32 @@ def test_a_profile_field_without_a_value_is_null(mock_authenticate, client):
     mock_authenticate.return_value = {
         "status": True,
         "message": "Login successful.",
-        "profile": {"name": "John Doe", "semester": None, "section": None, "campusCode": 1},
+        "profile": {
+            "name": "John Doe",
+            "semester": None,
+            "section": None,
+            "campusCode": 1,
+            "middleName": None,
+            "rollNumber": 27,
+            "dateOfBirth": "2002-01-31",
+            "gender": None,
+        },
     }
 
     response = client.post("/authenticate", json={"username": "u", "password": "p", "profile": True})
 
     assert response.status_code == 200
     # Fields filtered out (or never produced) stay out; requested ones with no value are null
-    assert response.json()["profile"] == {"name": "John Doe", "semester": None, "section": None, "campusCode": 1}
+    assert response.json()["profile"] == {
+        "name": "John Doe",
+        "semester": None,
+        "section": None,
+        "campusCode": 1,
+        "middleName": None,
+        "rollNumber": 27,
+        "dateOfBirth": "2002-01-31",
+        "gender": None,
+    }
 
 
 @patch("app.app.pesu_academy.authenticate")

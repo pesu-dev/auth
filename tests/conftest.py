@@ -80,21 +80,56 @@ def pytest_collection_modifyitems(config, items):
     items.sort(key=sort_key)
 
 
-@pytest.fixture
-def check_live_profile(expected_profile):
-    """Check a default profile from the live API against the test account.
+# The fields added with the mobile API, beyond the eleven the web flow returned. Every live test that
+# requests particular fields asks for these too, so they are checked the same way as the originals.
+NEW_PROFILE_FIELDS = [
+    "firstName",
+    "middleName",
+    "lastName",
+    "programShortCode",
+    "branchShortCode",
+    "institute",
+    "rollNumber",
+    "gender",
+    "dateOfBirth",
+]
 
-    Every field must equal its TEST_* value. Each comparison names only the field when it fails, so
-    the account's values never reach the test output. The IDs are also checked for shape, which
-    does not depend on the variables at all.
+
+@pytest.fixture
+def new_profile_fields():
+    """The profile fields added with the mobile API."""
+    return list(NEW_PROFILE_FIELDS)
+
+
+@pytest.fixture
+def check_live_fields(expected_profile):
+    """Check that a live profile holds exactly the requested fields, each equal to its TEST_* value.
+
+    A mismatch names the fields, never their values, so the account's data never reaches the test
+    output.
+    """
+
+    def check(profile, fields):
+        assert sorted(profile) == sorted(set(fields)), "the profile does not hold exactly the requested fields"
+        mismatched = [field for field in fields if profile[field] != expected_profile[field]]
+        assert not mismatched, f"these fields do not match their TEST_* values: {mismatched}"
+
+    return check
+
+
+@pytest.fixture
+def check_live_profile(expected_profile, check_live_fields):
+    """Check a full default profile from the live API against the test account.
+
+    Every field must equal its TEST_* value (see check_live_fields), in the documented order. The
+    IDs are also checked for shape, which does not depend on the variables at all.
     """
     from app.pesu import PRN_PATTERN, SRN_PATTERN, PESUAcademy
 
     def check(profile):
         assert list(profile) == PESUAcademy.DEFAULT_FIELDS
         assert list(expected_profile) == PESUAcademy.DEFAULT_FIELDS, "a profile field has no TEST_* variable"
-        mismatched = [field for field, expected in expected_profile.items() if profile[field] != expected]
-        assert not mismatched, f"these fields do not match their TEST_* values: {mismatched}"
+        check_live_fields(profile, PESUAcademy.DEFAULT_FIELDS)
         # An older account's SRN is its PRN; a newer one's SRN is the new format. Either way both IDs
         # carry the same campus digit.
         ok = profile["prn"] is None or PRN_PATTERN.fullmatch(profile["prn"]) is not None

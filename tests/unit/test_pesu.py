@@ -547,9 +547,19 @@ async def test_an_unknown_program_is_returned_as_is_and_counted(
 async def test_field_filtering(pesu, upstream, make_response, login_payload, profile_payload):
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    result = await pesu.authenticate("user", "pass", profile=True, fields=["name", "campus"])
+    fields = ["dateOfBirth", "name", "rollNumber", "campus", "middleName", "programShortCode"]
+    result = await pesu.authenticate("user", "pass", profile=True, fields=fields)
 
-    assert result["profile"] == {"name": "JOHN DOE", "campus": "EC"}
+    assert result["profile"] == {
+        "name": "JOHN DOE",
+        "campus": "EC",
+        "middleName": None,
+        "programShortCode": "B.Tech.",
+        "rollNumber": 27,
+        "dateOfBirth": "2005-01-01",
+    }
+    # In the documented order, whatever order they were asked for in
+    assert list(result["profile"]) == [field for field in PESUAcademy.DEFAULT_FIELDS if field in fields]
 
 
 @pytest.mark.asyncio
@@ -557,12 +567,21 @@ async def test_a_requested_field_upstream_does_not_have_is_none(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
     login_payload["mobileJsonObject"]["className"] = None
+    profile_payload["STUDENT_PHOTO"]["gender"] = ""
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    result = await pesu.authenticate("user", "pass", profile=True, fields=["semester", "srn"])
+    result = await pesu.authenticate(
+        "user", "pass", profile=True, fields=["semester", "srn", "middleName", "gender", "institute"]
+    )
 
     # Requested, so present; no value, so None
-    assert result["profile"] == {"srn": "PES2UG25CS001", "semester": None}
+    assert result["profile"] == {
+        "srn": "PES2UG25CS001",
+        "semester": None,
+        "middleName": None,
+        "institute": "PES University (Electronic City)",
+        "gender": None,
+    }
 
 
 def test_default_fields_are_every_profile_field():
@@ -734,14 +753,14 @@ async def test_duplicate_requested_fields_are_returned_once(
 ):
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    result = await pesu.authenticate("user", "pass", profile=True, fields=["name", "name"])
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["name", "rollNumber", "name", "rollNumber"])
 
-    assert result["profile"] == {"name": "JOHN DOE"}
+    assert result["profile"] == {"name": "JOHN DOE", "rollNumber": 27}
 
 
 @pytest.mark.asyncio
 async def test_fields_without_a_profile_are_ignored(pesu, login_ok):
-    result = await pesu.authenticate("user", "pass", profile=False, fields=["name"])
+    result = await pesu.authenticate("user", "pass", profile=False, fields=["name", "rollNumber", "dateOfBirth"])
 
     assert "profile" not in result
     login_ok.assert_awaited_once()
@@ -847,11 +866,12 @@ async def test_a_timeout_is_an_upstream_error(pesu, wire, collector):
 @pytest.mark.asyncio
 async def test_concurrent_logins_do_not_share_anything(pesu, upstream, make_response, login_payload, profile_payload):
     """Two students logging in at once each get their own token, profile and client."""
+    # token, SRN, name, first name, roll number, date of birth (midnight IST)
     students = {
-        "alice": ("TOKEN-ALICE", "PES1UG25CS001", "ALICE A"),
-        "bob": ("TOKEN-BOB", "PES2UG25EC002", "BOB B"),
+        "alice": ("TOKEN-ALICE", "PES1UG25CS001", "ALICE A", "ALICE", 11, 1078425000000),
+        "bob": ("TOKEN-BOB", "PES2UG25EC002", "BOB B", "BOB", 42, 1069266600000),
     }
-    tokens = {token: student for student, (token, _, _) in students.items()}
+    tokens = {details[0]: student for student, details in students.items()}
 
     async def respond(url, files, headers):
         # Yield first, so the two logins interleave rather than run back to back
@@ -861,19 +881,41 @@ async def test_concurrent_logins_do_not_share_anything(pesu, upstream, make_resp
             body = {**login_payload, "accessToken": students[student][0]}
             return make_response(json=body)
         student = tokens[headers["Authorization"].removeprefix("Bearer ")]
-        _, srn, name = students[student]
-        info = {**profile_payload["STUDENT_INFO"], "SRN": srn, "NameAsInSSLC": name}
-        return make_response(json={**profile_payload, "STUDENT_INFO": info})
+        _, srn, name, first_name, roll_number, date_of_birth = students[student]
+        info = {
+            **profile_payload["STUDENT_INFO"],
+            "SRN": srn,
+            "NameAsInSSLC": name,
+            "FirstName": first_name,
+            "DateOfBirth": date_of_birth,
+        }
+        semesters = [{"studentRollNo": roll_number, "batchClassOrder": 1}]
+        return make_response(json={**profile_payload, "STUDENT_INFO": info, "STUDENT_SEMESTERS": semesters})
 
     upstream.side_effect = respond
 
+    fields = ["name", "srn", "campus", "firstName", "rollNumber", "dateOfBirth"]
     alice, bob = await asyncio.gather(
-        pesu.authenticate("alice", "pass", profile=True, fields=["name", "srn", "campus"]),
-        pesu.authenticate("bob", "pass", profile=True, fields=["name", "srn", "campus"]),
+        pesu.authenticate("alice", "pass", profile=True, fields=fields),
+        pesu.authenticate("bob", "pass", profile=True, fields=fields),
     )
 
-    assert alice["profile"] == {"name": "ALICE A", "srn": "PES1UG25CS001", "campus": "RR"}
-    assert bob["profile"] == {"name": "BOB B", "srn": "PES2UG25EC002", "campus": "EC"}
+    assert alice["profile"] == {
+        "name": "ALICE A",
+        "srn": "PES1UG25CS001",
+        "campus": "RR",
+        "firstName": "ALICE",
+        "rollNumber": 11,
+        "dateOfBirth": "2004-03-05",
+    }
+    assert bob["profile"] == {
+        "name": "BOB B",
+        "srn": "PES2UG25EC002",
+        "campus": "EC",
+        "firstName": "BOB",
+        "rollNumber": 42,
+        "dateOfBirth": "2003-11-20",
+    }
 
 
 @pytest.mark.asyncio
@@ -1316,3 +1358,16 @@ async def test_blood_group_is_never_returned(pesu, upstream, make_response, logi
 
     assert "bloodGroup" not in profile
     assert "BLOODGROUPSECRET" not in str(profile)
+
+
+ORIGINAL_FIELDS = ["name", "prn", "srn", "program", "branch", "semester", "section", "email", "phone", "campusCode", "campus"]
+
+
+def test_the_live_tests_request_every_new_field(new_profile_fields):
+    """The live specific-fields tests ask for every field added since the web flow.
+
+    A field added later without being added to that list would otherwise never be checked against
+    a real account by those tests.
+    """
+    assert sorted(new_profile_fields) == sorted(set(PESUAcademy.DEFAULT_FIELDS) - set(ORIGINAL_FIELDS))
+    assert [field for field in PESUAcademy.DEFAULT_FIELDS if field in ORIGINAL_FIELDS] == ORIGINAL_FIELDS

@@ -118,13 +118,24 @@ def test_a_profile_with_missing_values_returns_null(client, pesu_up, login_paylo
 def test_requested_fields_only_and_null_when_empty(client, pesu_up, login_payload):
     login_payload["mobileJsonObject"]["className"] = None
 
-    profile = _authenticate(client, profile=True, fields=["semester", "campusCode", "name"]).json()["profile"]
+    fields = ["semester", "campusCode", "name", "middleName", "rollNumber", "dateOfBirth", "branchShortCode"]
+    profile = _authenticate(client, profile=True, fields=fields).json()["profile"]
 
-    assert profile == {"name": "JOHN DOE", "semester": None, "campusCode": 2}
+    assert profile == {
+        "name": "JOHN DOE",
+        "semester": None,
+        "campusCode": 2,
+        "middleName": None,
+        "branchShortCode": "CSE",
+        "rollNumber": 27,
+        "dateOfBirth": "2005-01-01",
+    }
+    # On the wire, in the documented order
+    assert list(profile) == [field for field in FULL_PROFILE if field in fields]
 
 
 def test_fields_without_profile_return_no_profile(client, pesu_up):
-    body = _authenticate(client, profile=False, fields=["name"]).json()
+    body = _authenticate(client, profile=False, fields=["name", "gender", "rollNumber"]).json()
 
     assert "profile" not in body
     assert len(pesu_up.requests) == 1

@@ -93,8 +93,19 @@ def test_validate_fields_multiple_invalid_fields():
 
 
 def test_validate_fields_valid_fields():
-    model = RequestModel(username="testuser", password="testpass", fields=["name", "email"])
-    assert model.fields == ["name", "email"]
+    model = RequestModel(username="testuser", password="testpass", fields=["name", "email", "rollNumber", "dateOfBirth"])
+    assert model.fields == ["name", "email", "rollNumber", "dateOfBirth"]
+
+
+def test_validate_every_profile_field_is_accepted():
+    from typing import get_args
+
+    from app.pesu import ProfileField
+
+    every_field = list(get_args(ProfileField))
+    assert RequestModel(username="testuser", password="testpass", fields=every_field).fields == every_field
+    for field in every_field:
+        assert RequestModel(username="testuser", password="testpass", fields=[field]).fields == [field]
 
 
 def test_validate_fields_none():
@@ -164,6 +175,27 @@ def test_validate_deprecated_campus_code_in_fields_rejected():
     errors = exc_info.value.errors()
     assert any(e["type"] == "literal_error" for e in errors)
     assert "fields.0" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["first_name", "middle_name", "last_name", "program_short_code", "branch_short_code", "roll_number", "date_of_birth"],
+)
+def test_validate_snake_case_new_fields_rejected(field):
+    """Fields are camelCase on the wire, like campusCode; the snake_case form is an unknown field."""
+    with pytest.raises(ValidationError) as exc_info:
+        RequestModel(username="testuser", password="testpass", fields=[field])
+    errors = exc_info.value.errors()
+    assert any(e["type"] == "literal_error" for e in errors)
+    assert "fields.0" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("field", ["bloodGroup", "photo", "profilePicture"])
+def test_validate_fields_the_api_does_not_return_rejected(field):
+    """Data in PESU's response that the API deliberately does not return cannot be requested."""
+    with pytest.raises(ValidationError) as exc_info:
+        RequestModel(username="testuser", password="testpass", fields=[field])
+    assert any(e["type"] == "literal_error" for e in exc_info.value.errors())
 
 
 def test_validate_removed_kycas_fields_rejected():
