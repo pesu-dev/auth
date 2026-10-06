@@ -40,7 +40,7 @@ class ProfileModel(BaseModel):
     name: str | None = Field(
         None,
         title="Full Name",
-        description="Full name of the user, as registered with PESU.",
+        description="Full name of the user.",
         json_schema_extra={"example": "John Doe"},
     )
     prn: str | None = Field(
