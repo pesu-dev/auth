@@ -159,18 +159,20 @@ def _multipart(form: Mapping[str, str]) -> dict[str, tuple[None, str]]:
 
 
 def _validation_failure_summary(error: ValidationError) -> list[tuple[Any, ...]]:
-    """Describe a validation failure by where it failed, without the values that failed.
+    """Describe a validation failure by where and why it failed, without the values that failed.
 
     A ValidationError's own message quotes the offending input, which here is a response full of
-    personal data, so it is never logged or chained; this is what gets logged instead.
+    personal data, so it is never logged or chained; this is what gets logged instead. Each error's
+    `msg` is safe to include: pydantic keeps the input apart from it, in `input`, which is left out,
+    and the msg is what says why a failure with no location (a whole-response check) failed.
 
     Args:
         error (ValidationError): The failure to describe.
 
     Returns:
-        list[tuple[Any, ...]]: The location and error type of each failure.
+        list[tuple[Any, ...]]: The location, error type and message of each failure.
     """
-    return [(*e["loc"], e["type"]) for e in error.errors()]
+    return [(*e["loc"], e["type"], e["msg"]) for e in error.errors()]
 
 
 def _error_envelope_status(content: bytes) -> int | None:
@@ -322,9 +324,9 @@ class PESUAcademy:
                 f"Failed to parse the profile response from PESU Academy for user={username}.",
             ) from None
 
-        # "SUCCESS_Record found Successfully" on success. Anything else is PESU declining to answer,
-        # which is their failure to serve the profile rather than a response we cannot read.
-        if not parsed.message.startswith("SUCCESS"):
+        # Anything but success is PESU declining to answer, which is their failure to serve the profile
+        # rather than a response we cannot read, whether or not it describes a student.
+        if not parsed.succeeded:
             raise ProfileFetchError(f"PESU Academy did not return a profile for user={username}.")
         return parsed.student()
 

@@ -150,8 +150,10 @@ async def test_an_unreachable_login_is_an_upstream_error(pesu, upstream):
 
 
 @pytest.mark.asyncio
-async def test_a_login_without_a_token_cannot_fetch_the_profile(pesu, upstream, make_response, login_payload):
-    del login_payload["accessToken"]
+async def test_a_login_without_a_token_cannot_fetch_the_profile(
+    pesu, upstream, make_response, login_payload, unusable_token
+):
+    _set_token(login_payload, unusable_token)
     upstream.side_effect = [make_response(json=login_payload)]
 
     with pytest.raises(UpstreamError):
@@ -161,13 +163,23 @@ async def test_a_login_without_a_token_cannot_fetch_the_profile(pesu, upstream, 
 
 
 @pytest.mark.asyncio
-async def test_a_login_without_a_token_is_fine_without_a_profile(pesu, upstream, make_response, login_payload):
-    del login_payload["accessToken"]
+async def test_a_login_without_a_token_is_fine_without_a_profile(
+    pesu, upstream, make_response, login_payload, unusable_token
+):
+    """Only the profile call uses the token, so a login that makes none succeeds without one."""
+    _set_token(login_payload, unusable_token)
     upstream.side_effect = [make_response(json=login_payload)]
 
     result = await pesu.authenticate("user", "pass")
 
     assert result["status"] is True
+
+
+def _set_token(login_payload, token):
+    if token is None:
+        del login_payload["accessToken"]
+    else:
+        login_payload["accessToken"] = token
 
 
 @pytest.mark.asyncio
@@ -210,12 +222,26 @@ async def test_an_unreachable_profile_is_a_fetch_error(pesu, upstream, make_resp
 
 
 @pytest.mark.asyncio
-async def test_a_declined_profile_is_a_fetch_error(pesu, upstream, make_response, login_payload, profile_payload):
+@pytest.mark.parametrize("student_info", ["unchanged", "missing", "empty"])
+async def test_a_declined_profile_is_a_fetch_error(
+    pesu, upstream, make_response, login_payload, profile_payload, collector, student_info
+):
+    """PESU declining to serve the profile is a 502 whether or not it still describes a student.
+
+    A refusal need not carry STUDENT_INFO, and one without it is not a response we cannot read: it is
+    neither a 422 nor counted as a parse error.
+    """
     profile_payload["MESSAGE"] = "FAILURE_Record not found"
+    if student_info == "missing":
+        del profile_payload["STUDENT_INFO"]
+    elif student_info == "empty":
+        profile_payload["STUDENT_INFO"] = {}
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
     with pytest.raises(ProfileFetchError):
         await pesu.authenticate("user", "pass", profile=True)
+
+    assert list(collector.snapshot().samples(PROFILE_PARSE_ERRORS.name)) == []
 
 
 @pytest.mark.asyncio
@@ -230,7 +256,7 @@ async def test_a_declined_profile_is_a_fetch_error(pesu, upstream, make_response
     ],
 )
 async def test_a_profile_without_student_info_is_a_parse_error(
-    pesu, upstream, make_response, login_payload, profile_payload, collector, student_info
+    pesu, upstream, make_response, login_payload, profile_payload, collector, caplog, student_info
 ):
     """STUDENT_INFO is where most of the profile comes from; nothing else stands in for it."""
     if student_info is None:
@@ -240,8 +266,11 @@ async def test_a_profile_without_student_info_is_a_parse_error(
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
     # STUDENT_PHOTO and the login response still describe the student, and are not used instead
-    with pytest.raises(ProfileParseError):
+    with caplog.at_level("WARNING"), pytest.raises(ProfileParseError):
         await pesu.authenticate("user", "pass", profile=True)
+
+    # The log says why, though the failure has no location
+    assert "STUDENT_INFO holds no student data" in caplog.text
     assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="response_structure") == 1.0
 
 

@@ -24,7 +24,7 @@ MISSING_VALUES = frozenset({"", "NA"})
 class UpstreamModel(BaseModel):
     """Base for the response shapes read from PESU Academy.
 
-    Only the fields this service returns are declared; everything else is dropped as the response is
+    Only the fields this service uses are declared; everything else is dropped as the response is
     parsed. Those responses also carry the student's photo, blood group, addresses, marks and their
     parents' contact details. Never holding them means no log line, exception or repr can leak them.
     """
@@ -97,6 +97,28 @@ class LoginResponse(UpstreamModel):
     # repr=False so the bearer token cannot reach a log through the model's repr
     access_token: str | None = Field(None, alias="accessToken", repr=False)
 
+    @field_validator("access_token", mode="wrap")
+    @classmethod
+    def _no_token_if_invalid(cls, value: Any, handler: ValidatorFunctionWrapHandler) -> str | None:  # noqa: ANN401
+        """Treat a token of an unexpected shape as a missing one.
+
+        Only a profile request needs the token, and it reports a missing one as a 502. Failing the
+        whole login over it would turn every login into a 502, including the ones that never use it.
+
+        Args:
+            value (Any): The raw value from the response.
+            handler (ValidatorFunctionWrapHandler): The field's own validation.
+
+        Returns:
+            str | None: The token, or None if it did not validate.
+        """
+        try:
+            return handler(value)
+        except ValidationError:
+            # Never the value: it would be a credential
+            logging.warning("Ignored an unexpected value for access_token in a PESU Academy response.")
+            return None
+
 
 class StudentInfo(UpstreamDetails):
     """The student as described by the profile response's `STUDENT_INFO`, the source of every field it has.
@@ -163,22 +185,34 @@ class ProfileResponse(UpstreamModel):
     info: StudentInfo | None = Field(None, alias="STUDENT_INFO")
     photo: StudentPhoto | None = Field(None, alias="STUDENT_PHOTO")
 
+    @property
+    def succeeded(self) -> bool:
+        """Whether PESU says it found the profile: MESSAGE is "SUCCESS_Record found Successfully" then.
+
+        Returns:
+            bool: True if MESSAGE reports success.
+        """
+        return self.message.startswith("SUCCESS")
+
     @model_validator(mode="after")
     def _has_student(self) -> ProfileResponse:
-        """Reject a response whose STUDENT_INFO describes no student.
+        """Reject a successful response whose STUDENT_INFO describes no student.
 
         STUDENT_INFO is where most of the profile comes from, and nothing stands in for it. A block
         counts only if it holds a value: PESU sends `{}` for an empty block (PLACEMENT_DETAILS is one),
         and since every field is optional, `{}` -- or a block of only unknown, null or unusable values --
         would otherwise parse into an all-empty block and pass as a profile.
 
+        Only a response that reports success has to describe a student. One that does not is PESU
+        declining to serve the profile, which the caller reports as such; it need not carry a student.
+
         Returns:
             ProfileResponse: The response, unchanged.
 
         Raises:
-            ValueError: If STUDENT_INFO is missing or holds no student data.
+            ValueError: If the response reports success but STUDENT_INFO is missing or holds no student data.
         """
-        if not _has_values(self.info):
+        if self.succeeded and not _has_values(self.info):
             raise ValueError("STUDENT_INFO holds no student data")
         return self
 

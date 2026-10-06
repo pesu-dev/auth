@@ -22,6 +22,8 @@ CREDENTIAL_VARIABLES = ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_PHONE", "TES
 METRICS_TOKEN = "test-metrics-token"
 # The models the OpenAPI docs refer to by name
 DOCUMENTED_MODELS = {"ResponseModel": ResponseModel, "MetricsModel": MetricsModel}
+# Login responses' accessToken values that give no token: None stands for the key being absent
+UNUSABLE_TOKENS = {"missing": None, "object": {"token": "x"}, "list": ["x"]}
 AGENT_FRONTMATTER = '---\nname: reviewer\ndescription: Reviews diffs. Read-only.\ntools: ["read"]\n---\n'
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).
@@ -179,6 +181,12 @@ def ist_offset():
 @pytest.fixture(params=CREDENTIAL_VARIABLES)
 def credential_variable(request):
     """Each variable scripts/run_tests.py needs before it runs the live tests, one per test."""
+    return request.param
+
+
+@pytest.fixture(params=list(UNUSABLE_TOKENS.values()), ids=list(UNUSABLE_TOKENS))
+def unusable_token(request):
+    """Each accessToken that gives no token, one per test; None means the key is absent."""
     return request.param
 
 
