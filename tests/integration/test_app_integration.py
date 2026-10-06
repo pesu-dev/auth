@@ -85,8 +85,9 @@ def test_integration_authenticate_success_username_srn(client):
 
 @pytest.mark.secret_required
 def test_integration_authenticate_with_specific_profile_fields(client, check_live_fields, new_profile_fields):
-    # Some of the original fields, and every field added with the mobile API
-    fields = ["prn", "branch", "campus", "name", *new_profile_fields]
+    # The original fields whose source or form changed with the mobile API, and every field added with it;
+    # the rest are left out, so the filtering is tested too
+    fields = ["name", "prn", "program", "branch", "semester", "mobile", "campusCode", "campus", *new_profile_fields]
     payload = {
         "username": os.getenv("TEST_EMAIL"),
         "password": os.getenv("TEST_PASSWORD"),

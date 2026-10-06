@@ -264,6 +264,23 @@ def test_the_profile_model_documents_every_field(schema):
     assert list(schema["components"]["schemas"]["ProfileModel"]["properties"]) == documented_fields
 
 
+def test_the_readme_documents_every_profile_field(schema):
+    """The README's ProfileObject table is the other place callers read; it lists every field, in order, typed."""
+    import re
+    from pathlib import Path
+
+    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text()
+    section = readme.split("##### `ProfileObject`", 1)[1].split("\n### ", 1)[0]
+    rows = re.findall(r"^\| `(\w+)` +\| `(\w+)` +\|", section, flags=re.MULTILINE)
+    assert [field for field, _ in rows] == PESUAcademy.DEFAULT_FIELDS
+
+    json_types = {"str": "string", "int": "integer", "bool": "boolean"}
+    properties = schema["components"]["schemas"]["ProfileModel"]["properties"]
+    for field, readme_type in rows:
+        schema_types = {option.get("type") for option in properties[field]["anyOf"]} - {"null"}
+        assert schema_types == {json_types[readme_type]}, f"{field} is typed differently in the README"
+
+
 
 def test_each_documented_field_request_has_a_matching_response(schema):
     """Every request example that names fields is answered by a response example with exactly those."""

@@ -165,14 +165,14 @@ the string `"true"` for `profile`), an unknown key, an empty `fields` list, or a
 
 #### Responses
 
-| **Code** | **When**                                                                                                                |
-| -------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `200`    | The credentials are valid. `profile` is included if it was requested                                                    |
-| `400`    | The request body failed validation, as described above                                                                  |
-| `401`    | PESU Academy rejected the credentials: a wrong password, or a user that does not exist                                  |
-| `422`    | PESU Academy's profile response could not be parsed, which means their API changed. Only when the profile was requested |
-| `500`    | An unexpected failure, rendered by the catch-all handler                                                                |
-| `502`    | PESU Academy could not be reached, timed out, or answered the login or profile request unexpectedly                     |
+| **Code** | **When**                                                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200`    | The credentials are valid. `profile` is included if it was requested                                                                              |
+| `400`    | The request body failed validation, as described above                                                                                            |
+| `401`    | PESU Academy rejected the credentials: a wrong password, or a user that does not exist                                                            |
+| `422`    | PESU Academy's profile response could not be parsed, or had no `STUDENT_INFO`, which means their API changed. Only when the profile was requested |
+| `500`    | An unexpected failure, rendered by the catch-all handler                                                                                          |
+| `502`    | PESU Academy could not be reached, timed out, or answered the login or profile request unexpectedly                                               |
 
 Every error this API renders carries the same `{status, message, timestamp}` body, with `status` set to `false`. The
 only exceptions are an unknown path or an unsupported method, which get the framework's own `404` or `405` with a
@@ -203,8 +203,8 @@ and fields come back in the order of the table below.
 
 Every field is taken from the `STUDENT_INFO` block of PESU Academy's profile response, as PESU Academy sends it, except
 `campus` and `gender` (from `STUDENT_PHOTO`, since `STUDENT_INFO` does not have them), `isParent` (from the login
-response, the only one that has it) and `campusCode` (mapped from `campus`). No other part of the response
-stands in for a value `STUDENT_INFO` lacks, so that field is `null`; a response without `STUDENT_INFO` is a `422`.
+response, the only one that has it) and `campusCode` (mapped from `campus`). No other part of either response stands in
+for a value its source lacks, so that field is `null`; a response without `STUDENT_INFO` is a `422`.
 
 The fields from `firstName` onwards came with the move to PESU Academy's mobile API. If PESU Academy ever sends one of
 them in an unexpected shape, that field is `null` and the rest of the profile still comes back; a change to one of the
@@ -768,8 +768,8 @@ curl -X POST http://localhost:5000/authenticate \
 #### Requesting specific fields
 
 Pass `fields` to receive only some of the profile, in any order; they come back in the order of the table above. A
-requested field that the user has no value for is `null` — here, a student who has graduated and is no longer in a
-class, and has no middle name. Their roll number is the one from their last semester.
+requested field that the user has no value for is `null` — here, a student who is no longer in a class and has no
+middle name.
 
 ```bash
 curl -X POST http://localhost:5000/authenticate \

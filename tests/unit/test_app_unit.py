@@ -49,6 +49,7 @@ def test_a_profile_field_without_a_value_is_null(mock_authenticate, client):
             "mobile": "1234567890",
             "dateOfBirth": "2002-01-31",
             "gender": None,
+            "isParent": None,
         },
     }
 
@@ -65,6 +66,7 @@ def test_a_profile_field_without_a_value_is_null(mock_authenticate, client):
         "mobile": "1234567890",
         "dateOfBirth": "2002-01-31",
         "gender": None,
+        "isParent": None,
     }
 
 

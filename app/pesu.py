@@ -195,8 +195,8 @@ class _StudentInfo(_UpstreamModel):
 class _StudentPhoto(_UpstreamModel):
     """The profile response's `STUDENT_PHOTO`, read only for what STUDENT_INFO does not have."""
 
-    # The campus, such as "PES University (Ring Road)"
-    institute: str | None = Field(None, alias="instituteName")
+    # The campus, named by its institute: "PES University (Ring Road)"
+    campus: str | None = Field(None, alias="instituteName")
     gender: Annotated[str | None, Secondary] = None
 
 
@@ -204,7 +204,7 @@ class _Student(_UpstreamModel):
     """The student, from the blocks of the profile response."""
 
     info: _StudentInfo
-    institute: str | None = None
+    campus: str | None = None
     gender: str | None = None
 
 
@@ -260,7 +260,7 @@ class _ProfileResponse(_UpstreamModel):
             _Student: The student details.
         """
         photo = self.photo or _StudentPhoto()
-        return _Student(info=self.info, institute=photo.institute, gender=photo.gender)
+        return _Student(info=self.info, campus=photo.campus, gender=photo.gender)
 
 
 @asynccontextmanager
@@ -530,23 +530,23 @@ class PESUAcademy:
             raise ProfileFetchError(f"PESU Academy did not return a profile for user={username}.")
         return parsed.student()
 
-    def _campus_code(self, institute: str | None, username: str) -> int | None:
-        """Get the campus code for a campus's institute name.
+    def _campus_code(self, campus: str | None, username: str) -> int | None:
+        """Get the campus code for a campus, named as PESU names it.
 
         Args:
-            institute (str | None): The institute name from upstream, such as "PES University (Ring Road)".
+            campus (str | None): The campus's institute name from upstream, such as "PES University (Ring Road)".
             username (str): The username of the user, for logging.
 
         Returns:
-            int | None: The campus code, or None if there is no institute name or it is not a known one.
+            int | None: The campus code, or None if there is no campus name or it is not a known one.
         """
-        if institute is None:
+        if campus is None:
             return None
-        if (campus_code := CAMPUS_CODES.get(institute)) is None:
+        if (campus_code := CAMPUS_CODES.get(campus)) is None:
             # Not fatal -- the campus is still returned as PESU named it -- but it means a campus, or the
             # way PESU writes its name, is new, which nothing else would surface.
             self._metrics.increment(PROFILE_PARSE_ERRORS, reason="unknown_campus_code")
-            logging.warning(f"Unknown institute name: {institute} for user={username}")
+            logging.warning(f"Unknown campus name: {campus} for user={username}")
         return campus_code
 
     def _build_profile(self, user: _LoginUser, student: _Student, username: str) -> dict[str, Any]:
@@ -583,8 +583,8 @@ class PESUAcademy:
             "section": info.section_name,
             "email": info.email,
             "mobile": info.mobile,
-            "campusCode": self._campus_code(student.institute, username),
-            "campus": student.institute,
+            "campusCode": self._campus_code(student.campus, username),
+            "campus": student.campus,
             "firstName": info.first_name,
             "middleName": info.middle_name,
             "lastName": info.last_name,

@@ -514,7 +514,7 @@ async def test_an_unknown_campus_name_is_returned_and_counted(
     assert profile["campus"] == "PES University (Hanumanthanagar)"
     assert profile["campusCode"] is None
     assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="unknown_campus_code") == 1.0
-    assert "Unknown institute name: PES University (Hanumanthanagar)" in caplog.text
+    assert "Unknown campus name: PES University (Hanumanthanagar)" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -538,7 +538,7 @@ async def test_the_program_is_returned_as_pesu_writes_it(
 async def test_field_filtering(pesu, upstream, make_response, login_payload, profile_payload):
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    fields = ["dateOfBirth", "name", "mobile", "campus", "middleName", "branchShortCode"]
+    fields = ["isParent", "dateOfBirth", "name", "mobile", "campus", "gender", "middleName", "branchShortCode"]
     result = await pesu.authenticate("user", "pass", profile=True, fields=fields)
 
     assert result["profile"] == {
@@ -547,7 +547,9 @@ async def test_field_filtering(pesu, upstream, make_response, login_payload, pro
         "campus": "PES University (Electronic City)",
         "middleName": None,
         "branchShortCode": "CSE",
+        "gender": "Male",
         "dateOfBirth": "2005-01-01",
+        "isParent": False,
     }
     # In the documented order, whatever order they were asked for in
     assert list(result["profile"]) == [field for field in PESUAcademy.DEFAULT_FIELDS if field in fields]
@@ -1035,11 +1037,7 @@ def test_the_default_fields_are_every_field():
     assert PESUAcademy.DEFAULT_FIELDS == list(get_args(ProfileField))
 
 
-# --- Telling the PRN and the SRN apart ---
-#
-# PRN: PES + campus digit + year of joining + 5 digits (PES1201800001).
-# SRN: PES + campus digit + program + 2-digit year + branch + 3 digits (PES2UG25CS001). Students who
-# joined before SRNs existed have an SRN that is their PRN.
+# --- The PRN and the SRN, as PESU labels them ---
 
 
 @pytest.mark.asyncio
@@ -1053,13 +1051,17 @@ async def test_the_labelled_srn_is_trusted_as_sent(pesu, upstream, make_response
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("role", [None, {}, {"LoginId": "NA"}, {"LoginId": 12345}])
-async def test_an_empty_or_odd_user_role_is_harmless(pesu, upstream, make_response, login_payload, profile_payload, role):
-    profile_payload["USER_ROLE"] = role
+@pytest.mark.parametrize("block", ["USER_ROLE", "STUDENT_SEMESTERS", "STUDENT_CGPA_DETAILS", "PLACEMENT_DETAILS"])
+@pytest.mark.parametrize("value", [None, {}, [], "garbage", {"LoginId": 12345}])
+async def test_blocks_that_are_not_read_cannot_break_a_profile(
+    pesu, upstream, make_response, login_payload, profile_payload, block, value
+):
+    """Only STUDENT_INFO and STUDENT_PHOTO are read; whatever shape the rest take, the profile is the same."""
+    profile_payload[block] = value
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
+    assert profile == FULL_PROFILE
 
 
 @pytest.mark.asyncio

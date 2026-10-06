@@ -284,7 +284,8 @@ run it alongside the live tests.
 - Put assertions about an exception after its `with pytest.raises(...)` block, not inside it, where
   they never run
 - Adding a profile field? Give it a `TEST_*` variable in `.env.example` and in `PROFILE_VARIABLES` in
-  `tests/conftest.py`, so the live tests compare it with the test account's real value; add it to
+  `tests/conftest.py`, so the live tests compare it with the test account's real value (list it in
+  `INTEGER_FIELDS` or `BOOLEAN_FIELDS` there if it is not a string); add it to
   `NEW_PROFILE_FIELDS` there too, so the live specific-fields tests request it (a unit test fails
   until you do); and ask a maintainer to add the matching repository secret, which
   `.github/workflows/ci_checks.yml` passes to the test job. Document it in the README's
