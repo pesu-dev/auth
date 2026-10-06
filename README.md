@@ -204,7 +204,7 @@ at all, and fields come back in the order of the table below.
 Every field is taken from the `STUDENT_INFO` block of PESU Academy's profile response, as PESU Academy sends it, except
 `campus` and `gender` (from `STUDENT_PHOTO`, since `STUDENT_INFO` does not have them) and `campusCode` (mapped from
 `campus`). No other part of PESU Academy's responses stands in for a value its source lacks, so that field is `null`; a
-profile response whose `STUDENT_INFO` is missing or holds no usable value is a `422`.
+successful profile response whose `STUDENT_INFO` is missing or holds no usable value is a `422`.
 
 | **Field**         | **Type** | **Description**                                                                                                                                                                                                                                                 |
 | ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
