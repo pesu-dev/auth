@@ -87,6 +87,7 @@ authenticate_docs = ApiDocs(
                                     "branchShortCode": "CSE",
                                     "gender": "Male",
                                     "dateOfBirth": "2002-01-31",
+                                    "isParent": False,
                                 },
                             },
                         },

@@ -10,8 +10,8 @@ class ProfileModel(BaseModel):
     """The user's profile, returned after a successful login when it was requested.
 
     Every requested field is present. A field PESU Academy has no value for is null, as is one of the
-    fields added with the mobile API (name parts, branch short code, gender, date of birth) if PESU sends it
-    in an unexpected shape.
+    fields added with the mobile API (name parts, branch short code, gender, date of birth, isParent) if PESU
+    sends it in an unexpected shape.
     """
 
     model_config = ConfigDict(strict=True, alias_generator=to_camel, populate_by_name=True)
@@ -133,4 +133,13 @@ class ProfileModel(BaseModel):
         title="Date of Birth",
         description="Date of birth of the user, as YYYY-MM-DD.",
         json_schema_extra={"example": "2002-01-31"},
+    )
+    is_parent: bool | None = Field(
+        None,
+        title="Is Parent",
+        description=(
+            "Whether PESU Academy marks the account as a parent's rather than the student's own, as its login "
+            "reports it."
+        ),
+        json_schema_extra={"example": False},
     )

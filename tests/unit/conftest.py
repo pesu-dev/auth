@@ -31,6 +31,7 @@ LOGIN_PAYLOAD = {
         "departmentId": "0",
         "usertype": "2",
         "dateofBirth": "2005-01-01",
+        "isParent": 0,
     },
     "accessToken": "ACCESS-TOKEN-SECRET",
     "refreshToken": "REFRESH-TOKEN-SECRET",

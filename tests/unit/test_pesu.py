@@ -40,6 +40,7 @@ FULL_PROFILE = {
     "gender": "Male",
     # Midnight IST on 2005-01-01; read in UTC it would be 2004-12-31
     "dateOfBirth": "2005-01-01",
+    "isParent": False,
 }
 
 
@@ -1059,6 +1060,45 @@ async def test_an_empty_or_odd_user_role_is_harmless(pesu, upstream, make_respon
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     assert (profile["prn"], profile["srn"]) == ("PES2202500001", "PES2UG25CS001")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("is_parent", "expected"),
+    [(0, False), (1, True), ("0", False), ("1", True), (None, None), ("", None)],
+)
+async def test_is_parent_is_the_login_responses_flag(
+    pesu, upstream, make_response, login_payload, profile_payload, is_parent, expected
+):
+    """Only the login response has it; PESU sends 0 for a student's own account."""
+    login_payload["mobileJsonObject"]["isParent"] = is_parent
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["isParent"] is expected
+
+
+@pytest.mark.asyncio
+async def test_without_is_parent_in_the_login_it_is_null(pesu, upstream, make_response, login_payload, profile_payload):
+    del login_payload["mobileJsonObject"]["isParent"]
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile["isParent"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("is_parent", [2, "maybe", [0], {"x": 1}])
+async def test_an_is_parent_of_an_unexpected_shape_is_null_and_the_login_still_works(
+    pesu, upstream, make_response, login_payload, profile_payload, caplog, is_parent
+):
+    login_payload["mobileJsonObject"]["isParent"] = is_parent
+
+    with caplog.at_level("WARNING"):
+        profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile == {**FULL_PROFILE, "isParent": None}
+    assert "Ignored an unexpected value for is_parent" in caplog.text
 
 
 # --- Secondary fields fail soft ---

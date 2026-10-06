@@ -59,6 +59,7 @@ ProfileField = Literal[
     "branchShortCode",
     "gender",
     "dateOfBirth",
+    "isParent",
 ]
 
 # The mobile app's API is undocumented. Every value below was read off the app's own traffic and can
@@ -148,14 +149,16 @@ Secondary = WrapValidator(_none_if_invalid)
 
 
 class _LoginUser(_UpstreamModel):
-    """The student as described by the login response's `mobileJsonObject`.
+    """The user as described by the login response's `mobileJsonObject`.
 
-    Only the success marker is read. The profile comes entirely from the profile response, so the login
-    response's copies of the same details (some of them partial: its "name" is the first name only) are
-    never mixed into it.
+    Read for the success marker and for isParent, which only the login response has. The rest of the
+    profile comes from the profile response, so the login response's copies of the same details (some
+    of them partial: its "name" is the first name only) are never mixed into it.
     """
 
     login: str | None = None
+    # 0 for a student's own account; PESU Academy also has parent accounts
+    is_parent: Annotated[bool | None, Secondary] = Field(None, alias="isParent")
 
 
 class _LoginResponse(_UpstreamModel):
@@ -546,14 +549,16 @@ class PESUAcademy:
             logging.warning(f"Unknown institute name: {institute} for user={username}")
         return campus_code
 
-    def _build_profile(self, student: _Student, username: str) -> dict[str, Any]:
-        """Build the profile this API returns from the profile response.
+    def _build_profile(self, user: _LoginUser, student: _Student, username: str) -> dict[str, Any]:
+        """Build the profile this API returns from the profile and login responses.
 
         Every field STUDENT_INFO has is taken from STUDENT_INFO alone, as PESU wrote it, or is null: no
         other block, and not the login response, stands in for a value it lacks. Only what STUDENT_INFO
-        does not have comes from elsewhere: the campus and gender, from STUDENT_PHOTO.
+        does not have comes from elsewhere: the campus and gender from STUDENT_PHOTO, and isParent from
+        the login response.
 
         Args:
+            user (_LoginUser): The user from the login response.
             student (_Student): The student from the profile response.
             username (str): The username of the user, for logging.
 
@@ -586,6 +591,7 @@ class PESUAcademy:
             "branchShortCode": info.branch_short_code,
             "gender": student.gender,
             "dateOfBirth": _date_from_epoch_ms(info.date_of_birth),
+            "isParent": user.is_parent,
         }
 
     async def authenticate(
@@ -636,7 +642,7 @@ class PESUAcademy:
                 if login.access_token is None:
                     raise UpstreamError(f"PESU Academy sent no access token for user={username}.")
                 student = await self._fetch_profile(client, login.access_token, username)
-                result["profile"] = self._build_profile(student, username)
+                result["profile"] = self._build_profile(login.user, student, username)
                 logging.info(f"Complete profile information retrieved for user={username}: {result['profile']}.")
                 # Recorded at the branch itself rather than from the request body, so it reflects
                 # what actually happened: a caller who passes exactly the default field list has

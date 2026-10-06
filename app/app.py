@@ -287,7 +287,7 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
 
     Every requested profile field is in the response. A field PESU Academy has no value for is
     `null`, as is one of the fields added with the mobile API (name parts, branch short code, gender, date
-    of birth) if PESU sends it in an unexpected shape.
+    of birth, isParent) if PESU sends it in an unexpected shape.
     """
     current_time = datetime.datetime.now(IST)
     # Input has already been validated by the RequestModel

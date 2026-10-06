@@ -202,8 +202,8 @@ student whose PRN PESU Academy does not return has a `null` `prn`. Fields left o
 and fields come back in the order of the table below.
 
 Every field is taken from the `STUDENT_INFO` block of PESU Academy's profile response, as PESU Academy sends it, except
-`campus` and `gender` (from `STUDENT_PHOTO`, since `STUDENT_INFO` does not have them) and `campusCode` (mapped from
-`campus`). No other part of the response
+`campus` and `gender` (from `STUDENT_PHOTO`, since `STUDENT_INFO` does not have them), `isParent` (from the login
+response, the only one that has it) and `campusCode` (mapped from `campus`). No other part of the response
 stands in for a value `STUDENT_INFO` lacks, so that field is `null`; a response without `STUDENT_INFO` is a `422`.
 
 The fields from `firstName` onwards came with the move to PESU Academy's mobile API. If PESU Academy ever sends one of
@@ -229,6 +229,7 @@ fields above them is a `422`.
 | `branchShortCode` | `str`    | Abbreviation of the branch, such as `CSE`                                                                                                                                                                                                                       |
 | `gender`          | `str`    | Gender of the user, as recorded by PESU                                                                                                                                                                                                                         |
 | `dateOfBirth`     | `str`    | Date of birth, as `YYYY-MM-DD`                                                                                                                                                                                                                                  |
+| `isParent`        | `bool`   | Whether PESU Academy marks the account as a parent's rather than the student's own                                                                                                                                                                              |
 
 Everything else in PESU Academy's responses, such as the photo, blood group, addresses, parents' details and marks, is
 discarded and never returned, and cannot be requested in `fields`.
@@ -733,7 +734,8 @@ print(response.json())
     "lastName": "Blaze",
     "branchShortCode": "CSE",
     "gender": "Male",
-    "dateOfBirth": "2002-01-31"
+    "dateOfBirth": "2002-01-31",
+    "isParent": false
   },
   "message": "Login successful.",
   "timestamp": "2024-07-28T22:30:10.103368+05:30"

@@ -37,6 +37,7 @@ FULL_PROFILE = {
     "branchShortCode": "CSE",
     "gender": "Male",
     "dateOfBirth": "2005-01-01",
+    "isParent": False,
 }
 
 
