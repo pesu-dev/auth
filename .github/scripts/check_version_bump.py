@@ -129,7 +129,7 @@ def main() -> int:
             "   Every pull request raises `version` in pyproject.toml exactly once, so that what\n"
             "   is deployed can be identified. One merge to dev is one bump, to one of:\n\n"
             f"     {format_version(allowed['minor']):<8} minor - the default, whatever the change.\n"
-            f"     {format_version(allowed['patch']):<8} patch - a post-merge fix for what the last merged PR missed.\n"
+            f"     {format_version(allowed['patch']):<8} patch - work meant for the last minor, missed or split out.\n"
             f"     {format_version(allowed['major']):<8} major - a backwards-incompatible API or schema change.\n\n"
             "   Bump once per pull request, not once per feature within it -- a second bump\n"
             "   skips a version that never reaches dev.\n\n"
