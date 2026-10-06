@@ -118,12 +118,8 @@ def plot_response_time_over_requests(dfs: list[pd.DataFrame], files: list[str], 
     plt.close()
 
 
-def main(argv: list[str] | None = None) -> None:
-    """Summarise and plot benchmark CSV files from the command line.
-
-    Args:
-        argv (list[str] | None): The arguments, defaulting to the process's own.
-    """
+def main() -> None:
+    """Summarise and plot benchmark CSV files from the command line."""
     parser = argparse.ArgumentParser(description="Analyze benchmark CSV output.")
     # Required: without it args.files is None and the read below fails with a bare TypeError
     parser.add_argument("--files", "-f", help="Path to the benchmark CSV files", nargs="+", required=True)
@@ -137,7 +133,7 @@ def main(argv: list[str] | None = None) -> None:
         type=str,
         help="An identifier appended to the generated filenames, for telling runs apart",
     )
-    args = parser.parse_args(argv)
+    args = parser.parse_args()
 
     dfs = [pd.read_csv(file) for file in args.files]
 

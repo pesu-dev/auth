@@ -18,9 +18,6 @@ from app.exceptions.metrics import MetricsAuthorizationError
 from app.metrics.auth import _configured_token, require_metrics_token
 from app.metrics.collector import MetricsCollector
 
-TOKEN = "test-metrics-token"
-
-
 @pytest.fixture
 def client(monkeypatch):
     """A client with a fresh collector and no token configured."""
@@ -31,9 +28,9 @@ def client(monkeypatch):
 
 
 @pytest.fixture
-def protected(client, monkeypatch):
+def protected(client, monkeypatch, metrics_token):
     """The same client, with a token required."""
-    monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", TOKEN)
+    monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", metrics_token)
     return client
 
 
@@ -44,27 +41,27 @@ def test_open_when_no_token_is_configured(client, query):
 
 
 @pytest.mark.parametrize("query", ["", "?fmt=json", "?fmt=prometheus"])
-def test_the_right_token_is_accepted_in_either_format(protected, query):
-    response = protected.get(f"/metrics{query}", headers={"Authorization": f"Bearer {TOKEN}"})
+def test_the_right_token_is_accepted_in_either_format(protected, query, metrics_token):
+    response = protected.get(f"/metrics{query}", headers={"Authorization": f"Bearer {metrics_token}"})
     assert response.status_code == 200
 
 
 @pytest.mark.parametrize(
     ("label", "headers"),
     [
-        ("no header at all", {}),
-        ("the wrong token", {"Authorization": "Bearer not-the-token"}),
-        ("a prefix of the token", {"Authorization": f"Bearer {TOKEN[:-1]}"}),
-        ("the token without its scheme", {"Authorization": TOKEN}),
-        ("basic instead of bearer", {"Authorization": "Basic dXNlcjpwYXNz"}),
+        ("no header at all", lambda _: {}),
+        ("the wrong token", lambda _: {"Authorization": "Bearer not-the-token"}),
+        ("a prefix of the token", lambda token: {"Authorization": f"Bearer {token[:-1]}"}),
+        ("the token without its scheme", lambda token: {"Authorization": token}),
+        ("basic instead of bearer", lambda _: {"Authorization": "Basic dXNlcjpwYXNz"}),
         # HTTPBasic would raise HTTPException on this one, answering in Starlette's shape and
         # skipping errors_total; HTTPBearer rejects the scheme before that can happen.
-        ("malformed basic credentials", {"Authorization": "Basic !!!!"}),
-        ("an empty bearer value", {"Authorization": "Bearer "}),
+        ("malformed basic credentials", lambda _: {"Authorization": "Basic !!!!"}),
+        ("an empty bearer value", lambda _: {"Authorization": "Bearer "}),
     ],
 )
-def test_rejected_without_the_token(protected, label, headers):
-    response = protected.get("/metrics", headers=headers)
+def test_rejected_without_the_token(protected, metrics_token, label, headers):
+    response = protected.get("/metrics", headers=headers(metrics_token))
     assert response.status_code == 401, label
 
 
@@ -87,10 +84,10 @@ def test_the_json_format_is_protected_too(protected):
     assert protected.get("/metrics?fmt=json").status_code == 401
 
 
-def test_a_rejection_is_counted_as_an_error_and_a_client_fault(protected):
+def test_a_rejection_is_counted_as_an_error_and_a_client_fault(protected, metrics_token):
     """The middleware/handler split from the metrics work still holds for this new error."""
     protected.get("/metrics")
-    body = protected.get("/metrics?fmt=json", headers={"Authorization": f"Bearer {TOKEN}"}).json()
+    body = protected.get("/metrics?fmt=json", headers={"Authorization": f"Bearer {metrics_token}"}).json()
     assert body["errorsByType"] == {"MetricsAuthorizationError": 1}
     assert body["responsesByStatus"]["401"] == 1
     assert body["failuresByFault"] == {"client": 1}
@@ -151,13 +148,13 @@ def test_a_non_ascii_token_actually_works(client, monkeypatch):
 
 @pytest.mark.parametrize("credential", ["ü", "tökén", "\udcff", "é" * 500])
 @pytest.mark.asyncio
-async def test_the_dependency_itself_never_raises_typeerror(monkeypatch, credential):
+async def test_the_dependency_itself_never_raises_typeerror(monkeypatch, credential, metrics_token):
     """Pinned one level below the HTTP layer, where the TypeError actually happened.
 
     Includes a lone surrogate, which no HTTP client would send but which `.encode("utf-8")` would
     choke on -- the reason the comparison encodes latin-1 rather than UTF-8 on this side.
     """
-    monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", TOKEN)
+    monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", metrics_token)
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=credential)
     with pytest.raises(MetricsAuthorizationError):
         await require_metrics_token(credentials)

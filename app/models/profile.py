@@ -5,13 +5,34 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+# The name of every field in ProfileModel, as a caller writes it in a request's fields
+ProfileField = Literal[
+    "name",
+    "prn",
+    "srn",
+    "program",
+    "branch",
+    "semester",
+    "section",
+    "email",
+    "mobile",
+    "campusCode",
+    "campus",
+    "firstName",
+    "middleName",
+    "lastName",
+    "branchShortCode",
+    "gender",
+    "dateOfBirth",
+    "isParent",
+]
+
 
 class ProfileModel(BaseModel):
     """The user's profile, returned after a successful login when it was requested.
 
-    Every requested field is present. A field PESU Academy has no value for is null, as is one of the
-    fields added with the mobile API (name parts, branch short code, gender, date of birth, isParent) if PESU
-    sends it in an unexpected shape.
+    Only the fields below can be requested; any other name is a 400. Every requested field is present,
+    and is null when PESU Academy has no value for it or sends it in an unexpected shape.
     """
 
     model_config = ConfigDict(strict=True, alias_generator=to_camel, populate_by_name=True)
@@ -44,10 +65,7 @@ class ProfileModel(BaseModel):
     program: str | None = Field(
         None,
         title="Program",
-        description=(
-            "Academic program the user is enrolled in, as PESU Academy writes it: an abbreviation such as "
-            "B.Tech. PESU Academy sends no full name, so none is made up here."
-        ),
+        description="Abbreviation of the academic program the user is enrolled in, as PESU Academy writes it.",
         json_schema_extra={"example": "B.Tech."},
     )
     branch: str | None = Field(
@@ -59,16 +77,13 @@ class ProfileModel(BaseModel):
     semester: str | None = Field(
         None,
         title="Semester",
-        description=(
-            "Current semester, as PESU Academy writes it, such as Sem-4. Null when PESU Academy has none, as "
-            "for a user who is not in a class."
-        ),
+        description="Current semester, as PESU Academy writes it. Null when the user has graduated.",
         json_schema_extra={"example": "Sem-2"},
     )
     section: str | None = Field(
         None,
         title="Section",
-        description="Current section, such as Section C. Null when the user is not in a class.",
+        description="Current section, as PESU Academy writes it. Null when the user has graduated.",
         json_schema_extra={"example": "Section C"},
     )
     email: str | None = Field(
@@ -119,7 +134,7 @@ class ProfileModel(BaseModel):
     branch_short_code: str | None = Field(
         None,
         title="Branch Short Code",
-        description="Abbreviation of the branch, such as CSE.",
+        description="Abbreviation of the branch, as PESU Academy writes it.",
         json_schema_extra={"example": "CSE"},
     )
     gender: str | None = Field(

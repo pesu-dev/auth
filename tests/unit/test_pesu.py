@@ -21,29 +21,6 @@ from app.metrics.collector import (
 from app.models import ProfileModel
 from app.pesu import _CLOSE_TASKS, DISPATCHER_URL, LOGIN_URL, PESUAcademy, _upstream_call
 
-FULL_PROFILE = {
-    "name": "JOHN DOE",
-    "prn": "PES2202500001",
-    "srn": "PES2UG25CS001",
-    "program": "B.Tech.",
-    "branch": "Computer Science and Engineering",
-    "semester": "Sem-4",
-    "section": "Section C",
-    "email": "john.doe@example.com",
-    "mobile": "9876543210",
-    "campusCode": 2,
-    "campus": "PES University (Electronic City)",
-    "firstName": "JOHN",
-    "middleName": None,
-    "lastName": "DOE",
-    "branchShortCode": "CSE",
-    "gender": "Male",
-    # Midnight IST on 2005-01-01; read in UTC it would be 2004-12-31
-    "dateOfBirth": "2005-01-01",
-    "isParent": False,
-}
-
-
 @pytest.fixture
 def collector():
     return MetricsCollector(clock=lambda: 1000.0)
@@ -70,9 +47,6 @@ async def _profile_for(pesu, upstream, make_response, login_payload, profile_pay
 def _clients(collector):
     snapshot = collector.snapshot()
     return {event: snapshot.value(HTTP_CLIENTS.name, event=event) for event in ("created", "closed")}
-
-
-# --- Login ---
 
 
 @pytest.mark.asyncio
@@ -196,14 +170,13 @@ async def test_a_login_without_a_token_is_fine_without_a_profile(pesu, upstream,
     assert result["status"] is True
 
 
-# --- Profile fetch ---
-
-
 @pytest.mark.asyncio
-async def test_profile_is_built_from_both_responses(pesu, upstream, make_response, login_payload, profile_payload):
+async def test_profile_is_built_from_both_responses(
+    pesu, upstream, make_response, login_payload, profile_payload, full_profile
+):
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile == FULL_PROFILE
+    assert profile == full_profile
     # And it is something the response model accepts
     ProfileModel.model_validate(profile)
 
@@ -246,11 +219,20 @@ async def test_a_declined_profile_is_a_fetch_error(pesu, upstream, make_response
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("student_info", [None, {}, {"UserId": None, "Unknown": "x"}])
+@pytest.mark.parametrize(
+    "student_info",
+    [
+        None,
+        {},
+        {"UserId": None, "Unknown": "x"},
+        # Not one usable value: every field null is no student at all, not a profile of nulls
+        {"LoginId": {"x": 1}, "SRN": ["PES2UG25CS001"], "NameAsInSSLC": {"x": 1}},
+    ],
+)
 async def test_a_profile_without_student_info_is_a_parse_error(
     pesu, upstream, make_response, login_payload, profile_payload, collector, student_info
 ):
-    """STUDENT_INFO is the source of every core field; nothing else stands in for it."""
+    """STUDENT_INFO is where most of the profile comes from; nothing else stands in for it."""
     if student_info is None:
         del profile_payload["STUDENT_INFO"]
     else:
@@ -335,9 +317,6 @@ async def test_an_error_envelope_from_the_dispatcher_is_a_fetch_error(
     assert exc_info.value.__cause__ is None
     # Not a parse failure: the API has not changed shape, PESU said no
     assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="response_structure") == 0.0
-
-
-# --- Mapping ---
 
 
 @pytest.mark.asyncio
@@ -531,9 +510,6 @@ async def test_the_program_is_returned_as_pesu_writes_it(
     assert list(collector.snapshot().samples(PROFILE_PARSE_ERRORS.name)) == []
 
 
-# --- Field filtering ---
-
-
 @pytest.mark.asyncio
 async def test_field_filtering(pesu, upstream, make_response, login_payload, profile_payload):
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
@@ -577,11 +553,8 @@ async def test_a_requested_field_upstream_does_not_have_is_none(
     }
 
 
-def test_default_fields_are_every_profile_field():
-    assert PESUAcademy.DEFAULT_FIELDS == list(FULL_PROFILE)
-
-
-# --- Client lifecycle ---
+def test_default_fields_are_every_profile_field(full_profile):
+    assert PESUAcademy.DEFAULT_FIELDS == list(full_profile)
 
 
 @pytest.mark.asyncio
@@ -621,9 +594,6 @@ async def test_the_client_is_closed_when_the_profile_fails(pesu, upstream, make_
     assert _clients(collector) == {"created": 1.0, "closed": 1.0}
 
 
-# --- What is logged ---
-
-
 @pytest.mark.asyncio
 async def test_no_password_token_or_private_data_is_logged(
     pesu, upstream, make_response, login_payload, profile_payload, secrets, caplog
@@ -641,14 +611,13 @@ async def test_no_password_token_or_private_data_is_logged(
 async def test_an_unparseable_profile_logs_where_not_what(
     pesu, upstream, make_response, login_payload, profile_payload, secrets, caplog
 ):
-    profile_payload["STUDENT_INFO"]["NameAsInSSLC"] = {"unexpected": "FATHERNAMESECRET"}
+    profile_payload["STUDENT_PHOTO"] = ["FATHERNAMESECRET"]
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
     with caplog.at_level("DEBUG"), pytest.raises(ProfileParseError) as exc_info:
         await pesu.authenticate("user", "pass", profile=True)
 
-    assert "STUDENT_INFO" in caplog.text
-    assert "NameAsInSSLC" in caplog.text
+    assert "STUDENT_PHOTO" in caplog.text
     for secret in secrets:
         assert secret not in caplog.text
         assert secret not in str(exc_info.value)
@@ -656,17 +625,14 @@ async def test_an_unparseable_profile_logs_where_not_what(
 
 @pytest.mark.asyncio
 async def test_parsed_login_does_not_expose_the_token_in_its_repr(login_payload):
-    from app.pesu import _LoginResponse
+    from app.models.upstream import LoginResponse
 
-    login = _LoginResponse.model_validate(login_payload)
+    login = LoginResponse.model_validate(login_payload)
 
     assert login.access_token == "ACCESS-TOKEN-SECRET"
     assert "ACCESS-TOKEN-SECRET" not in repr(login)
     # Fields never declared are never kept
     assert "LOGINPHOTOSECRET" not in repr(login)
-
-
-# --- More login and profile responses ---
 
 
 @pytest.mark.asyncio
@@ -699,7 +665,9 @@ async def test_a_blank_access_token_cannot_fetch_the_profile(pesu, upstream, mak
 
 
 @pytest.mark.asyncio
-async def test_extra_upstream_fields_are_ignored(pesu, upstream, make_response, login_payload, profile_payload):
+async def test_extra_upstream_fields_are_ignored(
+    pesu, upstream, make_response, login_payload, profile_payload, full_profile
+):
     """PESU adding a field must not break parsing; only removing or retyping one we use can."""
     login_payload["mobileJsonObject"]["someNewField"] = {"nested": [1, 2, 3]}
     profile_payload["STUDENT_INFO"]["AnotherNewField"] = "value"
@@ -707,14 +675,14 @@ async def test_extra_upstream_fields_are_ignored(pesu, upstream, make_response, 
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile == FULL_PROFILE
+    assert profile == full_profile
 
 
 @pytest.mark.asyncio
-async def test_a_retyped_field_we_use_is_a_parse_error(
+async def test_a_block_that_is_not_an_object_is_a_parse_error(
     pesu, upstream, make_response, login_payload, profile_payload, collector
 ):
-    profile_payload["STUDENT_INFO"]["SRN"] = ["PES2UG25CS001"]
+    profile_payload["STUDENT_INFO"] = ["PES2UG25CS001"]
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
     with pytest.raises(ProfileParseError):
@@ -740,9 +708,6 @@ async def test_fields_without_a_profile_are_ignored(pesu, login_ok):
 
     assert "profile" not in result
     login_ok.assert_awaited_once()
-
-
-# --- On the wire ---
 
 
 def _route_logins(wire, make_response, login_payload, profile_payload):
@@ -834,9 +799,6 @@ async def test_a_timeout_is_an_upstream_error(pesu, wire, collector):
 
     assert collector.snapshot().value(UPSTREAM_REQUESTS.name, operation="login", outcome="error") == 1.0
     assert _clients(collector) == {"created": 1.0, "closed": 1.0}
-
-
-# --- Concurrency and cancellation ---
 
 
 @pytest.mark.asyncio
@@ -933,9 +895,6 @@ async def test_a_cancellation_during_the_close_still_closes(
     assert _clients(collector) == {"created": 1.0, "closed": 1.0}
 
 
-# --- Upstream call accounting ---
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sink_contents", [[], [object()]])
 async def test_an_upstream_call_without_a_status_records_no_status(collector, sink_contents):
@@ -947,18 +906,13 @@ async def test_an_upstream_call_without_a_status_records_no_status(collector, si
     assert list(snapshot.samples(UPSTREAM_RESPONSES.name)) == []
 
 
-# --- Profile details beyond the core fields ---
-
-PERSONAL_FIELDS = ["gender", "dateOfBirth"]
-
-
 @pytest.mark.asyncio
 async def test_personal_details_are_returned_when_requested(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    result = await pesu.authenticate("user", "pass", profile=True, fields=["name", *PERSONAL_FIELDS])
+    result = await pesu.authenticate("user", "pass", profile=True, fields=["name", "gender", "dateOfBirth"])
 
     assert result["profile"] == {
         "name": "JOHN DOE",
@@ -1032,12 +986,9 @@ async def test_without_student_photo_there_is_no_campus_or_gender(
 def test_the_default_fields_are_every_field():
     from typing import get_args
 
-    from app.pesu import ProfileField
+    from app.models.profile import ProfileField
 
     assert PESUAcademy.DEFAULT_FIELDS == list(get_args(ProfileField))
-
-
-# --- The PRN and the SRN, as PESU labels them ---
 
 
 @pytest.mark.asyncio
@@ -1054,14 +1005,14 @@ async def test_the_labelled_srn_is_trusted_as_sent(pesu, upstream, make_response
 @pytest.mark.parametrize("block", ["USER_ROLE", "STUDENT_SEMESTERS", "STUDENT_CGPA_DETAILS", "PLACEMENT_DETAILS"])
 @pytest.mark.parametrize("value", [None, {}, [], "garbage", {"LoginId": 12345}])
 async def test_blocks_that_are_not_read_cannot_break_a_profile(
-    pesu, upstream, make_response, login_payload, profile_payload, block, value
+    pesu, upstream, make_response, login_payload, profile_payload, block, value, full_profile
 ):
     """Only STUDENT_INFO and STUDENT_PHOTO are read; whatever shape the rest take, the profile is the same."""
     profile_payload[block] = value
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile == FULL_PROFILE
+    assert profile == full_profile
 
 
 @pytest.mark.asyncio
@@ -1092,45 +1043,49 @@ async def test_without_is_parent_in_the_login_it_is_null(pesu, upstream, make_re
 @pytest.mark.asyncio
 @pytest.mark.parametrize("is_parent", [2, "maybe", [0], {"x": 1}])
 async def test_an_is_parent_of_an_unexpected_shape_is_null_and_the_login_still_works(
-    pesu, upstream, make_response, login_payload, profile_payload, caplog, is_parent
+    pesu, upstream, make_response, login_payload, profile_payload, caplog, is_parent, full_profile
 ):
     login_payload["mobileJsonObject"]["isParent"] = is_parent
 
     with caplog.at_level("WARNING"):
         profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile == {**FULL_PROFILE, "isParent": None}
+    assert profile == {**full_profile, "isParent": None}
     assert "Ignored an unexpected value for is_parent" in caplog.text
-
-
-# --- Secondary fields fail soft ---
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("block", "key", "value", "affected"),
+    ("block", "key", "value", "fields"),
     [
-        ("STUDENT_INFO", "DateOfBirth", "2005-01-01", {"dateOfBirth": None}),
-        ("STUDENT_INFO", "FirstName", {"unexpected": True}, {"firstName": None}),
-        ("STUDENT_INFO", "MiddleName", ["x"], {}),
-        ("STUDENT_INFO", "LastName", {"x": 1}, {"lastName": None}),
-        ("STUDENT_INFO", "BranchAbbreviation", [], {"branchShortCode": None}),
-        ("STUDENT_PHOTO", "gender", ["Male"], {"gender": None}),
+        ("STUDENT_INFO", "LoginId", {"unexpected": True}, ["prn"]),
+        ("STUDENT_INFO", "SRN", {"unexpected": True}, ["srn"]),
+        ("STUDENT_INFO", "NameAsInSSLC", ["JOHN"], ["name"]),
+        ("STUDENT_INFO", "ProgramAbbreviation", {"unexpected": True}, ["program"]),
+        ("STUDENT_INFO", "Branch", {"unexpected": True}, ["branch"]),
+        ("STUDENT_INFO", "ClassName", ["Sem-4"], ["semester"]),
+        ("STUDENT_INFO", "SectionName", {"unexpected": True}, ["section"]),
+        ("STUDENT_INFO", "Email", ["a@b.c"], ["email"]),
+        ("STUDENT_INFO", "Mobile", {"unexpected": True}, ["mobile"]),
+        ("STUDENT_PHOTO", "instituteName", {"unexpected": True}, ["campusCode", "campus"]),
+        ("STUDENT_INFO", "FirstName", {"unexpected": True}, ["firstName"]),
+        ("STUDENT_INFO", "MiddleName", ["x"], ["middleName"]),
+        ("STUDENT_INFO", "LastName", {"unexpected": True}, ["lastName"]),
+        ("STUDENT_INFO", "BranchAbbreviation", [], ["branchShortCode"]),
+        ("STUDENT_PHOTO", "gender", ["Male"], ["gender"]),
+        ("STUDENT_INFO", "DateOfBirth", "2005-01-01", ["dateOfBirth"]),
     ],
 )
-async def test_a_secondary_field_of_an_unexpected_shape_is_dropped(
-    pesu, upstream, make_response, login_payload, profile_payload, caplog, block, key, value, affected
+async def test_a_field_of_an_unexpected_shape_is_null(
+    pesu, upstream, make_response, login_payload, profile_payload, caplog, full_profile, block, key, value, fields
 ):
-    """Only that field is lost; the rest of the profile still comes back."""
-    if key is None:
-        profile_payload[block] = value
-    else:
-        profile_payload[block][key] = value
+    """Every field is treated the same: only that field is null, and the rest of the profile still comes back."""
+    profile_payload[block][key] = value
 
     with caplog.at_level("WARNING"):
         profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile == {**FULL_PROFILE, **affected}
+    assert profile == {**full_profile, **dict.fromkeys(fields)}
     # The field is named in the log, but never its value
     assert "Ignored an unexpected value" in caplog.text
     assert "unexpected': True" not in caplog.text
@@ -1149,29 +1104,6 @@ async def test_a_login_date_of_birth_of_an_unexpected_shape_does_not_fail_the_lo
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("block", "key", "value"),
-    [
-        ("STUDENT_INFO", "SRN", {"x": 1}),
-        ("STUDENT_INFO", "NameAsInSSLC", ["JOHN"]),
-        ("STUDENT_INFO", "Branch", {"x": 1}),
-        ("STUDENT_INFO", "Email", ["a@b.c"]),
-        ("STUDENT_PHOTO", "instituteName", {"x": 1}),
-        ("STUDENT_INFO", "LoginId", {"x": 1}),
-    ],
-)
-async def test_a_core_field_of_an_unexpected_shape_is_still_a_parse_error(
-    pesu, upstream, make_response, login_payload, profile_payload, block, key, value
-):
-    """A change to a field a profile cannot do without is PESU's API changing, so it stays a 422."""
-    profile_payload[block][key] = value
-    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
-
-    with pytest.raises(ProfileParseError):
-        await pesu.authenticate("user", "pass", profile=True)
-
-
-@pytest.mark.asyncio
 async def test_blood_group_is_never_returned(pesu, upstream, make_response, login_payload, profile_payload):
     """PESU sends a blood group; it is not authentication data, so it is not read at all."""
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
@@ -1180,14 +1112,6 @@ async def test_blood_group_is_never_returned(pesu, upstream, make_response, logi
     assert "BLOODGROUPSECRET" not in str(profile)
 
 
-ORIGINAL_FIELDS = ["name", "prn", "srn", "program", "branch", "semester", "section", "email", "mobile", "campusCode", "campus"]
-
-
-def test_the_live_tests_request_every_new_field(new_profile_fields):
-    """The live specific-fields tests ask for every field added since the web flow.
-
-    A field added later without being added to that list would otherwise never be checked against
-    a real account by those tests.
-    """
-    assert sorted(new_profile_fields) == sorted(set(PESUAcademy.DEFAULT_FIELDS) - set(ORIGINAL_FIELDS))
-    assert [field for field in PESUAcademy.DEFAULT_FIELDS if field in ORIGINAL_FIELDS] == ORIGINAL_FIELDS
+def test_every_profile_field_has_a_test_variable(profile_variables):
+    """Every field has a TEST_* variable, so the live tests compare each one with the test account's value."""
+    assert list(profile_variables) == PESUAcademy.DEFAULT_FIELDS

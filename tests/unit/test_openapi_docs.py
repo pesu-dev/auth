@@ -21,9 +21,6 @@ from app.exceptions.authentication import (
 from app.models import MetricsModel, ProfileModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
-MODELS = {"ResponseModel": ResponseModel, "MetricsModel": MetricsModel}
-
-
 @pytest.fixture(scope="module")
 def schema():
     app.openapi_schema = None
@@ -71,7 +68,7 @@ def test_every_documented_response_has_a_schema(schema):
                 assert "schema" in content, f"{verb} {path} {code} {media_type} has no schema"
 
 
-def test_json_examples_validate_against_the_model_they_claim(schema):
+def test_json_examples_validate_against_the_model_they_claim(schema, documented_models):
     """An example its own declared model rejects would mislead every reader.
 
     Validated **both** ways. JSON mode is what a caller parsing a response body is in; Python mode
@@ -83,7 +80,7 @@ def test_json_examples_validate_against_the_model_they_claim(schema):
         for code, response in operation["responses"].items():
             content = response.get("content", {}).get("application/json", {})
             ref = content.get("schema", {}).get("$ref", "")
-            model = MODELS.get(ref.rsplit("/", 1)[-1])
+            model = documented_models.get(ref.rsplit("/", 1)[-1])
             if model is None or "example" not in content:
                 continue
             model.model_validate_json(json.dumps(content["example"]))
@@ -257,7 +254,7 @@ def test_the_profile_model_documents_every_field(schema):
     """Every field a caller can request is in the published model, in order."""
     from typing import get_args
 
-    from app.pesu import ProfileField
+    from app.models.profile import ProfileField
 
     documented_fields = [field.alias for field in ProfileModel.model_fields.values()]
     assert documented_fields == list(get_args(ProfileField))

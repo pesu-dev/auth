@@ -84,10 +84,8 @@ def test_integration_authenticate_success_username_srn(client):
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_with_specific_profile_fields(client, check_live_fields, new_profile_fields):
-    # The original fields whose source or form changed with the mobile API, and every field added with it;
-    # the rest are left out, so the filtering is tested too
-    fields = ["name", "prn", "program", "branch", "semester", "mobile", "campusCode", "campus", *new_profile_fields]
+def test_integration_authenticate_with_specific_profile_fields(client, check_live_fields, specific_profile_fields):
+    fields = specific_profile_fields
     payload = {
         "username": os.getenv("TEST_EMAIL"),
         "password": os.getenv("TEST_PASSWORD"),
@@ -118,7 +116,6 @@ def test_integration_authenticate_with_all_profile_fields(client, check_live_pro
     assert data["status"] is True
     assert "timestamp" in data
     assert data["message"] == "Login successful."
-    # Every default field is present; one the account has no value for is null
     check_live_profile(data["profile"])
 
 
@@ -395,7 +392,7 @@ def test_integration_authenticate_removed_kycas_fields_rejected(client):
     "field",
     ["first_name", "middle_name", "last_name", "branch_short_code", "date_of_birth", "campus_code"],
 )
-def test_integration_authenticate_snake_case_new_fields_rejected(client, field):
+def test_integration_authenticate_snake_case_fields_rejected(client, field):
     """Fields are camelCase on the wire, like campusCode; the snake_case form is a 400."""
     payload = {"username": "username", "password": "password", "profile": True, "fields": [field]}
 

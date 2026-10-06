@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator
 
     from fastapi.requests import Request
     from fastapi.responses import Response
@@ -48,12 +48,15 @@ KNOWN_REQUEST_FIELDS = frozenset({"username", "password", "profile", "fields", "
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Lifespan event handler for startup and shutdown events."""
-    # Nothing to prepare or tear down: each login opens and closes its own upstream client
+    # Startup
     metrics.increment(LIFESPAN_EVENTS, event="startup")
     logging.info("PESUAuth API startup")
+
     yield
+
+    # Shutdown
     metrics.increment(LIFESPAN_EVENTS, event="shutdown")
     logging.info("PESUAuth API shutdown.")
 
@@ -219,7 +222,6 @@ async def health() -> JSONResponse:
 
 @app.get(
     "/metrics",
-    # Named like the other routes; the default would come from the function name, "Metrics Endpoint"
     summary="Metrics",
     # The response type depends on ?fmt, so it cannot be declared once. Both shapes are documented
     # in responses= instead, which is what Swagger renders anyway.
@@ -282,12 +284,12 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
     - profile (bool, optional): Whether to also return the user's profile. Fetching it is a second
       call to PESU Academy, so the request takes longer. Defaults to false.
     - fields (List[str], optional): Which profile fields to return, from those listed in
-      `ProfileModel`; every field when omitted. Only used when `profile` is true. Fields come back in
-      `ProfileModel`'s order, whatever order they are asked for in, and an unknown name is a 400.
+      `ProfileModel`. Every field is returned when it is omitted. Only used when `profile` is true.
+      Fields come back in `ProfileModel`'s order, whatever order they are asked for in, and a name
+      that is not in `ProfileModel` is a 400.
 
-    Every requested profile field is in the response. A field PESU Academy has no value for is
-    `null`, as is one of the fields added with the mobile API (name parts, branch short code, gender, date
-    of birth, isParent) if PESU sends it in an unexpected shape.
+    Every requested profile field is in the response, and is `null` when PESU Academy has no value
+    for it or sends it in an unexpected shape.
     """
     current_time = datetime.datetime.now(IST)
     # Input has already been validated by the RequestModel
@@ -329,9 +331,9 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
     try:
         authentication_result = ResponseModel.model_validate(authentication_result)
         logging.info(f"Returning auth result for user={username}: {authentication_result}")
-        # exclude_unset, not exclude_none: a profile field the user has no value for is returned as
-        # null, while a field that was never set -- `profile` when none was requested, or a profile
-        # field the caller filtered out -- stays out of the response entirely.
+        # exclude_unset rather than exclude_none, so that a requested profile field with no value is
+        # still returned, as null. What was never set stays out of the response: the profile when it
+        # was not requested, and any profile field the caller did not ask for.
         authentication_result = authentication_result.model_dump(by_alias=True, exclude_unset=True)
         authentication_result["timestamp"] = current_time.isoformat()
         return JSONResponse(

@@ -6,7 +6,7 @@ and logs record it.
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import httpx2
 import pytest
@@ -17,29 +17,6 @@ from app.exceptions.authentication import ProfileFetchError, ProfileParseError, 
 from app.metrics.collector import MetricsCollector
 from app.models import ResponseModel
 from app.pesu import DISPATCHER_URL, LOGIN_URL
-
-IST = timedelta(hours=5, minutes=30)
-FULL_PROFILE = {
-    "name": "JOHN DOE",
-    "prn": "PES2202500001",
-    "srn": "PES2UG25CS001",
-    "program": "B.Tech.",
-    "branch": "Computer Science and Engineering",
-    "semester": "Sem-4",
-    "section": "Section C",
-    "email": "john.doe@example.com",
-    "mobile": "9876543210",
-    "campusCode": 2,
-    "campus": "PES University (Electronic City)",
-    "firstName": "JOHN",
-    "middleName": None,
-    "lastName": "DOE",
-    "branchShortCode": "CSE",
-    "gender": "Male",
-    "dateOfBirth": "2005-01-01",
-    "isParent": False,
-}
-
 
 @pytest.fixture
 def collector(monkeypatch):
@@ -67,21 +44,24 @@ def _authenticate(client, **body):
     return client.post("/authenticate", json={"username": "user", "password": "pass", **body})
 
 
-def _assert_error_body(response, status):
-    body = response.json()
-    assert response.status_code == status
-    assert set(body) == {"status", "message", "timestamp"}
-    assert body["status"] is False
-    assert datetime.fromisoformat(body["timestamp"]).utcoffset() == IST
-    # The documented error shape, which callers are told to parse with ResponseModel
-    ResponseModel.model_validate(body)
-    return body
+@pytest.fixture
+def assert_error_body(ist_offset):
+    """Check that a response is the documented error shape, with the given status, and return its body."""
+
+    def check(response, status):
+        body = response.json()
+        assert response.status_code == status
+        assert set(body) == {"status", "message", "timestamp"}
+        assert body["status"] is False
+        assert datetime.fromisoformat(body["timestamp"]).utcoffset() == ist_offset
+        # The documented error shape, which callers are told to parse with ResponseModel
+        ResponseModel.model_validate(body)
+        return body
+
+    return check
 
 
-# --- Success ---
-
-
-def test_a_login_without_a_profile(client, pesu_up):
+def test_a_login_without_a_profile(client, pesu_up, ist_offset):
     response = _authenticate(client)
 
     assert response.status_code == 200
@@ -89,31 +69,31 @@ def test_a_login_without_a_profile(client, pesu_up):
     assert set(body) == {"status", "message", "timestamp"}
     assert body["status"] is True
     assert body["message"] == "Login successful."
-    assert datetime.fromisoformat(body["timestamp"]).utcoffset() == IST
+    assert datetime.fromisoformat(body["timestamp"]).utcoffset() == ist_offset
     # No profile asked for, so no profile call
     assert len(pesu_up.requests) == 1
 
 
-def test_a_login_with_the_full_profile(client, pesu_up):
+def test_a_login_with_the_full_profile(client, pesu_up, full_profile):
     response = _authenticate(client, profile=True)
 
     assert response.status_code == 200
-    assert response.json()["profile"] == FULL_PROFILE
+    assert response.json()["profile"] == full_profile
     assert len(pesu_up.requests) == 2
 
 
-def test_a_profile_with_missing_values_returns_null(client, pesu_up, profile_payload):
+def test_a_profile_with_missing_values_returns_null(client, pesu_up, profile_payload, full_profile):
     """What a graduated student looks like on the wire: every field present, the empty ones null."""
     profile_payload["STUDENT_INFO"].update(ClassName=None, SectionName="NA")
 
     profile = _authenticate(client, profile=True).json()["profile"]
 
-    assert list(profile) == list(FULL_PROFILE)
+    assert list(profile) == list(full_profile)
     assert profile["semester"] is None
     assert profile["section"] is None
 
 
-def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payload):
+def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payload, full_profile):
     profile_payload["STUDENT_INFO"]["ClassName"] = None
 
     fields = ["semester", "campusCode", "name", "middleName", "mobile", "dateOfBirth", "branchShortCode", "isParent"]
@@ -130,7 +110,7 @@ def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payl
         "isParent": False,
     }
     # On the wire, in the documented order
-    assert list(profile) == [field for field in FULL_PROFILE if field in fields]
+    assert list(profile) == [field for field in full_profile if field in fields]
 
 
 def test_fields_without_profile_return_no_profile(client, pesu_up):
@@ -147,13 +127,10 @@ def test_the_username_is_sent_without_surrounding_whitespace(client, pesu_up):
     assert b"  PES2UG25CS001" not in pesu_up.requests[0].content
 
 
-# --- Failures ---
-
-
-def test_rejected_credentials(client, wire, make_response, collector):
+def test_rejected_credentials(client, wire, make_response, collector, assert_error_body):
     wire.routes[LOGIN_URL] = lambda request: make_response(401, json={"statusCode": 401})
 
-    body = _assert_error_body(_authenticate(client, profile=True), 401)
+    body = assert_error_body(_authenticate(client, profile=True), 401)
 
     assert body["message"] == "Invalid username or password, or user does not exist for user=user."
     metrics = client.get("/metrics?fmt=json").json()
@@ -172,42 +149,39 @@ def test_rejected_credentials(client, wire, make_response, collector):
     ],
     ids=["server error", "redirect", "not json", "unreachable"],
 )
-def test_a_login_pesu_cannot_complete_is_a_502(client, wire, collector, reply):
+def test_a_login_pesu_cannot_complete_is_a_502(client, wire, collector, reply, assert_error_body):
     wire.routes[LOGIN_URL] = reply
 
-    _assert_error_body(_authenticate(client), 502)
+    assert_error_body(_authenticate(client), 502)
 
     assert client.get("/metrics?fmt=json").json()["errorsByType"] == {UpstreamError.__name__: 1}
 
 
-def test_a_failed_profile_call_is_a_502(client, pesu_up, collector):
+def test_a_failed_profile_call_is_a_502(client, pesu_up, collector, assert_error_body):
     pesu_up.routes[DISPATCHER_URL] = lambda request: httpx2.Response(503)
 
-    _assert_error_body(_authenticate(client, profile=True), 502)
+    assert_error_body(_authenticate(client, profile=True), 502)
 
     metrics = client.get("/metrics?fmt=json").json()
     assert metrics["errorsByType"] == {ProfileFetchError.__name__: 1}
     assert metrics["upstream"]["profile_fetch"]["responsesByStatus"] == {"503": 1}
 
 
-def test_an_unparseable_profile_is_a_422(client, pesu_up, profile_payload, collector):
+def test_an_unparseable_profile_is_a_422(client, pesu_up, profile_payload, collector, assert_error_body):
     del profile_payload["STUDENT_INFO"]
     del profile_payload["STUDENT_PHOTO"]
 
-    _assert_error_body(_authenticate(client, profile=True), 422)
+    assert_error_body(_authenticate(client, profile=True), 422)
 
     metrics = client.get("/metrics?fmt=json").json()
     assert metrics["errorsByType"] == {ProfileParseError.__name__: 1}
     assert metrics["profileParseErrors"] == {"response_structure": 1}
 
 
-def test_a_validation_failure_never_reaches_pesu(client, wire):
-    _assert_error_body(client.post("/authenticate", json={"username": "user"}), 400)
+def test_a_validation_failure_never_reaches_pesu(client, wire, assert_error_body):
+    assert_error_body(client.post("/authenticate", json={"username": "user"}), 400)
 
     assert wire.requests == []
-
-
-# --- Privacy ---
 
 
 def test_nothing_secret_is_logged_or_returned(client, pesu_up, secrets, caplog):
@@ -222,16 +196,13 @@ def test_nothing_secret_is_logged_or_returned(client, pesu_up, secrets, caplog):
         assert secret not in response.text
 
 
-def test_the_upstream_error_text_is_not_forwarded(client, wire, caplog):
+def test_the_upstream_error_text_is_not_forwarded(client, wire, caplog, assert_error_body):
     """A caller learns that PESU failed, not what PESU said."""
     wire.routes[LOGIN_URL] = lambda request: httpx2.Response(500, content=b"Stack trace: internal-detail-xyz")
 
-    body = _assert_error_body(_authenticate(client), 502)
+    body = assert_error_body(_authenticate(client), 502)
 
     assert "internal-detail-xyz" not in body["message"]
-
-
-# --- Personal details ---
 
 
 def test_personal_details_are_in_the_default_profile(client, pesu_up):
@@ -252,22 +223,22 @@ def test_personal_details_are_null_when_pesu_has_none(client, pesu_up, profile_p
     assert profile == {"gender": None, "dateOfBirth": None}
 
 
-def test_an_unknown_field_name_is_still_rejected(client, pesu_up):
-    body = _assert_error_body(_authenticate(client, profile=True, fields=["fatherName"]), 400)
+def test_an_unknown_field_name_is_still_rejected(client, pesu_up, assert_error_body):
+    body = assert_error_body(_authenticate(client, profile=True, fields=["fatherName"]), 400)
 
     assert "fields.0" in body["message"]
     assert pesu_up.requests == []
 
 
-def test_blood_group_cannot_be_requested(client, pesu_up):
-    body = _assert_error_body(_authenticate(client, profile=True, fields=["bloodGroup"]), 400)
+def test_blood_group_cannot_be_requested(client, pesu_up, assert_error_body):
+    body = assert_error_body(_authenticate(client, profile=True, fields=["bloodGroup"]), 400)
 
     assert "fields.0" in body["message"]
     assert pesu_up.requests == []
 
 
 @pytest.mark.parametrize("field", ["username", "password"])
-def test_text_that_cannot_be_encoded_is_a_400(client, wire, caplog, field):
+def test_text_that_cannot_be_encoded_is_a_400(client, wire, caplog, field, assert_error_body):
     """An unpaired surrogate decodes from JSON but cannot be sent on; it is the caller's error, not a 500."""
     body = {"username": "user", "password": "pass"}
     raw = json.dumps(body).replace(f'"{body[field]}"', '"\\ud800abc"').encode()
@@ -275,7 +246,7 @@ def test_text_that_cannot_be_encoded_is_a_400(client, wire, caplog, field):
     with caplog.at_level("WARNING"):
         response = client.post("/authenticate", content=raw, headers={"content-type": "application/json"})
 
-    result = _assert_error_body(response, 400)
+    result = assert_error_body(response, 400)
     assert f"{field.capitalize()} contains characters that are not valid text" in result["message"]
     assert wire.requests == []
     assert not [r for r in caplog.records if r.levelname == "ERROR"]

@@ -196,19 +196,15 @@ profile data was requested, the response's `profile` key will store a dictionary
 This object contains the user's profile information, which is returned only if the `profile` parameter is set to `True`.
 If the authentication fails, this field will not be present in the response.
 
-Every requested field is present, and **any field can be `null`** when PESU Academy has no value for it. For example,
-a student who is not currently in a class (such as one who has graduated) has a `null` `semester` and `section`, and a
-student whose PRN PESU Academy does not return has a `null` `prn`. Fields left out by `fields` are not included at all,
-and fields come back in the order of the table below.
+Only the fields in the table below can be requested; any other name in `fields` is a `400`. Every requested field is
+present, and **any field can be `null`** when PESU Academy has no value for it or sends it in an unexpected shape. For
+example, a student who has graduated has a `null` `semester` and `section`. Fields left out by `fields` are not included
+at all, and fields come back in the order of the table below.
 
 Every field is taken from the `STUDENT_INFO` block of PESU Academy's profile response, as PESU Academy sends it, except
 `campus` and `gender` (from `STUDENT_PHOTO`, since `STUDENT_INFO` does not have them), `isParent` (from the login
 response, the only one that has it) and `campusCode` (mapped from `campus`). No other part of either response stands in
 for a value its source lacks, so that field is `null`; a response without `STUDENT_INFO` is a `422`.
-
-The fields from `firstName` onwards came with the move to PESU Academy's mobile API. If PESU Academy ever sends one of
-them in an unexpected shape, that field is `null` and the rest of the profile still comes back; a change to one of the
-fields above them is a `422`.
 
 | **Field**         | **Type** | **Description**                                                                                                                                                                                                                                                 |
 | ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -426,7 +422,7 @@ pesu_auth_authentication_results_total{result="success"} 604
 # TYPE pesu_auth_profile_field_filtering_total counter
 pesu_auth_profile_field_filtering_total{enabled="false"} 90
 pesu_auth_profile_field_filtering_total{enabled="true"} 40
-# HELP pesu_auth_profile_parse_errors_total Profile response parse failures, by what could not be parsed or mapped.
+# HELP pesu_auth_profile_parse_errors_total Profile parse failures, keyed by what could not be parsed or mapped.
 # TYPE pesu_auth_profile_parse_errors_total counter
 pesu_auth_profile_parse_errors_total{reason="unknown_campus_code"} 3
 # HELP pesu_auth_validation_errors_total Request validation failures, by the field that failed.

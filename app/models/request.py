@@ -3,7 +3,7 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 
-from app.pesu import ProfileField
+from app.models.profile import ProfileField
 
 
 def _require_valid_text(value: str, label: str) -> None:
@@ -59,9 +59,9 @@ class RequestModel(BaseModel):
         None,
         title="Profile Fields",
         description=(
-            "Which profile fields to return, from those listed in ProfileModel; every field when omitted. Only "
-            "used when profile is true. Fields come back in ProfileModel's order, whatever order they are asked "
-            "for in."
+            "Which profile fields to return, from those listed in ProfileModel. Every field is returned when "
+            "this is omitted. Only used when profile is true. Fields come back in ProfileModel's order, whatever "
+            "order they are asked for in, and a name that is not in ProfileModel is rejected."
         ),
         json_schema_extra={"example": ["name", "email", "campus", "branch", "semester", "firstName", "mobile"]},
     )

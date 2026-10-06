@@ -1,10 +1,7 @@
 """Tests for the benchmark scripts in scripts/benchmark/. Nothing here sends a real request."""
 
-import argparse
-import importlib.util
 import re
 import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import httpx2
@@ -14,85 +11,51 @@ import pytest
 
 matplotlib.use("Agg")
 
-BENCHMARK_DIR = Path(__file__).resolve().parents[2] / "scripts" / "benchmark"
+
+def test_loading_the_scripts_leaves_no_trace(benchmark_dir, benchmark_util):
+    assert str(benchmark_dir) not in sys.path
+    assert sys.modules.get("util") is not benchmark_util
 
 
-def _load(name, module_name):
-    spec = importlib.util.spec_from_file_location(module_name, BENCHMARK_DIR / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def _load_scripts():
-    """Load the scripts under names of their own, without putting scripts/benchmark on sys.path.
-
-    They import their helper as a sibling (`from util import ...`), the way they run from that
-    directory. So `util` is registered only while the other two load, then the previous entry, if
-    any, is put back: no other test sees a module called `util` that is not its own.
-    """
-    helper = _load("util", "benchmark_util")
-    previous = sys.modules.get("util")
-    sys.modules["util"] = helper
-    try:
-        return helper, _load("benchmark_requests", "benchmark_requests"), _load("analyze_benchmark", "analyze_benchmark")
-    finally:
-        if previous is None:
-            del sys.modules["util"]
-        else:
-            sys.modules["util"] = previous
-
-
-util, benchmark_requests, analyze_benchmark = _load_scripts()
-
-
-def test_loading_the_scripts_leaves_no_trace():
-    assert str(BENCHMARK_DIR) not in sys.path
-    assert sys.modules.get("util") is not util
-
-# --- util.resolve_output_path ---
-
-
-def test_an_explicit_path_is_used_as_given(tmp_path):
+def test_an_explicit_path_is_used_as_given(benchmark_util, tmp_path):
     target = tmp_path / "nested" / "run.csv"
 
-    assert util.resolve_output_path("script", "csv", output=str(target)) == target
+    assert benchmark_util.resolve_output_path("script", "csv", output=str(target)) == target
     assert target.parent.is_dir()
 
 
-def test_a_bare_filename_goes_in_the_output_directory(tmp_path):
-    assert util.resolve_output_path("script", "csv", output="run.csv", output_dir=str(tmp_path)) == tmp_path / "run.csv"
+def test_a_bare_filename_goes_in_the_output_directory(benchmark_util, tmp_path):
+    path = benchmark_util.resolve_output_path("script", "csv", output="run.csv", output_dir=str(tmp_path))
+
+    assert path == tmp_path / "run.csv"
 
 
 @pytest.mark.parametrize(("tag", "suffix"), [(None, ""), ("baseline", "_baseline")])
-def test_a_generated_name_is_timestamped_and_tagged(tmp_path, monkeypatch, tag, suffix):
-    monkeypatch.setattr(util, "DEFAULT_OUTPUT_DIR", tmp_path / "results")
+def test_a_generated_name_is_timestamped_and_tagged(benchmark_util, tmp_path, monkeypatch, tag, suffix):
+    monkeypatch.setattr(benchmark_util, "DEFAULT_OUTPUT_DIR", tmp_path / "results")
 
-    path = util.resolve_output_path("benchmark_requests", "csv", tag=tag)
+    path = benchmark_util.resolve_output_path("benchmark_requests", "csv", tag=tag)
 
     assert path.parent == tmp_path / "results"
     assert path.parent.is_dir()
     assert re.fullmatch(rf"benchmark_requests_\d{{8}}_\d{{6}}{suffix}\.csv", path.name)
 
 
-# --- util.make_request ---
-
-
 @pytest.fixture
-def http_client():
+def http_client(benchmark_util):
     """Replace httpx2.Client with a mock; `.post` and `.get` return whatever a test sets."""
     client = MagicMock()
-    with patch.object(util.httpx2, "Client") as client_class:
+    with patch.object(benchmark_util.httpx2, "Client") as client_class:
         client_class.return_value.__enter__.return_value = client
         yield client
 
 
-def test_authenticate_posts_the_test_credentials(http_client, monkeypatch):
+def test_authenticate_posts_the_test_credentials(benchmark_util, http_client, monkeypatch):
     monkeypatch.setenv("TEST_PRN", "PES1201800001")
     monkeypatch.setenv("TEST_PASSWORD", "secret")
     http_client.post.return_value = httpx2.Response(200, json={"status": True})
 
-    body, elapsed = util.make_request(host="http://api.test", profile=False)
+    body, elapsed = benchmark_util.make_request(host="http://api.test", profile=False)
 
     assert body == {"status": True}
     assert elapsed >= 0
@@ -105,10 +68,10 @@ def test_authenticate_posts_the_test_credentials(http_client, monkeypatch):
     }
 
 
-def test_other_routes_are_fetched_with_get(http_client):
+def test_other_routes_are_fetched_with_get(benchmark_util, http_client):
     http_client.get.return_value = httpx2.Response(200, json={"status": True, "message": "ok"})
 
-    body, _ = util.make_request(host="http://api.test", route="health")
+    body, _ = benchmark_util.make_request(host="http://api.test", route="health")
 
     assert body["message"] == "ok"
     assert http_client.get.call_args.args[0] == "http://api.test/health"
@@ -116,47 +79,52 @@ def test_other_routes_are_fetched_with_get(http_client):
 
 
 @pytest.mark.parametrize(("status", "success"), [(200, True), (502, False)])
-def test_a_non_json_answer_is_summarised(http_client, status, success):
+def test_a_non_json_answer_is_summarised(benchmark_util, http_client, status, success):
     http_client.get.return_value = httpx2.Response(status, text="<html>not json</html>")
 
-    body, _ = util.make_request(route="readme")
+    body, _ = benchmark_util.make_request(route="readme")
 
     assert body == {"status": success, "text": "<html>not json</html>"}
 
 
-# --- benchmark_requests ---
+def _run_benchmark(benchmark_requests, monkeypatch, tmp_path, *args, request):
+    """Run the benchmark's command line with make_request replaced, and return its CSV and output."""
+    monkeypatch.setattr(sys, "argv", ["benchmark_requests.py", "--output-dir", str(tmp_path), "--tag", "t", *args])
+    with patch.object(benchmark_requests, "make_request", side_effect=request) as make_request:
+        benchmark_requests.main()
+    (result,) = tmp_path.glob("benchmark_requests_*_t.csv")
+    return result.read_text(), make_request
 
 
-def _args(**overrides):
-    args = benchmark_requests.build_parser().parse_args([])
-    return argparse.Namespace(**{**vars(args), **overrides})
-
-
-def test_the_benchmark_defaults():
-    args = benchmark_requests.build_parser().parse_args([])
-
-    assert (args.num_requests, args.max_workers, args.route, args.host) == (10, 10, "authenticate", "http://localhost:5000")
-    assert args.parallel is False
-    assert args.no_profile is False
-
-
-def test_a_sequential_run_records_each_request(capsys):
+def test_a_sequential_run_records_each_request(benchmark_requests, monkeypatch, tmp_path, capsys):
     responses = iter([({"status": True}, 0.5), ({"status": False}, 1.5)])
-    with patch.object(benchmark_requests, "make_request", side_effect=lambda **_: next(responses)) as request:
-        success, times = benchmark_requests.run_benchmark(_args(num_requests=2, verbose=True, no_profile=True))
 
-    assert (success, times) == ([1, 0], [0.5, 1.5])
-    assert request.call_args.kwargs == {
+    csv, make_request = _run_benchmark(
+        benchmark_requests,
+        monkeypatch,
+        tmp_path,
+        "--num-requests",
+        "2",
+        "--verbose",
+        "--no-profile",
+        request=lambda **_: next(responses),
+    )
+
+    assert csv == "status,time\n1,0.5\n0,1.5\n"
+    assert make_request.call_args.kwargs == {
         "profile": False,
         "host": "http://localhost:5000",
         "route": "authenticate",
         "timeout": 10.0,
     }
-    assert "Response: {'status': False}" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Response: {'status': False}" in out
+    assert "Successful requests: 1 out of 2" in out
+    assert "Average time per request: 1.00 seconds" in out
 
 
-def test_a_parallel_run_skips_failed_requests(capsys):
-    calls = iter([({"status": True}, 0.2), RuntimeError("connection refused"), ({"status": True}, 0.4)])
+def test_a_parallel_run_skips_failed_requests(benchmark_requests, monkeypatch, tmp_path, capsys):
+    calls = iter([({"status": True}, 0.2), RuntimeError("connection refused"), ({"status": False}, 0.4)])
 
     def request(**_):
         outcome = next(calls)
@@ -164,43 +132,68 @@ def test_a_parallel_run_skips_failed_requests(capsys):
             raise outcome
         return outcome
 
-    with patch.object(benchmark_requests, "make_request", side_effect=request):
-        success, times = benchmark_requests.run_benchmark(_args(num_requests=3, parallel=True, max_workers=1))
+    csv, _ = _run_benchmark(
+        benchmark_requests,
+        monkeypatch,
+        tmp_path,
+        "--num-requests",
+        "3",
+        "--parallel",
+        "--max-workers",
+        "1",
+        "--verbose",
+        request=request,
+    )
 
-    assert success == [1, 1]
-    assert sorted(times) == [0.2, 0.4]
-    assert "Request failed: connection refused" in capsys.readouterr().out
-
-
-def test_results_are_written_as_csv(tmp_path, capsys):
-    outfile = tmp_path / "run.csv"
-
-    benchmark_requests.write_results([1, 0], [0.5, 1.5], outfile)
-
-    assert outfile.read_text() == "status,time\n1,0.5\n0,1.5\n"
+    assert sorted(csv.splitlines()[1:]) == ["0,0.4", "1,0.2"]
     out = capsys.readouterr().out
-    assert "Successful requests: 1 out of 2" in out
-    assert "Average time per request: 1.00 seconds" in out
+    assert "Request failed: connection refused" in out
+    assert "Response: {'status': True}" in out
 
 
-def test_results_with_no_completed_request(tmp_path, capsys):
+def test_a_parallel_run_prints_no_responses_unless_verbose(benchmark_requests, monkeypatch, tmp_path, capsys):
+    csv, _ = _run_benchmark(
+        benchmark_requests,
+        monkeypatch,
+        tmp_path,
+        "--num-requests",
+        "2",
+        "--parallel",
+        request=lambda **_: ({"status": True}, 0.1),
+    )
+
+    assert csv == "status,time\n1,0.1\n1,0.1\n"
+    assert "Response:" not in capsys.readouterr().out
+
+
+def test_a_parallel_run_with_no_completed_request(benchmark_requests, monkeypatch, tmp_path, capsys):
     """Every request can fail in the parallel runner; that used to divide by zero."""
-    benchmark_requests.write_results([], [], tmp_path / "run.csv")
 
+    def request(**_):
+        raise RuntimeError("connection refused")
+
+    csv, _ = _run_benchmark(
+        benchmark_requests, monkeypatch, tmp_path, "--num-requests", "2", "--parallel", request=request
+    )
+
+    assert csv == "status,time\n"
     out = capsys.readouterr().out
     assert "Successful requests: 0 out of 0" in out
     assert "Average time" not in out
 
 
-def test_the_benchmark_from_the_command_line(tmp_path):
-    with patch.object(benchmark_requests, "make_request", return_value=({"status": True}, 0.25)):
-        benchmark_requests.main(["--num-requests", "2", "--output-dir", str(tmp_path), "--tag", "t"])
+def test_the_benchmark_defaults(benchmark_requests, monkeypatch, tmp_path):
+    _, make_request = _run_benchmark(
+        benchmark_requests, monkeypatch, tmp_path, request=lambda **_: ({"status": True}, 0.25)
+    )
 
-    (result,) = tmp_path.glob("benchmark_requests_*_t.csv")
-    assert result.read_text() == "status,time\n1,0.25\n1,0.25\n"
-
-
-# --- analyze_benchmark ---
+    assert make_request.call_count == 10
+    assert make_request.call_args.kwargs == {
+        "profile": True,
+        "host": "http://localhost:5000",
+        "route": "authenticate",
+        "timeout": 10.0,
+    }
 
 
 @pytest.fixture
@@ -208,7 +201,7 @@ def results():
     return pd.DataFrame({"status": [1, 1, 0, 1], "time": [0.5, 1.0, 2.0, 1.5]})
 
 
-def test_the_summary(results, capsys):
+def test_the_summary(analyze_benchmark, results, capsys):
     analyze_benchmark.analyze_benchmark(results)
 
     out = capsys.readouterr().out
@@ -219,26 +212,29 @@ def test_the_summary(results, capsys):
     assert "Throughput           : 0.80 requests/sec" in out
 
 
-def test_the_summary_of_instant_requests(capsys):
+def test_the_summary_of_instant_requests(analyze_benchmark, capsys):
     analyze_benchmark.analyze_benchmark(pd.DataFrame({"status": [1], "time": [0.0]}))
 
     assert "Throughput           : inf requests/sec" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("plot", [analyze_benchmark.plot_distribution, analyze_benchmark.plot_response_time_over_requests])
-def test_each_plot_is_saved(results, tmp_path, plot):
+@pytest.mark.parametrize("plot", ["plot_distribution", "plot_response_time_over_requests"])
+def test_each_plot_is_saved(analyze_benchmark, results, tmp_path, plot):
     outfile = tmp_path / "plot.png"
 
-    plot([results, results.copy()], ["a.csv", "b.csv"], outfile)
+    getattr(analyze_benchmark, plot)([results, results.copy()], ["a.csv", "b.csv"], outfile)
 
     assert outfile.read_bytes().startswith(b"\x89PNG")
 
 
-def test_the_analysis_from_the_command_line(results, tmp_path, capsys):
+def test_the_analysis_from_the_command_line(analyze_benchmark, results, tmp_path, capsys, monkeypatch):
     csv = tmp_path / "run.csv"
     results.to_csv(csv, index=False)
 
-    analyze_benchmark.main(["-f", str(csv), "--output-dir", str(tmp_path), "--tag", "t"])
+    monkeypatch.setattr(
+        sys, "argv", ["analyze_benchmark.py", "-f", str(csv), "--output-dir", str(tmp_path), "--tag", "t"]
+    )
+    analyze_benchmark.main()
 
     assert len(list(tmp_path.glob("distribution_*_t.png"))) == 1
     assert len(list(tmp_path.glob("timeline_*_t.png"))) == 1

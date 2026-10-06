@@ -7,20 +7,10 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args
+from typing import TYPE_CHECKING, Any, get_args
 
 import httpx2
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    ValidationError,
-    ValidationInfo,
-    ValidatorFunctionWrapHandler,
-    WrapValidator,
-    field_validator,
-    model_validator,
-)
+from pydantic import ValidationError
 
 from app.exceptions.authentication import (
     AuthenticationError,
@@ -37,30 +27,11 @@ from app.metrics.collector import (
     UPSTREAM_RESPONSES,
     MetricsCollector,
 )
+from app.models.profile import ProfileField
+from app.models.upstream import ErrorEnvelope, LoginResponse, LoginUser, ProfileResponse, Student
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Mapping
-
-ProfileField = Literal[
-    "name",
-    "prn",
-    "srn",
-    "program",
-    "branch",
-    "semester",
-    "section",
-    "email",
-    "mobile",
-    "campusCode",
-    "campus",
-    "firstName",
-    "middleName",
-    "lastName",
-    "branchShortCode",
-    "gender",
-    "dateOfBirth",
-    "isParent",
-]
+    from collections.abc import AsyncGenerator, Mapping
 
 # The mobile app's API is undocumented. Every value below was read off the app's own traffic and can
 # change with an app release, without notice; when logins or profiles start failing, start here.
@@ -82,9 +53,6 @@ CAMPUS_CODES = {"PES University (Ring Road)": 1, "PES University (Electronic Cit
 # PESU stores a date of birth as the epoch milliseconds of midnight IST on that day. Read in UTC, the
 # same instant is 18:30 on the day before, so the timezone is what makes the date right.
 IST = timezone(timedelta(hours=5, minutes=30))
-# What upstream sends for a value it does not have. "NA" is what the web portal showed for a student
-# with no current class; it is a placeholder, not a value, so it is treated like a missing one.
-MISSING_VALUES = frozenset({"", "NA"})
 
 
 # Strong references to in-flight client closes. A close that outlives the coroutine which asked
@@ -93,178 +61,8 @@ MISSING_VALUES = frozenset({"", "NA"})
 _CLOSE_TASKS: set[asyncio.Task[None]] = set()
 
 
-class _UpstreamModel(BaseModel):
-    """Base for the response shapes read from PESU Academy.
-
-    Only the fields this service returns are declared; everything else is dropped as the response is
-    parsed. Those responses also carry the student's photo, blood group, addresses, marks and their
-    parents' contact details. Never holding them means no log line, exception or repr can leak them.
-    """
-
-    model_config = ConfigDict(extra="ignore", coerce_numbers_to_str=True)
-
-    @field_validator("*", mode="before")
-    @classmethod
-    def _placeholder_to_none(cls, value: Any) -> Any:  # noqa: ANN401
-        """Treat a blank or placeholder string as a missing value.
-
-        Upstream sends "" (and the web portal sent "NA") as often as null for a value it does not
-        have, and all of them mean the same thing to a caller: null, not a string.
-
-        Args:
-            value (Any): The raw value from the response.
-
-        Returns:
-            Any: The value stripped, or None if it was blank or a placeholder.
-        """
-        if isinstance(value, str):
-            value = value.strip()
-            return None if value in MISSING_VALUES else value
-        return value
-
-
-def _none_if_invalid(value: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo) -> Any:  # noqa: ANN401
-    """Validate a secondary field, turning a value of an unexpected shape into None.
-
-    Args:
-        value (Any): The raw value from the response.
-        handler (ValidatorFunctionWrapHandler): The field's own validation.
-        info (ValidationInfo): Which field is being validated.
-
-    Returns:
-        Any: The validated value, or None if it did not validate.
-    """
-    try:
-        return handler(value)
-    except ValidationError:
-        # The field's name only: the value is from a response full of personal data
-        logging.warning(f"Ignored an unexpected value for {info.field_name} in a PESU Academy response.")
-        return None
-
-
-# For the fields that add to a profile rather than make one. If PESU changes the shape of one of
-# these, that field is null and the rest of the profile still comes back; the core fields (name, IDs,
-# program, branch, class, contact details, campus) stay strict, so a change to them is still a 422.
-Secondary = WrapValidator(_none_if_invalid)
-
-
-class _LoginUser(_UpstreamModel):
-    """The user as described by the login response's `mobileJsonObject`.
-
-    Read for the success marker and for isParent, which only the login response has. The rest of the
-    profile comes from the profile response, so the login response's copies of the same details (some
-    of them partial: its "name" is the first name only) are never mixed into it.
-    """
-
-    login: str | None = None
-    # 0 for a student's own account; PESU Academy also has parent accounts
-    is_parent: Annotated[bool | None, Secondary] = Field(None, alias="isParent")
-
-
-class _LoginResponse(_UpstreamModel):
-    """The login response: the student, and the token the profile call needs."""
-
-    user: _LoginUser = Field(alias="mobileJsonObject")
-    # repr=False so the bearer token cannot reach a log through the model's repr
-    access_token: str | None = Field(None, alias="accessToken", repr=False)
-
-
-class _StudentInfo(_UpstreamModel):
-    """The student as described by the profile response's `STUDENT_INFO`, the source of every field it has.
-
-    For students whose PRN and SRN differ, PESU sends the PRN as LoginId and the SRN as SRN; for students
-    who joined before SRNs existed, both hold the same ID.
-    """
-
-    prn: str | None = Field(None, alias="LoginId")
-    srn: str | None = Field(None, alias="SRN")
-    name: str | None = Field(None, alias="NameAsInSSLC")
-    first_name: Annotated[str | None, Secondary] = Field(None, alias="FirstName")
-    middle_name: Annotated[str | None, Secondary] = Field(None, alias="MiddleName")
-    last_name: Annotated[str | None, Secondary] = Field(None, alias="LastName")
-    email: str | None = Field(None, alias="Email")
-    mobile: str | None = Field(None, alias="Mobile")
-    program: str | None = Field(None, alias="ProgramAbbreviation")
-    branch: str | None = Field(None, alias="Branch")
-    branch_short_code: Annotated[str | None, Secondary] = Field(None, alias="BranchAbbreviation")
-    class_name: str | None = Field(None, alias="ClassName")
-    section_name: str | None = Field(None, alias="SectionName")
-    date_of_birth: Annotated[int | None, Secondary] = Field(None, alias="DateOfBirth")
-
-
-class _StudentPhoto(_UpstreamModel):
-    """The profile response's `STUDENT_PHOTO`, read only for what STUDENT_INFO does not have."""
-
-    # The campus, named by its institute: "PES University (Ring Road)"
-    campus: str | None = Field(None, alias="instituteName")
-    gender: Annotated[str | None, Secondary] = None
-
-
-class _Student(_UpstreamModel):
-    """The student, from the blocks of the profile response."""
-
-    info: _StudentInfo
-    campus: str | None = None
-    gender: str | None = None
-
-
-class _ErrorEnvelope(_UpstreamModel):
-    """PESU's error body, which it can send with an HTTP 200, as in {"status": 400, "message": "..."}."""
-
-    status: int
-    message: str | None = None
-
-
-def _has_values(block: BaseModel | None) -> bool:
-    """Tell whether a parsed block holds any value at all.
-
-    Args:
-        block (BaseModel | None): The block, or None if it was absent.
-
-    Returns:
-        bool: True if the block is present and at least one of its fields is not None.
-    """
-    return block is not None and any(value is not None for value in block.model_dump().values())
-
-
-class _ProfileResponse(_UpstreamModel):
-    """The profile (dispatcher) response."""
-
-    message: str = Field(alias="MESSAGE")
-    info: _StudentInfo | None = Field(None, alias="STUDENT_INFO")
-    photo: _StudentPhoto | None = Field(None, alias="STUDENT_PHOTO")
-
-    @model_validator(mode="after")
-    def _has_student(self) -> _ProfileResponse:
-        """Reject a response whose STUDENT_INFO describes no student.
-
-        STUDENT_INFO is where every core field comes from, and nothing stands in for it. A block counts
-        only if it holds a value: PESU sends `{}` for an empty block (PLACEMENT_DETAILS is one), and
-        since every field is optional, `{}` -- or a block of only unknown or null keys -- would otherwise
-        parse into an all-empty block and pass as a profile.
-
-        Returns:
-            _ProfileResponse: The response, unchanged.
-
-        Raises:
-            ValueError: If STUDENT_INFO is missing or holds no student data.
-        """
-        if not _has_values(self.info):
-            raise ValueError("STUDENT_INFO holds no student data")
-        return self
-
-    def student(self) -> _Student:
-        """Gather the student from the blocks of the response.
-
-        Returns:
-            _Student: The student details.
-        """
-        photo = self.photo or _StudentPhoto()
-        return _Student(info=self.info, campus=photo.campus, gender=photo.gender)
-
-
 @asynccontextmanager
-async def _upstream_call(metrics: MetricsCollector, operation: str) -> AsyncIterator[list[Any]]:
+async def _upstream_call(metrics: MetricsCollector, operation: str) -> AsyncGenerator[list[Any]]:
     """Time one call to PESU Academy and record its outcome.
 
     Yields a one-element list: put the response in it and the status code is recorded too. The
@@ -385,7 +183,7 @@ def _error_envelope_status(content: bytes) -> int | None:
         int | None: The envelope's status if the body is one that reports an error, otherwise None.
     """
     try:
-        envelope = _ErrorEnvelope.model_validate_json(content)
+        envelope = ErrorEnvelope.model_validate_json(content)
     except ValidationError:
         return None
     return envelope.status if envelope.status != 200 else None
@@ -433,7 +231,7 @@ class PESUAcademy:
         """
         self._metrics = metrics if metrics is not None else MetricsCollector()
 
-    async def _login(self, client: httpx2.AsyncClient, username: str, password: str) -> _LoginResponse:
+    async def _login(self, client: httpx2.AsyncClient, username: str, password: str) -> LoginResponse:
         """Log in to PESU Academy.
 
         Args:
@@ -442,11 +240,11 @@ class PESUAcademy:
             password (str): The password of the user.
 
         Returns:
-            _LoginResponse: The parsed login response.
+            LoginResponse: The parsed login response.
 
         Raises:
             AuthenticationError: If the credentials were rejected.
-            UpstreamError: If PESU Academy could not be reached or answered unexpectedly.
+            UpstreamError: If PESU Academy could not be reached or returned an unexpected response.
         """
         form = {"userName": username, "password": password, **LOGIN_FORM}
         try:
@@ -466,7 +264,7 @@ class PESUAcademy:
             )
 
         try:
-            login = _LoginResponse.model_validate_json(response.content)
+            login = LoginResponse.model_validate_json(response.content)
         except ValidationError as e:
             logging.warning(f"Unexpected login response for user={username}: {_validation_failure_summary(e)}")
             # from None: the chained error would quote the response, which is personal data
@@ -480,7 +278,7 @@ class PESUAcademy:
             raise UpstreamError(f"PESU Academy did not report a successful login for user={username}.")
         return login
 
-    async def _fetch_profile(self, client: httpx2.AsyncClient, access_token: str, username: str) -> _Student:
+    async def _fetch_profile(self, client: httpx2.AsyncClient, access_token: str, username: str) -> Student:
         """Fetch the student's profile from the dispatcher.
 
         Args:
@@ -489,7 +287,7 @@ class PESUAcademy:
             username (str): The username of the user, for logging.
 
         Returns:
-            _Student: The parsed student details.
+            Student: The parsed student details.
 
         Raises:
             ProfileFetchError: If the profile could not be fetched.
@@ -509,7 +307,7 @@ class PESUAcademy:
             )
 
         try:
-            parsed = _ProfileResponse.model_validate_json(response.content)
+            parsed = ProfileResponse.model_validate_json(response.content)
         except ValidationError as e:
             # PESU reporting an error is PESU failing to serve the profile, not a response we cannot
             # read: a 502 like the login's, rather than the 422 that means their API has changed
@@ -549,7 +347,7 @@ class PESUAcademy:
             logging.warning(f"Unknown campus name: {campus} for user={username}")
         return campus_code
 
-    def _build_profile(self, user: _LoginUser, student: _Student, username: str) -> dict[str, Any]:
+    def _build_profile(self, user: LoginUser, student: Student, username: str) -> dict[str, Any]:
         """Build the profile this API returns from the profile and login responses.
 
         Every field STUDENT_INFO has is taken from STUDENT_INFO alone, as PESU wrote it, or is null: no
@@ -558,8 +356,8 @@ class PESUAcademy:
         the login response.
 
         Args:
-            user (_LoginUser): The user from the login response.
-            student (_Student): The student from the profile response.
+            user (LoginUser): The user from the login response.
+            student (Student): The student from the profile response.
             username (str): The username of the user, for logging.
 
         Returns:

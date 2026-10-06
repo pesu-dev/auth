@@ -61,9 +61,9 @@ authenticate_docs = ApiDocs(
                         "authentication_with_profile": {
                             "summary": "Authentication with Full Profile",
                             "description": (
-                                "Every field is always present. A field PESU Academy has no value for is null: "
-                                "for example semester and section for a student who is not in a class, or "
-                                "middleName for one who has none."
+                                "Every field is always present, and is null when PESU Academy has no value for "
+                                "it or sends it in an unexpected shape: for example semester and section for a "
+                                "student who has graduated, or middleName for one who has none."
                             ),
                             "value": {
                                 "status": True,

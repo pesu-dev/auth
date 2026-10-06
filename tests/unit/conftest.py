@@ -1,10 +1,28 @@
-"""Shared fixtures for unit tests that drive PESUAcademy against a mocked mobile API."""
+"""Shared constants and fixtures for the unit tests."""
 
 import copy
+import importlib.util
+import sys
+from datetime import timedelta
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx2
 import pytest
+
+from app.models import MetricsModel, ResponseModel
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+BENCHMARK_DIR = REPOSITORY_ROOT / "scripts" / "benchmark"
+VERSION_CHECK_SCRIPT = REPOSITORY_ROOT / ".github" / "scripts" / "check_version_bump.py"
+# The offset of every timestamp this API returns
+IST_OFFSET = timedelta(hours=5, minutes=30)
+# The variables scripts/run_tests.py needs before it runs the live tests
+CREDENTIAL_VARIABLES = ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_PHONE", "TEST_PASSWORD")
+METRICS_TOKEN = "test-metrics-token"
+# The models the OpenAPI docs refer to by name
+DOCUMENTED_MODELS = {"ResponseModel": ResponseModel, "MetricsModel": MetricsModel}
+AGENT_FRONTMATTER = '---\nname: reviewer\ndescription: Reviews diffs. Read-only.\ntools: ["read"]\n---\n'
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).
 # The personal fields this service must never keep or log -- photo, parents, address -- are
@@ -93,6 +111,29 @@ PROFILE_PAYLOAD = {
     "STUDENT_CGPA_DETAILS": [{"USN": "PES2UG25CS001", "CGPA": "CGPASECRET"}],
 }
 
+# The profile PESUAcademy builds from LOGIN_PAYLOAD and PROFILE_PAYLOAD
+FULL_PROFILE = {
+    "name": "JOHN DOE",
+    "prn": "PES2202500001",
+    "srn": "PES2UG25CS001",
+    "program": "B.Tech.",
+    "branch": "Computer Science and Engineering",
+    "semester": "Sem-4",
+    "section": "Section C",
+    "email": "john.doe@example.com",
+    "mobile": "9876543210",
+    "campusCode": 2,
+    "campus": "PES University (Electronic City)",
+    "firstName": "JOHN",
+    "middleName": None,
+    "lastName": "DOE",
+    "branchShortCode": "CSE",
+    "gender": "Male",
+    # Midnight IST on 2005-01-01; read in UTC it would be 2004-12-31
+    "dateOfBirth": "2005-01-01",
+    "isParent": False,
+}
+
 # Values that must never appear in a log line or an exception message
 SECRETS = (
     "LOGINPHOTOSECRET",
@@ -124,6 +165,105 @@ def profile_payload():
 def secrets():
     """Values from the fixture payloads that must never be logged."""
     return SECRETS
+
+
+@pytest.fixture
+def full_profile():
+    """The profile built from the fixture payloads, safe to modify per test."""
+    return copy.deepcopy(FULL_PROFILE)
+
+
+@pytest.fixture
+def ist_offset():
+    return IST_OFFSET
+
+
+@pytest.fixture(params=CREDENTIAL_VARIABLES)
+def credential_variable(request):
+    """Each variable scripts/run_tests.py needs before it runs the live tests, one per test."""
+    return request.param
+
+
+@pytest.fixture
+def credential_variables():
+    return CREDENTIAL_VARIABLES
+
+
+@pytest.fixture
+def metrics_token():
+    return METRICS_TOKEN
+
+
+@pytest.fixture
+def documented_models():
+    return DOCUMENTED_MODELS
+
+
+@pytest.fixture
+def agent_frontmatter():
+    return AGENT_FRONTMATTER
+
+
+@pytest.fixture
+def repository_root():
+    return REPOSITORY_ROOT
+
+
+@pytest.fixture
+def benchmark_dir():
+    return BENCHMARK_DIR
+
+
+def _load_script(path, module_name):
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="session")
+def version_check():
+    """.github/scripts/check_version_bump.py, which is not in an importable package."""
+    return _load_script(VERSION_CHECK_SCRIPT, "check_version_bump")
+
+
+@pytest.fixture(scope="session")
+def benchmark_scripts():
+    """Load the benchmark scripts under names of their own, without putting scripts/benchmark on sys.path.
+
+    They import their helper as a sibling (`from util import ...`), the way they run from that
+    directory. So `util` is registered only while the other two load, then the previous entry, if
+    any, is put back: no other test sees a module called `util` that is not its own.
+    """
+    helper = _load_script(BENCHMARK_DIR / "util.py", "benchmark_util")
+    previous = sys.modules.get("util")
+    sys.modules["util"] = helper
+    try:
+        return (
+            helper,
+            _load_script(BENCHMARK_DIR / "benchmark_requests.py", "benchmark_requests"),
+            _load_script(BENCHMARK_DIR / "analyze_benchmark.py", "analyze_benchmark"),
+        )
+    finally:
+        if previous is None:
+            del sys.modules["util"]
+        else:
+            sys.modules["util"] = previous
+
+
+@pytest.fixture
+def benchmark_util(benchmark_scripts):
+    return benchmark_scripts[0]
+
+
+@pytest.fixture
+def benchmark_requests(benchmark_scripts):
+    return benchmark_scripts[1]
+
+
+@pytest.fixture
+def analyze_benchmark(benchmark_scripts):
+    return benchmark_scripts[2]
 
 
 @pytest.fixture

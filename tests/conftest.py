@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# In a TEST_* profile variable, "NA" stands for a value the test account does not have (it has no
-# current class, so no semester or section), which the API returns as null. A sentinel is needed
+# In a TEST_* profile variable, "NA" stands for a value the test account does not have (it has
+# graduated, so no semester or section), which the API returns as null. A sentinel is needed
 # because GitHub secrets cannot be empty.
 ABSENT = "NA"
 PROFILE_VARIABLES = {
@@ -85,23 +85,20 @@ def pytest_collection_modifyitems(config, items):
     items.sort(key=sort_key)
 
 
-# The fields added with the mobile API, beyond the eleven the web flow returned. Every live test that
-# requests particular fields asks for these too, so they are checked the same way as the originals.
-NEW_PROFILE_FIELDS = [
-    "firstName",
-    "middleName",
-    "lastName",
-    "branchShortCode",
-    "gender",
-    "dateOfBirth",
-    "isParent",
-]
+@pytest.fixture
+def profile_variables():
+    """The TEST_* variable for each profile field, in the order the API returns them."""
+    return dict(PROFILE_VARIABLES)
 
 
 @pytest.fixture
-def new_profile_fields():
-    """The profile fields added with the mobile API."""
-    return list(NEW_PROFILE_FIELDS)
+def specific_profile_fields():
+    """Every profile field but name, in reverse order.
+
+    A live test that asks for these checks the field filtering (name is left out) and the order of the
+    response (it is the documented order, not the requested one), along with every value.
+    """
+    return [field for field in reversed(PROFILE_VARIABLES) if field != "name"]
 
 
 @pytest.fixture
@@ -114,6 +111,7 @@ def check_live_fields(expected_profile):
 
     def check(profile, fields):
         assert sorted(profile) == sorted(set(fields)), "the profile does not hold exactly the requested fields"
+        assert list(profile) == [field for field in PROFILE_VARIABLES if field in fields], "the fields are out of order"
         mismatched = [field for field in fields if profile[field] != expected_profile[field]]
         assert not mismatched, f"these fields do not match their TEST_* values: {mismatched}"
 

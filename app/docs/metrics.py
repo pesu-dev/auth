@@ -46,7 +46,7 @@ pesu_auth_authentication_results_total{result="failure"} 169
 # HELP pesu_auth_profile_field_filtering_total Profile fetches, by whether the caller narrowed the fields returned.
 # TYPE pesu_auth_profile_field_filtering_total counter
 pesu_auth_profile_field_filtering_total{enabled="false"} 90
-# HELP pesu_auth_profile_parse_errors_total Profile response parse failures, by what could not be parsed or mapped.
+# HELP pesu_auth_profile_parse_errors_total Profile parse failures, keyed by what could not be parsed or mapped.
 # TYPE pesu_auth_profile_parse_errors_total counter
 pesu_auth_profile_parse_errors_total{reason="unknown_campus_code"} 3
 # HELP pesu_auth_validation_errors_total Request validation failures, by the field that failed.

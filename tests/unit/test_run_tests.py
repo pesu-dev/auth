@@ -7,17 +7,14 @@ import pytest
 
 from scripts import run_tests
 
-CREDENTIALS = ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_PHONE", "TEST_PASSWORD")
-
-
 @pytest.fixture(autouse=True)
-def environment(monkeypatch):
+def environment(monkeypatch, credential_variables):
     """Start every test with no credentials and outside GitHub Actions.
 
     load_dotenv is stubbed out, so a local .env cannot put the credentials back.
     """
     monkeypatch.setattr(run_tests, "load_dotenv", lambda: None)
-    for variable in (*CREDENTIALS, "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY"):
+    for variable in (*credential_variables, "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY"):
         monkeypatch.delenv(variable, raising=False)
 
 
@@ -27,13 +24,13 @@ def pytest_run():
         yield run
 
 
-def _set_credentials(monkeypatch, **overrides):
-    for variable in CREDENTIALS:
+def _set_credentials(monkeypatch, credential_variables, **overrides):
+    for variable in credential_variables:
         monkeypatch.setenv(variable, overrides.get(variable, "value"))
 
 
-def test_with_credentials_every_test_runs(monkeypatch, pytest_run):
-    _set_credentials(monkeypatch)
+def test_with_credentials_every_test_runs(monkeypatch, pytest_run, credential_variables):
+    _set_credentials(monkeypatch, credential_variables)
 
     assert run_tests.run_tests() == 0
 
@@ -43,9 +40,10 @@ def test_with_credentials_every_test_runs(monkeypatch, pytest_run):
     assert "-m" not in command
 
 
-@pytest.mark.parametrize("missing", CREDENTIALS)
-def test_without_any_one_credential_the_live_tests_are_deselected(monkeypatch, pytest_run, caplog, missing):
-    _set_credentials(monkeypatch, **{missing: ""})
+def test_without_any_one_credential_the_live_tests_are_deselected(
+    monkeypatch, pytest_run, caplog, credential_variables, credential_variable
+):
+    _set_credentials(monkeypatch, credential_variables, **{credential_variable: ""})
 
     with caplog.at_level("WARNING"):
         run_tests.run_tests()
@@ -57,8 +55,8 @@ def test_without_any_one_credential_the_live_tests_are_deselected(monkeypatch, p
     assert "Live PESU tests skipped" in caplog.text
 
 
-def test_the_exit_code_is_pytests(monkeypatch, pytest_run):
-    _set_credentials(monkeypatch)
+def test_the_exit_code_is_pytests(monkeypatch, pytest_run, credential_variables):
+    _set_credentials(monkeypatch, credential_variables)
     pytest_run.return_value = MagicMock(returncode=3)
 
     assert run_tests.run_tests() == 3

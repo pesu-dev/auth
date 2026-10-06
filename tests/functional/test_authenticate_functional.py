@@ -69,11 +69,9 @@ async def test_authenticate_success_username_srn(pesu_academy: PESUAcademy):
 @pytest.mark.secret_required
 @pytest.mark.asyncio
 async def test_authenticate_with_specific_profile_fields(
-    pesu_academy: PESUAcademy, check_live_fields, new_profile_fields
+    pesu_academy: PESUAcademy, check_live_fields, specific_profile_fields
 ):
-    # The original fields whose source or form changed with the mobile API, and every field added with it;
-    # the rest are left out, so the filtering is tested too
-    fields = ["prn", "program", "branch", "semester", "mobile", "campusCode", "campus", *new_profile_fields]
+    fields = specific_profile_fields
     result = await pesu_academy.authenticate(
         os.getenv("TEST_EMAIL"), os.getenv("TEST_PASSWORD"), profile=True, fields=fields
     )

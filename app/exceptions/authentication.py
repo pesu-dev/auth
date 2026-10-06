@@ -12,7 +12,7 @@ class AuthenticationError(PESUAcademyError):
 
 
 class UpstreamError(PESUAcademyError):
-    """Raised when PESU Academy cannot be reached to log in, or answers the login unexpectedly."""
+    """Raised when PESU Academy cannot be reached to log in, or returns an unexpected response to the login."""
 
     def __init__(
         self,

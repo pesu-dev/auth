@@ -121,8 +121,8 @@ projects.
    Open the `.env` file and replace the example values with the details of a PESU Academy account you can test with.
    Each variable is documented in `.env.example`. There is a `TEST_*` variable for every profile field, and the live
    tests compare each one exactly with what the API returns for that account. Set a variable to `NA` when the account
-   has no value for that field (for example `TEST_MIDDLE_NAME`, or `TEST_SEMESTER` and `TEST_SECTION` if the account is
-   not currently in a class), since the API then returns `null`. CI reads the same variables from the repository's
+   has no value for that field (for example `TEST_MIDDLE_NAME`, or `TEST_SEMESTER` and `TEST_SECTION` if the account
+   has graduated), since the API then returns `null`. CI reads the same variables from the repository's
    secrets. The file is gitignored: never commit it or paste its values anywhere.
 
 ### Pre-commit Hooks
@@ -237,7 +237,7 @@ its logic in a function that a test can call.
 
 ### Tests that need credentials
 
-Thirteen tests are marked `secret_required` and log in to PESU Academy for real. They need the
+The tests marked `secret_required` log in to PESU Academy for real. They need the
 `TEST_*` variables in your `.env`; without them `scripts/run_tests.py` deselects those tests, warns
 that it has done so, and still enforces the coverage gate on the rest.
 
@@ -285,9 +285,8 @@ run it alongside the live tests.
   they never run
 - Adding a profile field? Give it a `TEST_*` variable in `.env.example` and in `PROFILE_VARIABLES` in
   `tests/conftest.py`, so the live tests compare it with the test account's real value (list it in
-  `INTEGER_FIELDS` or `BOOLEAN_FIELDS` there if it is not a string); add it to
-  `NEW_PROFILE_FIELDS` there too, so the live specific-fields tests request it (a unit test fails
-  until you do); and ask a maintainer to add the matching repository secret, which
+  `INTEGER_FIELDS` or `BOOLEAN_FIELDS` there if it is not a string; a unit test fails until every
+  field has one), and ask a maintainer to add the matching repository secret, which
   `.github/workflows/ci_checks.yml` passes to the test job. Document it in the README's
   `ProfileObject` table and in `ProfileModel`, whose descriptions become the Swagger docs
 
@@ -328,7 +327,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
 ### 🔢 Bump the Version
 
 Every pull request raises `version` in `pyproject.toml` by exactly one step from `dev`'s, once for the whole pull
-request, and runs `uv lock` so `uv.lock` records the same version. From `4.18.0`, that is one of:
+request, and runs `uv lock` so `uv.lock` records the same version. For example, if the version on `dev` is `4.18.0`, the
+new version is one of:
 
 | Bump  | Next version | Use for…                                                                                                                                                  |
 | ----- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -2,14 +2,14 @@
 
 ## Supported Versions
 
-We actively maintain security patches for the current stable version of the PESUAuth API (5.x). Please use the latest release to ensure you have the latest security updates.
+We actively maintain security patches for the current stable version of the PESUAuth API. Please use the latest release to ensure you have the latest security updates.
 
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability in PESUAuth API, please follow these guidelines to report it responsibly:
 
 - **Do NOT open a public issue** to report security problems.
-- Instead, contact the maintainers privately on the PESU Developer Group channel (`#pesu-dev`) on [PESU Discord](https://discord.gg/eZ3uFs2), or email them.
+- Instead, contact the maintainers on the PESU Developer Group channel (`#pesu-dev`) on [PESU Discord](https://discord.gg/eZ3uFs2), or email them.
 - Include as much detail as possible:
   - Steps to reproduce the issue
   - Impact of the vulnerability

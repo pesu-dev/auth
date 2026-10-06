@@ -4,14 +4,11 @@ import pytest
 
 from scripts.sync_agents import AGENTS_PATH, REPO_ROOT, ROLES_PATH, main, read_frontmatter, sync_agents
 
-FRONTMATTER = "---\nname: reviewer\ndescription: Reviews diffs. Read-only.\ntools: [\"read\"]\n---\n"
-
-
 @pytest.fixture
-def roles_dir(tmp_path: Path) -> Path:
+def roles_dir(tmp_path: Path, agent_frontmatter) -> Path:
     roles = tmp_path / "roles"
     roles.mkdir()
-    (roles / "reviewer.md").write_text(f"{FRONTMATTER}\n# Reviewer\n\nThe full role.\n")
+    (roles / "reviewer.md").write_text(f"{agent_frontmatter}\n# Reviewer\n\nThe full role.\n")
     (roles / "planner.md").write_text("---\nname: planner\ndescription: Plans.\n---\n\n# Planner\n")
     return roles
 
@@ -21,13 +18,13 @@ def agents_dir(tmp_path: Path) -> Path:
     return tmp_path / "agents"
 
 
-def test_generates_one_wrapper_per_role(roles_dir, agents_dir):
+def test_generates_one_wrapper_per_role(roles_dir, agents_dir, agent_frontmatter):
     assert sync_agents(roles_dir, agents_dir, check=False) == 0
 
     assert sorted(path.name for path in agents_dir.iterdir()) == ["planner.agent.md", "reviewer.agent.md"]
     wrapper = (agents_dir / "reviewer.agent.md").read_text()
     # The frontmatter is copied verbatim; the body only points at the role file
-    assert wrapper.startswith(FRONTMATTER)
+    assert wrapper.startswith(agent_frontmatter)
     assert f"Read `{ROLES_PATH}/reviewer.md` and follow it exactly" in wrapper
     assert "The full role." not in wrapper
 
@@ -41,7 +38,7 @@ def test_sync_is_idempotent(roles_dir, agents_dir):
     assert sync_agents(roles_dir, agents_dir, check=True) == 0
 
 
-def test_sync_rewrites_stale_and_removes_extra_wrappers(roles_dir, agents_dir):
+def test_sync_rewrites_stale_and_removes_extra_wrappers(roles_dir, agents_dir, agent_frontmatter):
     sync_agents(roles_dir, agents_dir, check=False)
     (agents_dir / "reviewer.agent.md").write_text("edited by hand\n")
     (agents_dir / "removed-role.agent.md").write_text("---\nname: removed-role\n---\n")
@@ -49,7 +46,7 @@ def test_sync_rewrites_stale_and_removes_extra_wrappers(roles_dir, agents_dir):
 
     assert sync_agents(roles_dir, agents_dir, check=False) == 0
 
-    assert (agents_dir / "reviewer.agent.md").read_text().startswith(FRONTMATTER)
+    assert (agents_dir / "reviewer.agent.md").read_text().startswith(agent_frontmatter)
     assert not (agents_dir / "removed-role.agent.md").exists()
     assert (agents_dir / "README.md").exists()
 
