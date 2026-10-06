@@ -96,7 +96,7 @@ def test_a_profile_with_missing_values_returns_null(client, pesu_up, profile_pay
 def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payload, full_profile):
     profile_payload["STUDENT_INFO"]["ClassName"] = None
 
-    fields = ["semester", "campusCode", "name", "middleName", "mobile", "dateOfBirth", "branchShortCode", "isParent"]
+    fields = ["semester", "campusCode", "name", "middleName", "mobile", "dateOfBirth", "branchShortCode"]
     profile = _authenticate(client, profile=True, fields=fields).json()["profile"]
 
     assert profile == {
@@ -107,7 +107,6 @@ def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payl
         "middleName": None,
         "branchShortCode": "CSE",
         "dateOfBirth": "2005-01-01",
-        "isParent": False,
     }
     # On the wire, in the documented order
     assert list(profile) == [field for field in full_profile if field in fields]

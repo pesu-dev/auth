@@ -82,14 +82,12 @@ class UpstreamDetails(UpstreamModel):
 class LoginUser(UpstreamDetails):
     """The user as described by the login response's `mobileJsonObject`.
 
-    Read for the success marker and for isParent, which only the login response has. The rest of the
-    profile comes from the profile response, so the login response's copies of the same details (some
-    of them partial: its "name" is the first name only) are never mixed into it.
+    Read only for the success marker. The profile comes from the profile response, so the login
+    response's copies of the same details (some of them partial: its "name" is the first name only)
+    are never mixed into it.
     """
 
     login: str | None = None
-    # 0 for a student's own account; PESU Academy also has parent accounts
-    is_parent: bool | None = Field(None, alias="isParent")
 
 
 class LoginResponse(UpstreamModel):

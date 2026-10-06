@@ -28,7 +28,7 @@ from app.metrics.collector import (
     MetricsCollector,
 )
 from app.models.profile import ProfileField
-from app.models.upstream import ErrorEnvelope, LoginResponse, LoginUser, ProfileResponse, Student
+from app.models.upstream import ErrorEnvelope, LoginResponse, ProfileResponse, Student
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Mapping
@@ -347,16 +347,14 @@ class PESUAcademy:
             logging.warning(f"Unknown campus name: {campus} for user={username}")
         return campus_code
 
-    def _build_profile(self, user: LoginUser, student: Student, username: str) -> dict[str, Any]:
-        """Build the profile this API returns from the profile and login responses.
+    def _build_profile(self, student: Student, username: str) -> dict[str, Any]:
+        """Build the profile this API returns from the profile response.
 
         Every field STUDENT_INFO has is taken from STUDENT_INFO alone, as PESU wrote it, or is null: no
         other block, and not the login response, stands in for a value it lacks. Only what STUDENT_INFO
-        does not have comes from elsewhere: the campus and gender from STUDENT_PHOTO, and isParent from
-        the login response.
+        does not have comes from elsewhere: the campus and gender, from STUDENT_PHOTO.
 
         Args:
-            user (LoginUser): The user from the login response.
             student (Student): The student from the profile response.
             username (str): The username of the user, for logging.
 
@@ -389,7 +387,6 @@ class PESUAcademy:
             "branchShortCode": info.branch_short_code,
             "gender": student.gender,
             "dateOfBirth": _date_from_epoch_ms(info.date_of_birth),
-            "isParent": user.is_parent,
         }
 
     async def authenticate(
@@ -440,7 +437,7 @@ class PESUAcademy:
                 if login.access_token is None:
                     raise UpstreamError(f"PESU Academy sent no access token for user={username}.")
                 student = await self._fetch_profile(client, login.access_token, username)
-                result["profile"] = self._build_profile(login.user, student, username)
+                result["profile"] = self._build_profile(student, username)
                 logging.info(f"Complete profile information retrieved for user={username}: {result['profile']}.")
                 # Recorded at the branch itself rather than from the request body, so it reflects
                 # what actually happened: a caller who passes exactly the default field list has

@@ -49,7 +49,6 @@ LOGIN_PAYLOAD = {
         "departmentId": "0",
         "usertype": "2",
         "dateofBirth": "2005-01-01",
-        "isParent": 0,
     },
     "accessToken": "ACCESS-TOKEN-SECRET",
     "refreshToken": "REFRESH-TOKEN-SECRET",
@@ -131,7 +130,6 @@ FULL_PROFILE = {
     "gender": "Male",
     # Midnight IST on 2005-01-01; read in UTC it would be 2004-12-31
     "dateOfBirth": "2005-01-01",
-    "isParent": False,
 }
 
 # Values that must never appear in a log line or an exception message

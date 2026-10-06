@@ -285,7 +285,7 @@ run it alongside the live tests.
   they never run
 - Adding a profile field? Give it a `TEST_*` variable in `.env.example` and in `PROFILE_VARIABLES` in
   `tests/conftest.py`, so the live tests compare it with the test account's real value (list it in
-  `INTEGER_FIELDS` or `BOOLEAN_FIELDS` there if it is not a string; a unit test fails until every
+  `INTEGER_FIELDS` there if it is an integer; a unit test fails until every
   field has one), and ask a maintainer to add the matching repository secret, which
   `.github/workflows/ci_checks.yml` passes to the test job. Document it in the README's
   `ProfileObject` table and in `ProfileModel`, whose descriptions become the Swagger docs

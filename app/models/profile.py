@@ -24,7 +24,6 @@ ProfileField = Literal[
     "branchShortCode",
     "gender",
     "dateOfBirth",
-    "isParent",
 ]
 
 
@@ -148,13 +147,4 @@ class ProfileModel(BaseModel):
         title="Date of Birth",
         description="Date of birth of the user, as YYYY-MM-DD.",
         json_schema_extra={"example": "2002-01-31"},
-    )
-    is_parent: bool | None = Field(
-        None,
-        title="Is Parent",
-        description=(
-            "Whether PESU Academy marks the account as a parent's rather than the student's own, as its login "
-            "reports it."
-        ),
-        json_schema_extra={"example": False},
     )

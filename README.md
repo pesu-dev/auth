@@ -202,9 +202,9 @@ example, a student who has graduated has a `null` `semester` and `section`. Fiel
 at all, and fields come back in the order of the table below.
 
 Every field is taken from the `STUDENT_INFO` block of PESU Academy's profile response, as PESU Academy sends it, except
-`campus` and `gender` (from `STUDENT_PHOTO`, since `STUDENT_INFO` does not have them), `isParent` (from the login
-response, the only one that has it) and `campusCode` (mapped from `campus`). No other part of either response stands in
-for a value its source lacks, so that field is `null`; a response without `STUDENT_INFO` is a `422`.
+`campus` and `gender` (from `STUDENT_PHOTO`, since `STUDENT_INFO` does not have them) and `campusCode` (mapped from
+`campus`). No other part of PESU Academy's responses stands in for a value its source lacks, so that field is `null`; a
+profile response whose `STUDENT_INFO` is missing or holds no usable value is a `422`.
 
 | **Field**         | **Type** | **Description**                                                                                                                                                                                                                                                 |
 | ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -225,7 +225,6 @@ for a value its source lacks, so that field is `null`; a response without `STUDE
 | `branchShortCode` | `str`    | Abbreviation of the branch, such as `CSE`                                                                                                                                                                                                                       |
 | `gender`          | `str`    | Gender of the user, as recorded by PESU                                                                                                                                                                                                                         |
 | `dateOfBirth`     | `str`    | Date of birth, as `YYYY-MM-DD`                                                                                                                                                                                                                                  |
-| `isParent`        | `bool`   | Whether PESU Academy marks the account as a parent's rather than the student's own                                                                                                                                                                              |
 
 Everything else in PESU Academy's responses, such as the photo, blood group, addresses, parents' details and marks, is
 discarded and never returned, and cannot be requested in `fields`.
@@ -730,8 +729,7 @@ print(response.json())
     "lastName": "Doe",
     "branchShortCode": "CSE",
     "gender": "Male",
-    "dateOfBirth": "2002-01-31",
-    "isParent": false
+    "dateOfBirth": "2002-01-31"
   },
   "message": "Login successful.",
   "timestamp": "2024-07-28T22:30:10.103368+05:30"

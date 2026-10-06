@@ -28,12 +28,9 @@ PROFILE_VARIABLES = {
     "branchShortCode": "TEST_BRANCH_SHORT_CODE",
     "gender": "TEST_GENDER",
     "dateOfBirth": "TEST_DATE_OF_BIRTH",
-    "isParent": "TEST_IS_PARENT",
 }
 # Variables hold strings; these fields are integers in the API
 INTEGER_FIELDS = ("campusCode",)
-# And these are booleans, written true or false
-BOOLEAN_FIELDS = ("isParent",)
 
 
 @pytest.fixture
@@ -47,10 +44,6 @@ def expected_profile():
     for field in INTEGER_FIELDS:
         if profile[field] is not None:
             profile[field] = int(profile[field])
-    for field in BOOLEAN_FIELDS:
-        if profile[field] is not None:
-            assert profile[field] in ("true", "false"), f"{PROFILE_VARIABLES[field]} must be true or false"
-            profile[field] = profile[field] == "true"
     return profile
 
 

@@ -514,7 +514,7 @@ async def test_the_program_is_returned_as_pesu_writes_it(
 async def test_field_filtering(pesu, upstream, make_response, login_payload, profile_payload):
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    fields = ["isParent", "dateOfBirth", "name", "mobile", "campus", "gender", "middleName", "branchShortCode"]
+    fields = ["dateOfBirth", "name", "mobile", "campus", "gender", "middleName", "branchShortCode"]
     result = await pesu.authenticate("user", "pass", profile=True, fields=fields)
 
     assert result["profile"] == {
@@ -525,7 +525,6 @@ async def test_field_filtering(pesu, upstream, make_response, login_payload, pro
         "branchShortCode": "CSE",
         "gender": "Male",
         "dateOfBirth": "2005-01-01",
-        "isParent": False,
     }
     # In the documented order, whatever order they were asked for in
     assert list(result["profile"]) == [field for field in PESUAcademy.DEFAULT_FIELDS if field in fields]
@@ -1013,45 +1012,6 @@ async def test_blocks_that_are_not_read_cannot_break_a_profile(
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     assert profile == full_profile
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("is_parent", "expected"),
-    [(0, False), (1, True), ("0", False), ("1", True), (None, None), ("", None)],
-)
-async def test_is_parent_is_the_login_responses_flag(
-    pesu, upstream, make_response, login_payload, profile_payload, is_parent, expected
-):
-    """Only the login response has it; PESU sends 0 for a student's own account."""
-    login_payload["mobileJsonObject"]["isParent"] = is_parent
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile["isParent"] is expected
-
-
-@pytest.mark.asyncio
-async def test_without_is_parent_in_the_login_it_is_null(pesu, upstream, make_response, login_payload, profile_payload):
-    del login_payload["mobileJsonObject"]["isParent"]
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile["isParent"] is None
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("is_parent", [2, "maybe", [0], {"x": 1}])
-async def test_an_is_parent_of_an_unexpected_shape_is_null_and_the_login_still_works(
-    pesu, upstream, make_response, login_payload, profile_payload, caplog, is_parent, full_profile
-):
-    login_payload["mobileJsonObject"]["isParent"] = is_parent
-
-    with caplog.at_level("WARNING"):
-        profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile == {**full_profile, "isParent": None}
-    assert "Ignored an unexpected value for is_parent" in caplog.text
 
 
 @pytest.mark.asyncio

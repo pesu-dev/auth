@@ -112,7 +112,6 @@ jobs:
       TEST_BRANCH_SHORT_CODE: ${{ secrets.TEST_BRANCH_SHORT_CODE }}
       TEST_GENDER: ${{ secrets.TEST_GENDER }}
       TEST_DATE_OF_BIRTH: ${{ secrets.TEST_DATE_OF_BIRTH }}
-      TEST_IS_PARENT: ${{ secrets.TEST_IS_PARENT }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
