@@ -145,8 +145,8 @@ authenticate_docs = ApiDocs(
         },
         422: {
             "description": (
-                "Unprocessable Entity - PESU Academy's profile response could not be parsed, or had no STUDENT_INFO, "
-                "which means their API changed. Only when the profile was requested."
+                "Unprocessable Entity - PESU Academy's profile response could not be parsed, or reported success "
+                "without any STUDENT_INFO, which means their API changed. Only when the profile was requested."
             ),
             "model": ResponseModel,
             "content": {

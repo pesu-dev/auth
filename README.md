@@ -165,14 +165,14 @@ the string `"true"` for `profile`), an unknown key, an empty `fields` list, or a
 
 #### Responses
 
-| **Code** | **When**                                                                                                                                          |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `200`    | The credentials are valid. `profile` is included if it was requested                                                                              |
-| `400`    | The request body failed validation, as described above                                                                                            |
-| `401`    | PESU Academy rejected the credentials: a wrong password, or a user that does not exist                                                            |
-| `422`    | PESU Academy's profile response could not be parsed, or had no `STUDENT_INFO`, which means their API changed. Only when the profile was requested |
-| `500`    | An unexpected failure, rendered by the catch-all handler                                                                                          |
-| `502`    | PESU Academy could not be reached, timed out, or answered the login or profile request unexpectedly                                               |
+| **Code** | **When**                                                                                                                                                                |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200`    | The credentials are valid. `profile` is included if it was requested                                                                                                    |
+| `400`    | The request body failed validation, as described above                                                                                                                  |
+| `401`    | PESU Academy rejected the credentials: a wrong password, or a user that does not exist                                                                                  |
+| `422`    | PESU Academy's profile response could not be parsed, or reported success without any `STUDENT_INFO`, which means their API changed. Only when the profile was requested |
+| `500`    | An unexpected failure, rendered by the catch-all handler                                                                                                                |
+| `502`    | PESU Academy could not be reached, timed out, or answered the login or profile request unexpectedly                                                                     |
 
 Every error this API renders carries the same `{status, message, timestamp}` body, with `status` set to `false`. The
 only exceptions are an unknown path or an unsupported method, which get the framework's own `404` or `405` with a
