@@ -79,6 +79,7 @@ Please provide a concise summary of the changes:
 - [ ] `app/models/request.py` – Input validation or request schema changes
 - [ ] `app/models/response.py` – Authentication response formatting
 - [ ] `app/models/profile.py` – Profile response schema
+- [ ] `app/models/upstream.py` – Parsing of PESU Academy's login and profile responses
 
 ### 🐳 DevOps & Config
 
