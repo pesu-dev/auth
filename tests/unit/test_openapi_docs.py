@@ -271,12 +271,11 @@ def test_the_readme_documents_every_profile_field(schema):
     rows = re.findall(r"^\| `(\w+)` +\| `(\w+)` +\|", section, flags=re.MULTILINE)
     assert [field for field, _ in rows] == PESUAcademy.DEFAULT_FIELDS
 
-    json_types = {"str": "string", "int": "integer", "bool": "boolean"}
+    json_types = {"str": "string", "int": "integer"}
     properties = schema["components"]["schemas"]["ProfileModel"]["properties"]
     for field, readme_type in rows:
         schema_types = {option.get("type") for option in properties[field]["anyOf"]} - {"null"}
         assert schema_types == {json_types[readme_type]}, f"{field} is typed differently in the README"
-
 
 
 def test_each_documented_field_request_has_a_matching_response(schema):
