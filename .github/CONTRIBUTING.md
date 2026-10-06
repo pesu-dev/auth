@@ -330,11 +330,11 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
 Every pull request raises `version` in `pyproject.toml` by exactly one step from `dev`'s, once for the whole pull
 request, and runs `uv lock` so `uv.lock` records the same version. From `4.18.0`, that is one of:
 
-| Bump  | Next version | Use for…                                        |
-| ----- | ------------ | ----------------------------------------------- |
-| minor | `4.19.0`     | The default, whatever the change                |
-| patch | `4.18.1`     | A fix that changes no behaviour callers rely on |
-| major | `5.0.0`      | A backwards-incompatible API or schema change   |
+| Bump  | Next version | Use for…                                                                                 |
+| ----- | ------------ | ---------------------------------------------------------------------------------------- |
+| minor | `4.19.0`     | The default, whatever the change                                                         |
+| patch | `4.18.1`     | A post-merge fix: something that belonged in the last merged pull request but was missed |
+| major | `5.0.0`      | A backwards-incompatible API or schema change                                            |
 
 The *Version check* in CI fails on anything else: an unchanged version, a skipped one such as `4.20.0`, or one that
 does not reset the numbers to its right, such as `4.19.1`.
