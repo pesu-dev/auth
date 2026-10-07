@@ -190,6 +190,21 @@ def test_client_error_is_logged_without_a_traceback(client, caplog):
     assert all(r.exc_info is None for r in records)
 
 
+def test_an_errors_detail_is_logged_but_never_returned(client, caplog):
+    """The detail names the user and what PESU answered; the caller only ever sees the documented message."""
+    error = UpstreamError(detail="PESU Academy answered the login for user=user with status 503.")
+    assert str(error) == "UpstreamError: PESU Academy answered the login for user=user with status 503."
+    assert str(UpstreamError()) == f"UpstreamError: {UpstreamError().message}"
+
+    with patch("app.app.pesu_academy.authenticate") as mock_authenticate:
+        mock_authenticate.side_effect = error
+        with caplog.at_level("ERROR"):
+            response = client.post("/authenticate", json={"username": "user", "password": "pass"})
+
+    assert response.json()["message"] == UpstreamError().message
+    assert "UpstreamError: PESU Academy answered the login for user=user with status 503." in caplog.text
+
+
 def test_server_error_is_logged_with_a_traceback(client, caplog):
     """A 5xx is genuinely our problem or the upstream's, so it keeps the stack trace."""
     with patch("app.app.pesu_academy.authenticate") as mock_authenticate:

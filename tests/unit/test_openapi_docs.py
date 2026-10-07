@@ -21,6 +21,7 @@ from app.exceptions.authentication import (
 from app.models import MetricsModel, ProfileModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
+
 @pytest.fixture(scope="module")
 def schema():
     app.openapi_schema = None
@@ -290,6 +291,7 @@ def test_each_documented_field_request_has_a_matching_response(schema):
 @pytest.mark.parametrize(
     ("code", "errors"),
     [
+        (401, (AuthenticationError,)),
         (422, (ProfileParseError,)),
         (502, (UpstreamError, ProfileFetchError)),
     ],

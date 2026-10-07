@@ -13,10 +13,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.app import app
-from app.exceptions.authentication import ProfileFetchError, ProfileParseError, UpstreamError
+from app.exceptions.authentication import AuthenticationError, ProfileFetchError, ProfileParseError, UpstreamError
 from app.metrics.collector import MetricsCollector
 from app.models import ResponseModel
 from app.pesu import DISPATCHER_URL, LOGIN_URL
+
 
 @pytest.fixture
 def collector(monkeypatch):
@@ -131,7 +132,8 @@ def test_rejected_credentials(client, wire, make_response, collector, assert_err
 
     body = assert_error_body(_authenticate(client, profile=True), 401)
 
-    assert body["message"] == "Invalid username or password, or user does not exist for user=user."
+    # The documented message, not the log's detail
+    assert body["message"] == "Invalid username or password, or user does not exist."
     metrics = client.get("/metrics?fmt=json").json()
     assert metrics["errorsByType"] == {"AuthenticationError": 1}
     assert metrics["upstream"]["login"]["responsesByStatus"] == {"401": 1}
@@ -195,13 +197,62 @@ def test_nothing_secret_is_logged_or_returned(client, pesu_up, secrets, caplog):
         assert secret not in response.text
 
 
-def test_the_upstream_error_text_is_not_forwarded(client, wire, caplog, assert_error_body):
+def test_the_upstream_error_text_is_not_forwarded(client, wire, assert_error_body):
     """A caller learns that PESU failed, not what PESU said."""
     wire.routes[LOGIN_URL] = lambda request: httpx2.Response(500, content=b"Stack trace: internal-detail-xyz")
 
     body = assert_error_body(_authenticate(client), 502)
 
     assert "internal-detail-xyz" not in body["message"]
+
+
+@pytest.mark.parametrize(
+    ("scenario", "error", "status", "logged"),
+    [
+        ("rejected", AuthenticationError, 401, "user=user"),
+        ("login 503", UpstreamError, 502, "with status 503"),
+        ("login not json", UpstreamError, 502, "unexpected login response"),
+        ("profile 503", ProfileFetchError, 502, "with status 503"),
+        ("profile declined", ProfileFetchError, 502, "did not return a profile"),
+        ("profile error envelope", ProfileFetchError, 502, "with error status 400"),
+        ("profile unparseable", ProfileParseError, 422, "Failed to parse the profile response"),
+    ],
+)
+def test_a_real_failure_answers_with_the_documented_message(
+    client, pesu_up, profile_payload, caplog, assert_error_body, scenario, error, status, logged
+):
+    """The caller gets the fixed message the docs show; the specifics go only to the log.
+
+    Driven through real PESU responses rather than a mocked authenticate, so the message is the one a
+    caller actually receives.
+    """
+    replies = {
+        "rejected": (LOGIN_URL, lambda request: httpx2.Response(401, json={"statusCode": 401})),
+        "login 503": (LOGIN_URL, lambda request: httpx2.Response(503)),
+        "login not json": (LOGIN_URL, lambda request: httpx2.Response(200, content=b"<html></html>")),
+        "profile 503": (DISPATCHER_URL, lambda request: httpx2.Response(503)),
+        "profile declined": (
+            DISPATCHER_URL,
+            lambda request: httpx2.Response(200, json={"MESSAGE": "FAILURE_Record not found"}),
+        ),
+        "profile error envelope": (
+            DISPATCHER_URL,
+            lambda request: httpx2.Response(200, json={"status": 400, "message": "Invalid request"}),
+        ),
+        "profile unparseable": (DISPATCHER_URL, lambda request: httpx2.Response(200, content=b"<html></html>")),
+    }
+    url, reply = replies[scenario]
+    pesu_up.routes[url] = reply
+
+    with caplog.at_level("WARNING"):
+        body = assert_error_body(_authenticate(client, profile=True), status)
+
+    assert body["message"] == error().message
+    assert "user=" not in body["message"]
+    # Still traceable in the log, which names the user and says what PESU answered
+    record = next(r for r in caplog.records if r.getMessage().startswith(f"{error.__name__}: "))
+    assert "user=user" in record.getMessage()
+    assert logged in record.getMessage()
 
 
 def test_personal_details_are_in_the_default_profile(client, pesu_up):

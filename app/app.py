@@ -171,10 +171,12 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
     # Severity follows the status code. A 4xx is an expected outcome -- a wrong password is the
     # API working correctly -- and logging one at ERROR with a traceback both buries real faults
     # and pages whoever alerts on the error rate. Only 5xx gets a stack trace.
+    # The detail, where there is one, is for the log only: it names the user and says what PESU
+    # Academy answered. The caller gets the fixed message the API documents.
     if exc.status_code < 500:
-        logging.warning(f"{type(exc).__name__}: {exc.message}")
+        logging.warning(f"{type(exc).__name__}: {exc.detail or exc.message}")
     else:
-        logging.exception(f"{type(exc).__name__}: {exc.message}")
+        logging.exception(f"{type(exc).__name__}: {exc.detail or exc.message}")
     return JSONResponse(
         status_code=exc.status_code,
         content={

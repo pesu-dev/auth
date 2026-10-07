@@ -341,12 +341,12 @@ A few definitions that are easy to assume wrongly:
 
 **Authentication**
 
-| Metric                                   | Meaning                                                                                                                                                                                                                                                                                           |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication_requests_total{profile}` | Authentication requests, split by whether profile data was asked for                                                                                                                                                                                                                              |
-| `authentication_results_total{result}`   | Attempts by outcome: `success` or `failure`. Deliberately only those two — `errors_total` already names the exception class, and recording the reason here too would put one fact in two places. This family exists for the login **success rate**, where success and failure share a denominator |
-| `profile_field_filtering_total{enabled}` | Profile fetches, split by whether the caller narrowed the returned fields. Recorded where the branch is taken, so a caller passing exactly the default list counts as `false`                                                                                                                     |
-| `profile_parse_errors_total{reason}`     | Profile response problems by what broke: `response_structure` (the response could not be parsed, a `422`) or `unknown_campus_code` (a campus name with no known campus code). These mean PESU Academy's API changed                                                                               |
+| Metric                                   | Meaning                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `authentication_requests_total{profile}` | Authentication requests, split by whether profile data was asked for                                                                                                                                                                                                                                                           |
+| `authentication_results_total{result}`   | Attempts by outcome: `success` or `failure`. Deliberately only those two — `errors_total` already names the exception class, and recording the reason here too would put one fact in two places. This family exists for the login **success rate**, where success and failure share a denominator                              |
+| `profile_field_filtering_total{enabled}` | Profile fetches, split by whether the caller narrowed the returned fields. Recorded where the branch is taken, so a caller passing exactly the default list counts as `false`                                                                                                                                                  |
+| `profile_parse_errors_total{reason}`     | Profile response problems by what broke: `response_structure` (the response could not be parsed, a `422`) or `unknown_campus_code` (a campus name with no known campus code). `response_structure` means PESU Academy's API changed; `unknown_campus_code` usually means a new campus, or a new way of writing a campus's name |
 
 **Upstream (PESU Academy)**
 
@@ -762,8 +762,8 @@ curl -X POST http://localhost:5000/authenticate \
 #### Requesting specific fields
 
 Pass `fields` to receive only some of the profile, in any order; they come back in the order of the table above. A
-requested field that the user has no value for is `null` — here, a student who is no longer in a class and has no
-middle name.
+requested field that the user has no value for is `null` — here, a student who has graduated and has no middle
+name.
 
 ```bash
 curl -X POST http://localhost:5000/authenticate \

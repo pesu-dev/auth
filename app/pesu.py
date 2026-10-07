@@ -254,15 +254,17 @@ class PESUAcademy:
                 response = await client.post(LOGIN_URL, files=_multipart(form), headers=MOBILE_HEADERS)
                 sink.append(response)
         except httpx2.HTTPError as e:
-            raise UpstreamError(f"Could not reach PESU Academy to log in user={username}.") from e
+            raise UpstreamError(detail=f"Could not reach PESU Academy to log in user={username}.") from e
 
         # Wrong credentials and unknown users both come back as a 401 with
         # {"statusCode": 401, "statusDescription": "Invalid Login Credentials"}
         if response.status_code == 401:
-            raise AuthenticationError(f"Invalid username or password, or user does not exist for user={username}.")
+            raise AuthenticationError(
+                detail=f"Invalid username or password, or user does not exist for user={username}."
+            )
         if response.status_code != 200:
             raise UpstreamError(
-                f"PESU Academy answered the login for user={username} with status {response.status_code}.",
+                detail=f"PESU Academy answered the login for user={username} with status {response.status_code}.",
             )
 
         try:
@@ -270,14 +272,14 @@ class PESUAcademy:
         except ValidationError as e:
             logging.warning(f"Unexpected login response for user={username}: {_validation_failure_summary(e)}")
             # from None: the chained error would quote the response, which is personal data
-            raise UpstreamError(f"PESU Academy sent an unexpected login response for user={username}.") from None
+            raise UpstreamError(detail=f"PESU Academy sent an unexpected login response for user={username}.") from None
 
         # Rejected credentials have only ever been seen as an HTTP 401, handled above. A 200 that does not
         # say SUCCESS -- whether the marker is missing or holds anything else -- is a response nobody has
         # seen, so it is reported as PESU's failure. Calling it a wrong password would tell every user
         # their credentials are bad, and hide an upstream change as 4xx noise.
         if login.user.login != "SUCCESS":
-            raise UpstreamError(f"PESU Academy did not report a successful login for user={username}.")
+            raise UpstreamError(detail=f"PESU Academy did not report a successful login for user={username}.")
         return login
 
     async def _fetch_profile(self, client: httpx2.AsyncClient, access_token: str, username: str) -> Student:
@@ -301,11 +303,15 @@ class PESUAcademy:
                 response = await client.post(DISPATCHER_URL, files=_multipart(PROFILE_FORM), headers=headers)
                 sink.append(response)
         except httpx2.HTTPError as e:
-            raise ProfileFetchError(f"Could not reach PESU Academy to fetch the profile of user={username}.") from e
+            raise ProfileFetchError(
+                detail=f"Could not reach PESU Academy to fetch the profile of user={username}."
+            ) from e
 
         if response.status_code != 200:
             raise ProfileFetchError(
-                f"PESU Academy answered the profile request for user={username} with status {response.status_code}.",
+                detail=(
+                    f"PESU Academy answered the profile request for user={username} with status {response.status_code}."
+                ),
             )
 
         try:
@@ -315,19 +321,19 @@ class PESUAcademy:
             # read: a 502 like the login's, rather than the 422 that means their API has changed
             if (status := _error_envelope_status(response.content)) is not None:
                 raise ProfileFetchError(
-                    f"PESU Academy answered the profile request for user={username} with error status {status}.",
+                    detail=f"PESU Academy answered the profile request for user={username} with error status {status}.",
                 ) from None
             self._metrics.increment(PROFILE_PARSE_ERRORS, reason="response_structure")
             logging.warning(f"Unexpected profile response for user={username}: {_validation_failure_summary(e)}")
             # from None: the chained error would quote the response, which is personal data
             raise ProfileParseError(
-                f"Failed to parse the profile response from PESU Academy for user={username}.",
+                detail=f"Failed to parse the profile response from PESU Academy for user={username}.",
             ) from None
 
         # Anything but success is PESU declining to answer, which is their failure to serve the profile
         # rather than a response we cannot read, whether or not it describes a student.
         if not parsed.succeeded:
-            raise ProfileFetchError(f"PESU Academy did not return a profile for user={username}.")
+            raise ProfileFetchError(detail=f"PESU Academy did not return a profile for user={username}.")
         return parsed.student()
 
     def _campus_code(self, campus: str | None, username: str) -> int | None:
@@ -412,7 +418,11 @@ class PESUAcademy:
             and optionally the profile information.
 
         Raises:
-            UpstreamError: If the login response had no token to fetch the profile with.
+            AuthenticationError: If PESU Academy rejected the credentials.
+            UpstreamError: If PESU Academy could not be reached to log in or returned an unexpected response to
+                the login, or the login gave no token to fetch the profile with.
+            ProfileFetchError: If the profile could not be fetched, or PESU Academy declined to serve it.
+            ProfileParseError: If the profile response did not have the expected shape.
         """
         # Default fields to fetch if fields is not provided
         fields = self.DEFAULT_FIELDS if fields is None else fields
@@ -437,7 +447,7 @@ class PESUAcademy:
             if profile:
                 logging.info(f"Profile data requested for user={username}. Fetching profile data...")
                 if login.access_token is None:
-                    raise UpstreamError(f"PESU Academy sent no access token for user={username}.")
+                    raise UpstreamError(detail=f"PESU Academy sent no access token for user={username}.")
                 student = await self._fetch_profile(client, login.access_token, username)
                 result["profile"] = self._build_profile(student, username)
                 logging.info(f"Complete profile information retrieved for user={username}: {result['profile']}.")

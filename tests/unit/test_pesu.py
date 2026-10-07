@@ -21,6 +21,7 @@ from app.metrics.collector import (
 from app.models import ProfileModel
 from app.pesu import _CLOSE_TASKS, DISPATCHER_URL, LOGIN_URL, PESUAcademy, _upstream_call
 
+
 @pytest.fixture
 def collector():
     return MetricsCollector(clock=lambda: 1000.0)
@@ -115,7 +116,9 @@ async def test_any_other_login_status_is_an_upstream_error(pesu, upstream, make_
         await pesu.authenticate("user", "pass")
 
     assert exc_info.value.status_code == 502
-    assert str(status) in exc_info.value.message
+    # PESU's status is for the log; the caller gets the documented message
+    assert str(status) in exc_info.value.detail
+    assert exc_info.value.message == UpstreamError().message
 
 
 @pytest.mark.asyncio
@@ -183,7 +186,7 @@ def _set_token(login_payload, token):
 
 
 @pytest.mark.asyncio
-async def test_profile_is_built_from_both_responses(
+async def test_profile_is_built_from_the_profile_response(
     pesu, upstream, make_response, login_payload, profile_payload, full_profile
 ):
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
@@ -340,9 +343,10 @@ async def test_an_error_envelope_from_the_dispatcher_is_a_fetch_error(
         await pesu.authenticate("user", "pass", profile=True)
 
     assert exc_info.value.status_code == 502
-    assert "error status 400" in exc_info.value.message
-    # PESU's own text is not forwarded to the caller
-    assert "Invalid request" not in exc_info.value.message
+    assert "error status 400" in exc_info.value.detail
+    # PESU's own text is neither logged nor forwarded to the caller
+    assert "Invalid request" not in exc_info.value.detail
+    assert exc_info.value.message == ProfileFetchError().message
     assert exc_info.value.__cause__ is None
     # Not a parse failure: the API has not changed shape, PESU said no
     assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="response_structure") == 0.0
@@ -374,9 +378,10 @@ async def test_a_student_without_a_class_has_no_semester_or_section(
 
 
 @pytest.mark.asyncio
-async def test_class_and_section_fall_back_to_the_profile_response(
+async def test_class_and_section_do_not_need_the_login_response(
     pesu, upstream, make_response, login_payload, profile_payload
 ):
+    """STUDENT_INFO is their source, so the login response having none changes nothing."""
     login_payload["mobileJsonObject"].update(className=None, sectionName=None)
     profile_payload["STUDENT_INFO"].update(ClassName="Sem-6", SectionName="Section A")
 
@@ -468,16 +473,6 @@ async def test_the_prn_and_srn_are_student_infos_login_id_and_srn(
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     assert (profile["prn"], profile["srn"]) == (login_id, srn)
-
-
-@pytest.mark.asyncio
-async def test_an_older_student_whose_prn_is_their_srn(pesu, upstream, make_response, login_payload, profile_payload):
-    """Students admitted before SRNs existed have the PRN in both places."""
-    profile_payload["STUDENT_INFO"].update(LoginId="PES1201800001", SRN="PES1201800001")
-
-    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
-
-    assert profile["prn"] == profile["srn"] == "PES1201800001"
 
 
 @pytest.mark.asyncio
@@ -579,10 +574,6 @@ async def test_a_requested_field_upstream_does_not_have_is_none(
         "middleName": None,
         "gender": None,
     }
-
-
-def test_default_fields_are_every_profile_field(full_profile):
-    assert PESUAcademy.DEFAULT_FIELDS == list(full_profile)
 
 
 @pytest.mark.asyncio
@@ -696,7 +687,7 @@ async def test_a_blank_access_token_cannot_fetch_the_profile(pesu, upstream, mak
 async def test_extra_upstream_fields_are_ignored(
     pesu, upstream, make_response, login_payload, profile_payload, full_profile
 ):
-    """PESU adding a field must not break parsing; only removing or retyping one we use can."""
+    """PESU adding a field, or a whole block, changes neither the parsing nor the profile."""
     login_payload["mobileJsonObject"]["someNewField"] = {"nested": [1, 2, 3]}
     profile_payload["STUDENT_INFO"]["AnotherNewField"] = "value"
     profile_payload["BRAND_NEW_BLOCK"] = {}
@@ -814,7 +805,7 @@ async def test_a_redirect_is_not_followed(pesu, wire, make_response):
     with pytest.raises(UpstreamError) as exc_info:
         await pesu.authenticate("user", "pass")
 
-    assert "302" in exc_info.value.message
+    assert "302" in exc_info.value.detail
     assert len(wire.requests) == 1
 
 

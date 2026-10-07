@@ -284,11 +284,11 @@ run it alongside the live tests.
 - Put assertions about an exception after its `with pytest.raises(...)` block, not inside it, where
   they never run
 - Adding a profile field? Give it a `TEST_*` variable in `.env.example` and in `PROFILE_VARIABLES` in
-  `tests/conftest.py`, so the live tests compare it with the test account's real value (list it in
-  `INTEGER_FIELDS` there if it is an integer; a unit test fails until every
-  field has one), and ask a maintainer to add the matching repository secret, which
-  `.github/workflows/ci_checks.yml` passes to the test job. Document it in the README's
-  `ProfileObject` table and in `ProfileModel`, whose descriptions become the Swagger docs
+  `tests/conftest.py`, so the live tests compare it with the test account's real value; a unit test
+  fails until every field has one. If the field is an integer, also list it in `INTEGER_FIELDS` there.
+  Ask a maintainer to add the matching repository secret, which `.github/workflows/ci_checks.yml`
+  passes to the test job. Document the field in the README's `ProfileObject` table and in
+  `ProfileModel`, whose descriptions become the Swagger docs
 
 ## 🚀 Submitting Changes
 
@@ -394,6 +394,9 @@ To keep the codebase clean and maintainable, please follow these conventions:
 - Avoid large functions; keep logic modular and composable
 - Use Python 3.14+ syntax when appropriate (e.g., `match`, `|` union types)
 - Keep imports sorted and remove unused ones (handled automatically via `ruff`)
+- Report a failure by raising a `PESUAcademyError` subclass. Its `message` is what the caller receives, so keep it
+  to the fixed text the API documents; put the specifics, such as the username or what PESU Academy answered, in
+  `detail=`, which only the log sees
 
 ### 📝 Docstrings & Comments
 

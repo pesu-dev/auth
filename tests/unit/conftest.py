@@ -112,7 +112,7 @@ PROFILE_PAYLOAD = {
     "STUDENT_CGPA_DETAILS": [{"USN": "PES2UG25CS001", "CGPA": "CGPASECRET"}],
 }
 
-# The profile PESUAcademy builds from LOGIN_PAYLOAD and PROFILE_PAYLOAD
+# The profile PESUAcademy builds from PROFILE_PAYLOAD; LOGIN_PAYLOAD only supplies the token for the profile call
 FULL_PROFILE = {
     "name": "JOHN DOE",
     "prn": "PES2202500001",

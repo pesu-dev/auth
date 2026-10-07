@@ -192,7 +192,11 @@ def test_validate_snake_case_fields_rejected(field):
 
 @pytest.mark.parametrize("field", ["bloodGroup", "photo", "profilePicture", "programShortCode", "phone", "institute", "rollNumber"])
 def test_validate_fields_the_api_does_not_return_rejected(field):
-    """Data in PESU's response that the API deliberately does not return cannot be requested."""
+    """Neither what PESU sends but this API does not return, nor a field this API no longer returns, can be requested.
+
+    PESU sends a blood group, a photo and a profile picture; programShortCode, phone, institute and rollNumber are
+    fields this API returned before 5.0.0.
+    """
     with pytest.raises(ValidationError) as exc_info:
         RequestModel(username="testuser", password="testpass", fields=[field])
     assert any(e["type"] == "literal_error" for e in exc_info.value.errors())

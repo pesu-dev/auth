@@ -406,7 +406,7 @@ def test_integration_authenticate_snake_case_fields_rejected(client, field):
 
 @pytest.mark.parametrize("field", ["bloodGroup", "photo", "profilePicture", "programShortCode", "phone", "institute", "rollNumber"])
 def test_integration_authenticate_fields_the_api_does_not_return_rejected(client, field):
-    """PESU sends these, but the API does not return them, so asking for one is a 400."""
+    """PESU sends some of these and this API returned the others before 5.0.0; none is returned now, so asking is a 400."""
     payload = {"username": "username", "password": "password", "profile": True, "fields": [field]}
 
     response = client.post("/authenticate", json=payload)

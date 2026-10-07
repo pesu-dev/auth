@@ -7,6 +7,7 @@ import pytest
 
 from scripts import run_tests
 
+
 @pytest.fixture(autouse=True)
 def environment(monkeypatch, credential_variables):
     """Start every test with no credentials and outside GitHub Actions.
@@ -95,12 +96,11 @@ def test_a_runner_failure_is_exit_code_1(pytest_run, caplog, error):
     assert caplog.records[-1].levelname == "ERROR"
 
 
-def test_the_coverage_gate_lives_in_pyproject():
+def test_the_coverage_gate_lives_in_pyproject(repository_root):
     """The 100% gate and what it measures are configured once, in pyproject.toml, not here."""
     import tomllib
-    from pathlib import Path
 
-    config = tomllib.loads(Path("pyproject.toml").read_text())["tool"]["coverage"]
+    config = tomllib.loads((repository_root / "pyproject.toml").read_text())["tool"]["coverage"]
     assert config["report"]["fail_under"] == 100
     assert config["run"]["branch"] is True
     assert set(config["run"]["source"]) == {"app", "scripts", ".github/scripts"}

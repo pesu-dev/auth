@@ -18,6 +18,7 @@ from app.exceptions.metrics import MetricsAuthorizationError
 from app.metrics.auth import _configured_token, require_metrics_token
 from app.metrics.collector import MetricsCollector
 
+
 @pytest.fixture
 def client(monkeypatch):
     """A client with a fresh collector and no token configured."""

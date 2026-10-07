@@ -4,6 +4,7 @@ import pytest
 
 from scripts.sync_agents import AGENTS_PATH, REPO_ROOT, ROLES_PATH, main, read_frontmatter, sync_agents
 
+
 @pytest.fixture
 def roles_dir(tmp_path: Path, agent_frontmatter) -> Path:
     roles = tmp_path / "roles"
