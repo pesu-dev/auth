@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import (
     BaseModel,
@@ -19,6 +18,22 @@ from pydantic import (
 # What upstream sends for a value it does not have. "NA" is what the web portal showed for a student
 # with no current class; it is a placeholder, not a value, so it is treated like a missing one.
 MISSING_VALUES = frozenset({"", "NA"})
+# The key in a validation context under which the validators below list the fields they set to None
+UNEXPECTED_FIELDS = "unexpected_fields"
+
+
+def _note_unexpected(info: ValidationInfo, name: str) -> None:
+    """Record that a field was set to None for an unexpected shape, if the caller asked to be told.
+
+    The models cannot reach the metrics collector or name the user, so they record the field here and
+    PESUAcademy, which can do both, reports it.
+
+    Args:
+        info (ValidationInfo): The validation in progress, whose context holds the list to record into.
+        name (str): The field, named as PESU names it, such as "STUDENT_INFO.SRN". Never its value.
+    """
+    if isinstance(info.context, dict) and isinstance(found := info.context.get(UNEXPECTED_FIELDS), list):
+        found.append(name)
 
 
 class UpstreamModel(BaseModel):
@@ -58,7 +73,37 @@ class UpstreamDetails(UpstreamModel):
 
     A field PESU sends in an unexpected shape is null, like one it sends no value for, and the rest of
     the profile still comes back: one changed field does not fail every login that asks for a profile.
+
+    Attributes:
+        BLOCK (str): The name of the block in PESU's response, for naming its fields in logs.
     """
+
+    BLOCK: ClassVar[str]
+
+    @classmethod
+    def pesu_name(cls, field_name: str) -> str:
+        """Name a field as PESU does, with its block, such as "STUDENT_INFO.SRN".
+
+        Args:
+            field_name (str): The field's name on the model.
+
+        Returns:
+            str: The block and the key PESU sends the field under.
+        """
+        return f"{cls.BLOCK}.{cls.model_fields[field_name].alias or field_name}"
+
+    @classmethod
+    def missing_fields(cls, block: UpstreamDetails | None) -> list[str]:
+        """List the fields PESU did not send at all, as opposed to sending without a value.
+
+        Args:
+            block (UpstreamDetails | None): The parsed block, or None if the response had no such block.
+
+        Returns:
+            list[str]: Each absent field, named as PESU names it.
+        """
+        sent = block.model_fields_set if block is not None else set()
+        return [cls.pesu_name(name) for name in cls.model_fields if name not in sent]
 
     @field_validator("*", mode="wrap")
     @classmethod
@@ -77,7 +122,7 @@ class UpstreamDetails(UpstreamModel):
             return handler(value)
         except ValidationError:
             # The field's name only: the value is from a response full of personal data
-            logging.warning(f"Ignored an unexpected value for {info.field_name} in a PESU Academy response.")
+            _note_unexpected(info, cls.pesu_name(info.field_name))
             return None
 
 
@@ -88,6 +133,8 @@ class LoginUser(UpstreamDetails):
     response's copies of the same details (some of them partial: its "name" is the first name only)
     are never mixed into it.
     """
+
+    BLOCK = "mobileJsonObject"
 
     login: str | None = None
 
@@ -101,7 +148,12 @@ class LoginResponse(UpstreamModel):
 
     @field_validator("access_token", mode="wrap")
     @classmethod
-    def _no_token_if_invalid(cls, value: Any, handler: ValidatorFunctionWrapHandler) -> str | None:  # noqa: ANN401
+    def _no_token_if_invalid(
+        cls,
+        value: Any,  # noqa: ANN401
+        handler: ValidatorFunctionWrapHandler,
+        info: ValidationInfo,
+    ) -> str | None:
         """Treat a token of an unexpected shape as a missing one.
 
         Only a profile request needs the token, and it reports a missing one as a 502. Failing the
@@ -110,6 +162,7 @@ class LoginResponse(UpstreamModel):
         Args:
             value (Any): The raw value from the response.
             handler (ValidatorFunctionWrapHandler): The field's own validation.
+            info (ValidationInfo): The validation in progress.
 
         Returns:
             str | None: The token, or None if it did not validate.
@@ -118,7 +171,7 @@ class LoginResponse(UpstreamModel):
             return handler(value)
         except ValidationError:
             # Never the value: it would be a credential
-            logging.warning("Ignored an unexpected value for access_token in a PESU Academy response.")
+            _note_unexpected(info, "accessToken")
             return None
 
 
@@ -128,6 +181,8 @@ class StudentInfo(UpstreamDetails):
     For students whose PRN and SRN differ, PESU sends the PRN as LoginId and the SRN as SRN; for students
     who joined before SRNs existed, both hold the same ID.
     """
+
+    BLOCK = "STUDENT_INFO"
 
     prn: str | None = Field(None, alias="LoginId")
     srn: str | None = Field(None, alias="SRN")
@@ -151,6 +206,8 @@ class StudentPhoto(UpstreamDetails):
     Named after the block PESU sends, as StudentInfo is after STUDENT_INFO. Besides the photo, the block
     carries the campus and gender; the photo itself is never read.
     """
+
+    BLOCK = "STUDENT_PHOTO"
 
     # The campus, named by its institute: "PES University (Ring Road)"
     campus: str | None = Field(None, alias="instituteName")
@@ -221,6 +278,17 @@ class ProfileResponse(UpstreamModel):
         if self.succeeded and not _has_values(self.info):
             raise ValueError("STUDENT_INFO holds no student data")
         return self
+
+    def missing_fields(self) -> list[str]:
+        """List the fields this service reads that PESU did not send at all, named as PESU names them.
+
+        A key PESU sends with no value ("", "NA" or null) is not missing: that is PESU having no value for
+        this student. A key that is absent means PESU stopped sending it, which is a change to its API.
+
+        Returns:
+            list[str]: The absent fields, such as "STUDENT_INFO.SRN".
+        """
+        return StudentInfo.missing_fields(self.info) + StudentPhoto.missing_fields(self.photo)
 
     def student(self) -> Student:
         """Gather the student from the blocks of the response.

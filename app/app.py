@@ -291,7 +291,7 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
       that is not in `ProfileModel` is a 400.
 
     Every requested profile field is in the response, and is `null` when PESU Academy has no value
-    for it or sends it in an unexpected shape.
+    for it, does not send it, or sends it in an unexpected shape.
     """
     current_time = datetime.datetime.now(IST)
     # Input has already been validated by the RequestModel

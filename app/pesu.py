@@ -28,7 +28,7 @@ from app.metrics.collector import (
     MetricsCollector,
 )
 from app.models.profile import ProfileField
-from app.models.upstream import ErrorEnvelope, LoginResponse, ProfileResponse, Student
+from app.models.upstream import UNEXPECTED_FIELDS, ErrorEnvelope, LoginResponse, ProfileResponse, Student
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Mapping
@@ -267,8 +267,9 @@ class PESUAcademy:
                 detail=f"PESU Academy answered the login for user={username} with status {response.status_code}.",
             )
 
+        unexpected: list[str] = []
         try:
-            login = LoginResponse.model_validate_json(response.content)
+            login = LoginResponse.model_validate_json(response.content, context={UNEXPECTED_FIELDS: unexpected})
         except ValidationError as e:
             logging.warning(f"Unexpected login response for user={username}: {_validation_failure_summary(e)}")
             # from None: the chained error would quote the response, which is personal data
@@ -278,6 +279,10 @@ class PESUAcademy:
         # say SUCCESS -- whether the marker is missing or holds anything else -- is a response nobody has
         # seen, so it is reported as PESU's failure. Calling it a wrong password would tell every user
         # their credentials are bad, and hide an upstream change as 4xx noise.
+        if unexpected:
+            logging.warning(
+                f"Ignored values of an unexpected shape in the login response for user={username}: {unexpected}"
+            )
         if login.user.login != "SUCCESS":
             raise UpstreamError(detail=f"PESU Academy did not report a successful login for user={username}.")
         return login
@@ -314,8 +319,9 @@ class PESUAcademy:
                 ),
             )
 
+        unexpected: list[str] = []
         try:
-            parsed = ProfileResponse.model_validate_json(response.content)
+            parsed = ProfileResponse.model_validate_json(response.content, context={UNEXPECTED_FIELDS: unexpected})
         except ValidationError as e:
             # PESU reporting an error is PESU failing to serve the profile, not a response we cannot
             # read: a 502 like the login's, rather than the 422 that means their API has changed
@@ -334,7 +340,27 @@ class PESUAcademy:
         # rather than a response we cannot read, whether or not it describes a student.
         if not parsed.succeeded:
             raise ProfileFetchError(detail=f"PESU Academy did not return a profile for user={username}.")
+        self._report_unread_fields("missing_field", parsed.missing_fields(), username)
+        self._report_unread_fields("unexpected_value", unexpected, username)
         return parsed.student()
+
+    def _report_unread_fields(self, reason: str, fields: list[str], username: str) -> None:
+        """Count and log the profile fields that are null because PESU did not send them as expected.
+
+        The caller only ever sees null, as for a student with no value. These are different: PESU did not
+        send the field at all, or sent it in a shape nobody has seen, which means its API changed. Counted
+        once per field, so a change shows up on the dashboard rather than as quietly missing data.
+
+        Args:
+            reason (str): "missing_field" for a field PESU did not send, "unexpected_value" for one it
+                sent in an unexpected shape.
+            fields (list[str]): The fields, named as PESU names them. Never their values.
+            username (str): The username of the user, for logging.
+        """
+        if not fields:
+            return
+        self._metrics.increment(PROFILE_PARSE_ERRORS, float(len(fields)), reason=reason)
+        logging.warning(f"Profile fields left null ({reason}) for user={username}: {fields}")
 
     def _campus_code(self, campus: str | None, username: str) -> int | None:
         """Get the campus code for a campus, named as PESU names it.

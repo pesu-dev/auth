@@ -187,13 +187,15 @@ def _set_token(login_payload, token):
 
 @pytest.mark.asyncio
 async def test_profile_is_built_from_the_profile_response(
-    pesu, upstream, make_response, login_payload, profile_payload, full_profile
+    pesu, upstream, make_response, login_payload, profile_payload, full_profile, collector
 ):
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     assert profile == full_profile
     # And it is something the response model accepts
     ProfileModel.model_validate(profile)
+    # A response with every field in place reports nothing missing or unreadable
+    assert list(collector.snapshot().samples(PROFILE_PARSE_ERRORS.name)) == []
 
 
 @pytest.mark.asyncio
@@ -642,6 +644,13 @@ async def test_an_unparseable_profile_logs_where_not_what(
         assert secret not in str(exc_info.value)
 
 
+def test_the_models_work_without_a_context_to_record_into():
+    """Parsed directly, outside PESUAcademy, a value of an unexpected shape is still null; nothing records it."""
+    from app.models.upstream import StudentInfo
+
+    assert StudentInfo.model_validate({"SRN": {"unexpected": True}}).srn is None
+
+
 @pytest.mark.asyncio
 async def test_parsed_login_does_not_expose_the_token_in_its_repr(login_payload):
     from app.models.upstream import LoginResponse
@@ -989,17 +998,21 @@ async def test_the_branch_code_is_not_taken_from_the_login(
 
 @pytest.mark.asyncio
 async def test_without_student_photo_there_is_no_campus_or_gender(
-    pesu, upstream, make_response, login_payload, profile_payload
+    pesu, upstream, make_response, login_payload, profile_payload, collector, caplog
 ):
     del profile_payload["STUDENT_PHOTO"]
     upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
 
-    result = await pesu.authenticate(
-        "user", "pass", profile=True, fields=["campusCode", "campus", "gender", "dateOfBirth"]
-    )
+    with caplog.at_level("WARNING"):
+        result = await pesu.authenticate(
+            "user", "pass", profile=True, fields=["campusCode", "campus", "gender", "dateOfBirth"]
+        )
 
     # The date of birth is in STUDENT_INFO
     assert result["profile"] == {"campusCode": None, "campus": None, "gender": None, "dateOfBirth": "2005-01-01"}
+    # Both of the block's fields were never sent
+    assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="missing_field") == 2.0
+    assert "['STUDENT_PHOTO.instituteName', 'STUDENT_PHOTO.gender']" in caplog.text
 
 
 def test_the_default_fields_are_every_field():
@@ -1057,7 +1070,18 @@ async def test_blocks_that_are_not_read_cannot_break_a_profile(
     ],
 )
 async def test_a_field_of_an_unexpected_shape_is_null(
-    pesu, upstream, make_response, login_payload, profile_payload, caplog, full_profile, block, key, value, fields
+    pesu,
+    upstream,
+    make_response,
+    login_payload,
+    profile_payload,
+    caplog,
+    collector,
+    full_profile,
+    block,
+    key,
+    value,
+    fields,
 ):
     """Every field is treated the same: only that field is null, and the rest of the profile still comes back."""
     profile_payload[block][key] = value
@@ -1066,9 +1090,70 @@ async def test_a_field_of_an_unexpected_shape_is_null(
         profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     assert profile == {**full_profile, **dict.fromkeys(fields)}
-    # The field is named in the log, but never its value
-    assert "Ignored an unexpected value" in caplog.text
+    # Counted, and the field is named in the log, but never its value
+    snapshot = collector.snapshot()
+    assert snapshot.value(PROFILE_PARSE_ERRORS.name, reason="unexpected_value") == 1.0
+    assert snapshot.value(PROFILE_PARSE_ERRORS.name, reason="missing_field") == 0.0
+    assert f"Profile fields left null (unexpected_value) for user=user: ['{block}.{key}']" in caplog.text
     assert "unexpected': True" not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("block", "key", "fields"),
+    [
+        ("STUDENT_INFO", "SRN", ["srn"]),
+        ("STUDENT_INFO", "ClassName", ["semester"]),
+        ("STUDENT_INFO", "DateOfBirth", ["dateOfBirth"]),
+        ("STUDENT_PHOTO", "instituteName", ["campusCode", "campus"]),
+        ("STUDENT_PHOTO", "gender", ["gender"]),
+    ],
+)
+async def test_a_field_pesu_does_not_send_is_null_and_counted(
+    pesu, upstream, make_response, login_payload, profile_payload, caplog, collector, full_profile, block, key, fields
+):
+    """To the caller it is null, as for a student with no value; to us it is PESU's API changing."""
+    del profile_payload[block][key]
+
+    with caplog.at_level("WARNING"):
+        profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert profile == {**full_profile, **dict.fromkeys(fields)}
+    snapshot = collector.snapshot()
+    assert snapshot.value(PROFILE_PARSE_ERRORS.name, reason="missing_field") == 1.0
+    assert snapshot.value(PROFILE_PARSE_ERRORS.name, reason="unexpected_value") == 0.0
+    assert f"Profile fields left null (missing_field) for user=user: ['{block}.{key}']" in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("empty", [None, "", "NA"])
+async def test_a_field_sent_without_a_value_is_null_but_not_counted(
+    pesu, upstream, make_response, login_payload, profile_payload, collector, empty
+):
+    """PESU sending a key with no value is PESU having no value for this student, not a change to its API."""
+    profile_payload["STUDENT_INFO"].update(ClassName=empty, SectionName=empty)
+    profile_payload["STUDENT_PHOTO"]["gender"] = empty
+
+    profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert (profile["semester"], profile["section"], profile["gender"]) == (None, None, None)
+    assert list(collector.snapshot().samples(PROFILE_PARSE_ERRORS.name)) == []
+
+
+@pytest.mark.asyncio
+async def test_unexpected_values_in_the_login_response_are_logged_by_name(
+    pesu, upstream, make_response, login_payload, caplog
+):
+    """A token of an unexpected shape is no token; the log names it, never its value."""
+    login_payload["accessToken"] = {"token": "TOKEN-VALUE-SECRET"}
+    upstream.side_effect = [make_response(json=login_payload)]
+
+    with caplog.at_level("WARNING"):
+        result = await pesu.authenticate("user", "pass")
+
+    assert result["status"] is True
+    assert "Ignored values of an unexpected shape in the login response for user=user: ['accessToken']" in caplog.text
+    assert "TOKEN-VALUE-SECRET" not in caplog.text
 
 
 @pytest.mark.asyncio

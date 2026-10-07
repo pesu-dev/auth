@@ -336,7 +336,10 @@ class MetricsModel(BaseModel):
     profile_parse_errors: dict[str, int] = Field(
         ...,
         title="Profile Parse Errors",
-        description="Profile response parse failures keyed by what could not be parsed or mapped.",
+        description=(
+            "Profile response problems keyed by reason: response_structure, unknown_campus_code, missing_field "
+            "or unexpected_value. The last two are counted once per field."
+        ),
         json_schema_extra={"example": {"unknown_campus_code": 3}},
     )
 

@@ -31,7 +31,7 @@ class ProfileModel(BaseModel):
     """The user's profile, returned after a successful login when it was requested.
 
     Only the fields below can be requested; any other name is a 400. Every requested field is present,
-    and is null when PESU Academy has no value for it or sends it in an unexpected shape.
+    and is null when PESU Academy has no value for it, does not send it, or sends it in an unexpected shape.
     """
 
     model_config = ConfigDict(strict=True, alias_generator=to_camel, populate_by_name=True)
