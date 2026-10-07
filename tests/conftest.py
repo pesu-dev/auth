@@ -8,7 +8,8 @@ load_dotenv()
 
 # In a TEST_* profile variable, "NA" stands for a value the test account does not have (it has
 # graduated, so no semester or section), which the API returns as null. A sentinel is needed
-# because GitHub secrets cannot be empty.
+# because GitHub secrets cannot be empty. It is this file's convention only: the API returns an "NA"
+# that PESU sends as text, so a test account whose real value is "NA" could not be described here.
 ABSENT = "NA"
 PROFILE_VARIABLES = {
     "name": "TEST_NAME",

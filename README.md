@@ -199,9 +199,10 @@ If the authentication fails, this field will not be present in the response.
 
 Only the fields in the table below can be requested; any other name in `fields` is a `400`. Every requested field is
 present, and **any field can be `null`** when PESU Academy has no value for it, does not send it, or sends it in an
-unexpected shape. For example, a student who has graduated has a `null` `semester` and `section`. A requested field is
-never left out for having no value; only the fields not asked for in `fields` are, and fields come back in the order of
-the table below.
+unexpected shape. For example, a student who has graduated has a `null` `semester` and `section`. PESU Academy marks a
+missing value with `null` or an empty string, and both become `null`; any other text, `"NA"` included, is returned as
+PESU Academy wrote it, with surrounding whitespace trimmed. A requested field is never left out for having no value;
+only the fields not asked for in `fields` are, and fields come back in the order of the table below.
 
 Every field is taken from the `STUDENT_INFO` block of PESU Academy's profile response, as PESU Academy sends it, except
 `campus` and `gender` (from `STUDENT_PHOTO`, since `STUDENT_INFO` does not have them) and `campusCode` (mapped from

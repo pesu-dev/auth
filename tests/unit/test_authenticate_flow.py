@@ -85,13 +85,22 @@ def test_a_login_with_the_full_profile(client, pesu_up, full_profile):
 
 def test_a_profile_with_missing_values_returns_null(client, pesu_up, profile_payload, full_profile):
     """What a graduated student looks like on the wire: every field present, the empty ones null."""
-    profile_payload["STUDENT_INFO"].update(ClassName=None, SectionName="NA")
+    profile_payload["STUDENT_INFO"].update(ClassName=None, SectionName=None)
 
     profile = _authenticate(client, profile=True).json()["profile"]
 
     assert list(profile) == list(full_profile)
     assert profile["semester"] is None
     assert profile["section"] is None
+
+
+def test_na_reaches_the_caller_as_text(client, pesu_up, profile_payload):
+    """Only null and "" mean no value; "NA" is text PESU sent, such as the surname Na in capitals."""
+    profile_payload["STUDENT_INFO"]["LastName"] = "NA"
+
+    profile = _authenticate(client, profile=True, fields=["lastName", "middleName"]).json()["profile"]
+
+    assert profile == {"middleName": None, "lastName": "NA"}
 
 
 def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payload, full_profile):

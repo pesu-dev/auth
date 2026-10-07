@@ -314,7 +314,7 @@ async def test_nothing_stands_in_for_a_value_student_info_lacks(
         # PESU sends {} for an empty block; with every field optional it must not pass as a student
         b'{"MESSAGE": "SUCCESS_Record found Successfully", "STUDENT_INFO": {}, "STUDENT_PHOTO": {}}',
         b'{"MESSAGE": "SUCCESS_Record found Successfully", "STUDENT_INFO": {"SomethingNew": "x"}}',
-        b'{"MESSAGE": "SUCCESS_Record found Successfully", "STUDENT_INFO": {"SRN": null, "Email": "NA"}}',
+        b'{"MESSAGE": "SUCCESS_Record found Successfully", "STUDENT_INFO": {"SRN": null, "Email": "  "}}',
         # Not PESU's error envelope: a status of 200 is not an error
         b'{"status": 200, "message": "OK"}',
     ],
@@ -408,7 +408,7 @@ async def test_the_semester_is_the_class_name_as_sent(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("class_name", ["", "   ", "NA", None])
+@pytest.mark.parametrize("class_name", ["", "   ", None])
 async def test_a_blank_class_name_has_no_semester(
     pesu, upstream, make_response, login_payload, profile_payload, class_name
 ):
@@ -420,14 +420,19 @@ async def test_a_blank_class_name_has_no_semester(
 
 
 @pytest.mark.asyncio
-async def test_na_placeholders_are_treated_as_missing(pesu, upstream, make_response, login_payload, profile_payload):
-    """The web portal printed "NA" for a student with no class; it is not a semester."""
-    profile_payload["STUDENT_INFO"].update(ClassName="NA", SectionName=" NA ")
+async def test_na_is_returned_as_sent(pesu, upstream, make_response, login_payload, profile_payload, collector):
+    """PESU's mobile API marks a missing value with null or "", never "NA", so "NA" is text like any other.
+
+    The web portal printed "NA" for a value it did not have; the mobile API does not. In a field this
+    service reads, "NA" would be real text: PESU stores names in capitals, so a student surnamed Na is "NA".
+    """
+    profile_payload["STUDENT_INFO"].update(LastName="NA", ClassName="NA", SectionName=" NA ")
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert profile["semester"] is None
-    assert profile["section"] is None
+    assert (profile["lastName"], profile["semester"], profile["section"]) == ("NA", "NA", "NA")
+    # Text PESU sent: neither missing nor of an unexpected shape
+    assert list(collector.snapshot().samples(PROFILE_PARSE_ERRORS.name)) == []
 
 
 @pytest.mark.asyncio
@@ -1126,7 +1131,7 @@ async def test_a_field_pesu_does_not_send_is_null_and_counted(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("empty", [None, "", "NA"])
+@pytest.mark.parametrize("empty", [None, "", "   "])
 async def test_a_field_sent_without_a_value_is_null_but_not_counted(
     pesu, upstream, make_response, login_payload, profile_payload, collector, empty
 ):

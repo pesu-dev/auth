@@ -15,9 +15,6 @@ from pydantic import (
     model_validator,
 )
 
-# What upstream sends for a value it does not have. "NA" is what the web portal showed for a student
-# with no current class; it is a placeholder, not a value, so it is treated like a missing one.
-MISSING_VALUES = frozenset({"", "NA"})
 # The key in a validation context under which the validators below list the fields they set to None
 UNEXPECTED_FIELDS = "unexpected_fields"
 
@@ -50,21 +47,22 @@ class UpstreamModel(BaseModel):
 
     @field_validator("*", mode="before")
     @classmethod
-    def _placeholder_to_none(cls, value: Any) -> Any:  # noqa: ANN401
-        """Treat a blank or placeholder string as a missing value.
+    def _blank_to_none(cls, value: Any) -> Any:  # noqa: ANN401
+        """Treat a blank string as a missing value.
 
-        Upstream sends "" (and the web portal sent "NA") as often as null for a value it does not
-        have, and all of them mean the same thing to a caller: null, not a string.
+        For a value it does not have, PESU sends either null or "" -- a student with no middle name gets
+        "" -- and both mean the same thing to a caller: null, not an empty string. Any other text is
+        returned as PESU wrote it, "NA" included: PESU's mobile API does not use it to mark a missing
+        value, so in a field this service reads it would be real text, such as a surname stored in capitals.
 
         Args:
             value (Any): The raw value from the response.
 
         Returns:
-            Any: The value stripped, or None if it was blank or a placeholder.
+            Any: The value stripped, or None if it was blank.
         """
         if isinstance(value, str):
-            value = value.strip()
-            return None if value in MISSING_VALUES else value
+            return value.strip() or None
         return value
 
 
@@ -282,7 +280,7 @@ class ProfileResponse(UpstreamModel):
     def missing_fields(self) -> list[str]:
         """List the fields this service reads that PESU did not send at all, named as PESU names them.
 
-        A key PESU sends with no value ("", "NA" or null) is not missing: that is PESU having no value for
+        A key PESU sends with no value ("" or null) is not missing: that is PESU having no value for
         this student. A key that is absent means PESU stopped sending it, which is a change to its API.
 
         Returns:
