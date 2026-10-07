@@ -1,6 +1,7 @@
 """Script to benchmark the PESUAuth API."""
 
 import argparse
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tqdm.auto import tqdm
@@ -86,49 +87,48 @@ def main() -> None:
 
     success = []
     times = []
+    # When each request started, in seconds from the start of the run. In a parallel run the requests
+    # overlap, so their latencies add up to far more than the run took; throughput has to come from
+    # when they started and finished instead.
+    starts = []
+    run_started = time.perf_counter()
+
+    def timed_request() -> tuple[dict, float, float]:
+        """Make one request, noting when it started.
+
+        Returns:
+            tuple[dict, float, float]: The response body, its latency, and when it started.
+        """
+        started = time.perf_counter() - run_started
+        response, elapsed = make_request(profile=profile, host=host, route=route, timeout=timeout)
+        return response, elapsed, started
+
     if parallel:
         print(
             f"Running benchmark with max {max_workers} workers and {num_requests} requests in parallel...",
         )
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [
-                executor.submit(
-                    make_request,
-                    profile=profile,
-                    host=host,
-                    route=route,
-                    timeout=timeout,
-                )
-                for _ in range(num_requests)
-            ]
+            futures = [executor.submit(timed_request) for _ in range(num_requests)]
             for future in as_completed(futures):
                 try:
-                    response, elapsed = future.result()
+                    response, elapsed, started = future.result()
                     times.append(elapsed)
+                    starts.append(started)
                     if verbose:
                         print(f"Response: {response}")
-                    if response.get("status"):
-                        success.append(1)
-                    else:
-                        success.append(0)
+                    success.append(1 if response.get("status") else 0)
                 except Exception as e:
                     print(f"Request failed: {e}")
     else:
         print(f"Running benchmark with {num_requests} requests sequentially...")
         for _ in tqdm(range(num_requests), desc="Processing requests"):
-            response, elapsed = make_request(
-                profile=profile,
-                host=host,
-                route=route,
-                timeout=timeout,
-            )
+            response, elapsed, started = timed_request()
             times.append(elapsed)
+            starts.append(started)
             if verbose:
                 print(f"Response: {response}")
-            if response.get("status"):
-                success.append(1)
-            else:
-                success.append(0)
+            success.append(1 if response.get("status") else 0)
+    elapsed_total = time.perf_counter() - run_started
 
     outfile = resolve_output_path(
         script_name="benchmark_requests",
@@ -139,15 +139,16 @@ def main() -> None:
     )
 
     with open(outfile, "w") as f:
-        f.write("status,time\n")
-        f.writelines(f"{s},{t}\n" for s, t in zip(success, times, strict=False))
+        f.write("status,time,start\n")
+        f.writelines(f"{s},{t},{st}\n" for s, t, st in zip(success, times, starts, strict=True))
 
     print(f"Results saved to: {outfile}")
     print(f"Benchmark completed. Successful requests: {sum(success)} out of {len(success)}")
     # Every request can fail in the parallel runner, which records no time for a failure
     if times:
         print(f"Average time per request: {sum(times) / len(times):.2f} seconds")
-    print(f"Total time taken: {sum(times):.2f} seconds")
+    print(f"Elapsed time: {elapsed_total:.2f} seconds")
+    print(f"Throughput: {len(times) / elapsed_total:.2f} requests/second")
 
 
 if __name__ == "__main__":

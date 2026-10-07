@@ -96,6 +96,24 @@ def _run_benchmark(benchmark_requests, monkeypatch, tmp_path, *args, request):
     return result.read_text(), make_request
 
 
+def _rows(csv):
+    """The CSV's header, and its rows as (status, time) pairs and start offsets, in file order."""
+    header, *lines = csv.splitlines()
+    rows = [line.split(",") for line in lines]
+    return header, [f"{status},{time}" for status, time, _ in rows], [float(start) for *_, start in rows]
+
+
+@pytest.fixture
+def clock(benchmark_requests, monkeypatch):
+    """Make time.perf_counter return the given readings in turn, so elapsed times are exact."""
+
+    def set_readings(*readings):
+        values = iter(readings)
+        monkeypatch.setattr(benchmark_requests.time, "perf_counter", lambda: next(values))
+
+    return set_readings
+
+
 def test_a_sequential_run_records_each_request(benchmark_requests, monkeypatch, tmp_path, capsys):
     responses = iter([({"status": True}, 0.5), ({"status": False}, 1.5)])
 
@@ -110,7 +128,11 @@ def test_a_sequential_run_records_each_request(benchmark_requests, monkeypatch, 
         request=lambda **_: next(responses),
     )
 
-    assert csv == "status,time\n1,0.5\n0,1.5\n"
+    header, rows, starts = _rows(csv)
+    assert (header, rows) == ("status,time,start", ["1,0.5", "0,1.5"])
+    # Each request's start, from the start of the run: in order, since they ran one after another
+    assert starts == sorted(starts)
+    assert all(start >= 0 for start in starts)
     assert make_request.call_args.kwargs == {
         "profile": False,
         "host": "http://localhost:5000",
@@ -145,7 +167,11 @@ def test_a_parallel_run_skips_failed_requests(benchmark_requests, monkeypatch, t
         request=request,
     )
 
-    assert sorted(csv.splitlines()[1:]) == ["0,0.4", "1,0.2"]
+    header, rows, starts = _rows(csv)
+    assert header == "status,time,start"
+    assert sorted(rows) == ["0,0.4", "1,0.2"]
+    # Only completed requests are written, each with its start
+    assert len(starts) == 2
     out = capsys.readouterr().out
     assert "Request failed: connection refused" in out
     assert "Response: {'status': True}" in out
@@ -162,7 +188,7 @@ def test_a_parallel_run_prints_no_responses_unless_verbose(benchmark_requests, m
         request=lambda **_: ({"status": True}, 0.1),
     )
 
-    assert csv == "status,time\n1,0.1\n1,0.1\n"
+    assert _rows(csv)[:2] == ("status,time,start", ["1,0.1", "1,0.1"])
     assert "Response:" not in capsys.readouterr().out
 
 
@@ -176,10 +202,38 @@ def test_a_parallel_run_with_no_completed_request(benchmark_requests, monkeypatc
         benchmark_requests, monkeypatch, tmp_path, "--num-requests", "2", "--parallel", request=request
     )
 
-    assert csv == "status,time\n"
+    assert csv == "status,time,start\n"
     out = capsys.readouterr().out
     assert "Successful requests: 0 out of 0" in out
     assert "Average time" not in out
+    assert "Throughput: 0.00 requests/second" in out
+
+
+def test_elapsed_time_and_throughput_come_from_the_clock_not_the_latencies(
+    benchmark_requests, monkeypatch, tmp_path, capsys, clock
+):
+    """Throughput is requests over the run's elapsed time, not over the sum of their latencies.
+
+    In a parallel run the latencies overlap, so their sum is many times what the run took; using it
+    made throughput look a fraction of what it was.
+    """
+    # The run starts at 100 s; the requests start 1 s apart; the run ends at 104 s
+    clock(100.0, 100.0, 101.0, 104.0)
+
+    csv, _ = _run_benchmark(
+        benchmark_requests,
+        monkeypatch,
+        tmp_path,
+        "--num-requests",
+        "2",
+        request=lambda **_: ({"status": True}, 3.0),
+    )
+
+    assert csv == "status,time,start\n1,3.0,0.0\n1,3.0,1.0\n"
+    out = capsys.readouterr().out
+    assert "Elapsed time: 4.00 seconds" in out
+    # 2 requests in 4 s, though their latencies add up to 6 s
+    assert "Throughput: 0.50 requests/second" in out
 
 
 def test_the_benchmark_defaults(benchmark_requests, monkeypatch, tmp_path):
@@ -202,13 +256,24 @@ def results():
 
 
 def test_the_summary(analyze_benchmark, results, capsys):
-    analyze_benchmark.analyze_benchmark(results)
+    # Four overlapping requests, as a parallel run makes them: the run took 2.5 s, not 5 s
+    analyze_benchmark.analyze_benchmark(results.assign(start=[0.0, 0.0, 0.5, 1.0]))
 
     out = capsys.readouterr().out
     assert "Total requests       : 4" in out
     assert "Failed requests      : 1" in out
     assert "Success rate         : 75.00%" in out
     assert "Avg time/successful : 1.000 sec" in out
+    assert "Elapsed time         : 2.500 sec\n" in out
+    assert "Throughput           : 1.60 requests/sec" in out
+
+
+def test_the_summary_of_a_csv_without_start_times(analyze_benchmark, results, capsys):
+    """Older CSVs have no start column: the latencies' sum stands in, and the summary says so."""
+    analyze_benchmark.analyze_benchmark(results)
+
+    out = capsys.readouterr().out
+    assert "Elapsed time         : 5.000 sec (sum of latencies" in out
     assert "Throughput           : 0.80 requests/sec" in out
 
 
