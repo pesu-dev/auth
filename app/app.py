@@ -74,7 +74,7 @@ app = FastAPI(
         },
         {
             "name": "Documentation",
-            "description": "Render the README and other developer-facing docs.",
+            "description": "Redirect to the project's README on GitHub.",
         },
         {
             "name": "Monitoring",
@@ -351,7 +351,11 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    # Set up argument parser for command line arguments
+    """Build the command line parser for running the API.
+
+    Returns:
+        argparse.ArgumentParser: The parser, with --host, --port and --debug.
+    """
     parser = argparse.ArgumentParser(
         description="PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy.",
     )

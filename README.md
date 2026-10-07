@@ -29,7 +29,8 @@ responds, so nothing from one user's sign-in is shared with another's.
 
 > [!NOTE]
 > PESU Academy's mobile API is not publicly documented and can change without notice. If it does, `/authenticate`
-> may answer `422` or `502` until PESUAuth is updated to match.
+> may answer `422` or `502`, or return `null` for the profile fields that changed, until PESUAuth is updated to match.
+> [`/metrics`](#metrics) counts those fields as `missing_field` or `unexpected_value`.
 
 ## PESUAuth LIVE Deployment
 
@@ -111,7 +112,7 @@ If you don't have Docker installed, you can run the API natively. Ensure you hav
 installed on your system. We recommend using a package manager like [`uv`](https://docs.astral.sh/uv/) to manage
 dependencies.
 
-1. Create a virtual environment using and activate it. Then, install the dependencies using the following commands.
+1. Create a virtual environment and activate it. Then, install the dependencies using the following commands.
 
    ```bash
    uv venv --python=3.14
@@ -277,8 +278,9 @@ curl http://localhost:5000/metrics?fmt=json | jq    # the same numbers, for a hu
 #### How collection works
 
 Everything is counted **in this process, in memory**. There is no database and no external dependency, and the counters
-**reset to zero when the process restarts** — which on the hosted environments is often. `processStartTimeSeconds` is
-exposed so a dashboard can tell a restart apart from a drop in traffic.
+**reset to zero when the process restarts** — which on the hosted environments is often. The process start time
+(`startTimeSeconds` in JSON, `process_start_time_seconds` in Prometheus) is exposed so a dashboard can tell a restart
+apart from a drop in traffic.
 
 Collection happens at three layers, and which layer records what is deliberate:
 
@@ -334,11 +336,11 @@ A few definitions that are easy to assume wrongly:
 
 **Failures**
 
-| Metric                           | Meaning                                                                                                                                                                                                    |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `failures_total{fault}`          | Failed requests by whose fault it was: `client` for 4xx, `server` for 5xx. Alert on `server` without enumerating status codes                                                                              |
-| `errors_total{type}`             | Errors rendered by an exception handler, by exception class: `AuthenticationError`, `UpstreamError`, `ProfileFetchError`, `ProfileParseError`, `RequestValidationError`, or whatever reached the catch-all |
-| `validation_errors_total{field}` | Request validation failures by the field that failed. Unrecognised keys collapse into `other`, since the request body is caller-controlled                                                                 |
+| Metric                           | Meaning                                                                                                                                                                                                                                 |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `failures_total{fault}`          | Failed requests by whose fault it was: `client` for 4xx, `server` for 5xx. Alert on `server` without enumerating status codes                                                                                                           |
+| `errors_total{type}`             | Errors rendered by an exception handler, by exception class: `AuthenticationError`, `UpstreamError`, `ProfileFetchError`, `ProfileParseError`, `MetricsAuthorizationError`, `RequestValidationError`, or whatever reached the catch-all |
+| `validation_errors_total{field}` | Request validation failures by the field that failed. Unrecognised keys collapse into `other`, since the request body is caller-controlled                                                                                              |
 
 **Authentication**
 

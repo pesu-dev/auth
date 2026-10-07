@@ -8,6 +8,8 @@ your development environment and contributing to the project.
 
 - [🤝 Contributing to auth](#-contributing-to-auth)
 - [🚧 Getting Started](#-getting-started)
+  - [🌐 Deployment Environment](#-deployment-environment)
+  - [🔄 Development Workflow](#-development-workflow)
 - [🛠️ Development Environment Setup](#-development-environment-setup)
   - [Prerequisites](#prerequisites)
   - [Setting Up Your Environment](#setting-up-your-environment)
@@ -25,6 +27,7 @@ your development environment and contributing to the project.
 - [🚀 Submitting Changes](#-submitting-changes)
   - [🔀 Create a Branch](#-create-a-branch)
   - [✏️ Make and Commit Changes](#-make-and-commit-changes)
+  - [🔢 Bump the Version](#-bump-the-version)
   - [📤 Push and Open a Pull Request](#-push-and-open-a-pull-request)
 - [❓ Need Help?](#-need-help)
 - [🔐 Security](#-security)
@@ -194,7 +197,7 @@ The following checks are enforced:
 - ✅ `mdformat` to format Markdown files (with GFM support)
 - ✅ `end-of-file-fixer`, `trailing-whitespace`, `check-yaml`, `check-toml`, `check-added-large-files` for formatting
 - ✅ `name-tests-test` to enforce test naming conventions
-- ✅ `debug-statements` to prevent committed `print()` or `pdb`
+- ✅ `debug-statements` to prevent committed debugger calls, such as `pdb` or `breakpoint()`
 - ✅ `sync-agents` to check that `.github/agents/` matches the roles in the agent submodule
 - ✅ A local `pytest` hook that runs the full test suite
 
@@ -241,8 +244,9 @@ The tests marked `secret_required` log in to PESU Academy for real. They need th
 `TEST_*` variables in your `.env`; without them `scripts/run_tests.py` deselects those tests, warns
 that it has done so, and still enforces the coverage gate on the rest.
 
-The test account allows **one active session**, so never run the live tests while another run is in
-flight -- including CI. A second login is rejected and shows up as a puzzling `401`.
+The live tests all sign in to the same PESU Academy account. PESU Academy accepts more than one session for an
+account at a time, so a run does not fail because another is in flight, but every run makes real logins to PESU
+Academy: run them when you need them, not in a loop.
 
 The live tests compare the profile PESU Academy returns with the `TEST_*` values field by field, so a
 failure there after a PESU Academy release usually means their mobile API changed rather than our code.
@@ -250,7 +254,7 @@ The tests that are not marked `secret_required` still call PESU Academy (with in
 only `tests/unit/` runs offline.
 
 In CI, pull requests come from forks, and GitHub withholds secrets from fork pull requests. So
-*Pre-Commit Checks* runs the reduced suite on every pull request -- it says so in the run's summary
+the *Test suite & coverage* job of the *CI Checks* workflow runs the reduced suite on every pull request -- it says so in the run's summary
 -- and the live tests only run once the change reaches `dev`. Run them locally before you open a
 pull request; CI will not cover them for you.
 
@@ -283,12 +287,16 @@ run it alongside the live tests.
   (`tests/unit/test_authenticate_flow.py`)
 - Put assertions about an exception after its `with pytest.raises(...)` block, not inside it, where
   they never run
-- Adding a profile field? Give it a `TEST_*` variable in `.env.example` and in `PROFILE_VARIABLES` in
-  `tests/conftest.py`, so the live tests compare it with the test account's real value; a unit test
-  fails until every field has one. If the field is an integer, also list it in `INTEGER_FIELDS` there.
-  Ask a maintainer to add the matching repository secret, which `.github/workflows/ci_checks.yml`
-  passes to the test job. Document the field in the README's `ProfileObject` table and in
-  `ProfileModel`, whose descriptions become the Swagger docs
+- Adding a profile field? Read it in the model for its block in `app/models/upstream.py`, return it from
+  `PESUAcademy._build_profile`, and add it to `ProfileField` and `ProfileModel` in `app/models/profile.py`,
+  whose descriptions become the Swagger docs. Add it to the full-profile example in `app/docs/authenticate.py`
+  and to the README's `ProfileObject` table, and to the fixture payloads and `FULL_PROFILE` in
+  `tests/unit/conftest.py`; tests check that each lists every field, in order
+- For the live tests, give a new field a `TEST_*` variable in `.env.example` and in `PROFILE_VARIABLES` in
+  `tests/conftest.py`, so they compare it with the test account's real value; a unit test fails until every
+  field has one. If the field is an integer, also list it in `INTEGER_FIELDS` there. Add the variable to the
+  test job's `env` in `.github/workflows/ci_checks.yml`, and ask a maintainer to add the matching repository
+  secret
 
 ## 🚀 Submitting Changes
 
@@ -351,7 +359,8 @@ does not reset the numbers to its right, such as `4.19.1`.
 
 1. In your PR:
 
-   - Use a clear and descriptive title
+   - Use a [Conventional Commit](https://www.conventionalcommits.org/) title, such as `feat: add X` or `fix: handle Y`
+     (`feat!:` or `fix!:` for a breaking change), as the pull request template describes
    - Include a summary of your changes
    - Link any related issues using `Closes #issue-number`
    - Add screenshots, terminal output, or examples if relevant
@@ -409,14 +418,13 @@ Example:
 
 ```python
 def send_otp(email: str) -> bool:
-    """
-    Sends a one-time password to the given email.
+    """Send a one-time password to the given email address.
 
     Args:
-        email (str): User's email address
+        email (str): The user's email address.
 
     Returns:
-        bool: True if the OTP was sent successfully, False otherwise
+        bool: True if the OTP was sent, False otherwise.
     """
 ```
 
@@ -446,7 +454,6 @@ each label means:
 | Label         | Description                                             |
 | ------------- | ------------------------------------------------------- |
 | `enhancement` | 🟢 A request or proposal for improvement or new feature |
-| `feature`     | 🌟 Work related to adding a new capability              |
 | `question`    | ❓ Request for clarification or discussion              |
 
 ### 📚 Documentation
@@ -471,10 +478,9 @@ each label means:
 
 ### 🧠 Meta / Organization
 
-| Label        | Description                                        |
-| ------------ | -------------------------------------------------- |
-| `api`        | ⚙️ Core FastAPI application and route handlers     |
-| `discussion` | 🗣️ Open-ended conversation about project direction |
+| Label | Description                                    |
+| ----- | ---------------------------------------------- |
+| `api` | ⚙️ Core FastAPI application and route handlers |
 
 > [!NOTE]
 > When opening or triaging issues and PRs, feel free to suggest an appropriate label. Maintainers will review

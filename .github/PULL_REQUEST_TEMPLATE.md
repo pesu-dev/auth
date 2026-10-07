@@ -73,6 +73,9 @@ Please provide a concise summary of the changes:
 
 - [ ] `app/app.py` – Modified `/authenticate` route logic
 - [ ] `app/pesu.py` – Updated PESU Academy login or profile handling
+- [ ] `app/exceptions/` – Error types, their status codes or messages
+- [ ] `app/metrics/` – Metrics collection, exposition or the `/metrics` token
+- [ ] `app/docs/` – OpenAPI (Swagger) examples and descriptions
 
 ### 🧩 Models
 
@@ -87,6 +90,7 @@ Please provide a concise summary of the changes:
 - [ ] `.github/workflows/*.yml` – CI/CD pipeline or deployment updates
 - [ ] `pyproject.toml` / `uv.lock` – Dependency version changes
 - [ ] `.pre-commit-config.yaml` – Linting or formatting hook changes
+- [ ] `.github/scripts/check_version_bump.py` – The CI version check
 
 ### 📊 Benchmarks & Analysis
 

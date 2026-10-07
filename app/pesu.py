@@ -393,7 +393,8 @@ class PESUAcademy:
             username (str): The username of the user, for logging.
 
         Returns:
-            dict[str, Any]: The profile, with every field; None where upstream had no value.
+            dict[str, Any]: The profile, with every field; None where PESU had no value for it, did not send it
+                or sent it in an unexpected shape.
         """
         info = student.info
         # Worked out rather than copied: the campus code, a fixed mapping of the campus's name, and the
