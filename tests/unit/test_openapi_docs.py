@@ -308,6 +308,9 @@ def test_the_documented_upstream_errors_match_the_exceptions(schema, code, error
 def test_the_documented_upstream_errors_match_a_real_response(mock_authenticate, client, schema, error):
     mock_authenticate.side_effect = error()
     response = client.post("/authenticate", json={"username": "u", "password": "p"})
-    documented = next(iter(_authenticate_examples(schema, response.status_code).values()))
+    examples = _authenticate_examples(schema, response.status_code).values()
+    # Matched by message rather than position: 502 documents two errors
+    documented = next((example for example in examples if example["message"] == error().message), None)
+    assert documented is not None, f"no {response.status_code} example documents {error.__name__}'s message"
     assert set(response.json()) == set(documented)
-    assert response.json()["message"] == error().message
+    assert response.json()["message"] == documented["message"]

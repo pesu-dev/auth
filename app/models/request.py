@@ -69,7 +69,7 @@ class RequestModel(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
-        """Validate that username is valid text and not empty after stripping whitespace."""
+        """Validate that username is not empty after stripping whitespace, and can be sent as UTF-8."""
         v = v.strip()
         if not v:
             raise ValueError("Username cannot be empty.")
@@ -79,7 +79,7 @@ class RequestModel(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        """Validate that password is valid text and not empty after stripping whitespace."""
+        """Validate that password is not empty after stripping whitespace, and can be sent as UTF-8."""
         v = v.strip()
         if not v:
             raise ValueError("Password cannot be empty.")

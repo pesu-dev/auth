@@ -133,10 +133,12 @@ def check_live_profile(expected_profile, check_live_fields):
         # carry the same campus digit.
         ok = profile["prn"] is None or prn_pattern.fullmatch(profile["prn"]) is not None
         assert ok, "prn does not have the shape of a PRN"
-        srn = profile["srn"] or ""
-        ok = prn_pattern.fullmatch(srn) is not None or srn_pattern.fullmatch(srn) is not None
+        # Either ID can be null, as any field can; check_live_fields has already compared each with its
+        # TEST_* value, so a null here is one the variables expect
+        srn = profile["srn"]
+        ok = srn is None or prn_pattern.fullmatch(srn) is not None or srn_pattern.fullmatch(srn) is not None
         assert ok, "srn has neither the old nor the new shape"
-        ok = profile["prn"] is None or profile["prn"][3] == srn[3]
+        ok = profile["prn"] is None or srn is None or profile["prn"][3] == srn[3]
         assert ok, "prn and srn name different campuses"
 
     return check

@@ -29,6 +29,8 @@ class UpstreamModel(BaseModel):
     parents' contact details. Never holding them means no log line, exception or repr can leak them.
     """
 
+    # coerce_numbers_to_str: PESU sends some text as numbers, a mobile number or an ID among them, and a
+    # number where text is expected is the same value rather than an unexpected shape
     model_config = ConfigDict(extra="ignore", coerce_numbers_to_str=True)
 
     @field_validator("*", mode="before")
@@ -144,7 +146,11 @@ class StudentInfo(UpstreamDetails):
 
 
 class StudentPhoto(UpstreamDetails):
-    """The profile response's `STUDENT_PHOTO`, read only for what STUDENT_INFO does not have."""
+    """The profile response's `STUDENT_PHOTO` block, read only for what STUDENT_INFO does not have.
+
+    Named after the block PESU sends, as StudentInfo is after STUDENT_INFO. Besides the photo, the block
+    carries the campus and gender; the photo itself is never read.
+    """
 
     # The campus, named by its institute: "PES University (Ring Road)"
     campus: str | None = Field(None, alias="instituteName")
