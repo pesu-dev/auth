@@ -275,14 +275,14 @@ class PESUAcademy:
             # from None: the chained error would quote the response, which is personal data
             raise UpstreamError(detail=f"PESU Academy sent an unexpected login response for user={username}.") from None
 
-        # Rejected credentials have only ever been seen as an HTTP 401, handled above. A 200 that does not
-        # say SUCCESS -- whether the marker is missing or holds anything else -- is a response nobody has
-        # seen, so it is reported as PESU's failure. Calling it a wrong password would tell every user
-        # their credentials are bad, and hide an upstream change as 4xx noise.
         if unexpected:
             logging.warning(
                 f"Ignored values of an unexpected shape in the login response for user={username}: {unexpected}"
             )
+        # Rejected credentials have only ever been seen as an HTTP 401, handled above. A 200 that does not
+        # say SUCCESS -- whether the marker is missing or holds anything else -- is a response nobody has
+        # seen, so it is reported as PESU's failure. Calling it a wrong password would tell every user
+        # their credentials are bad, and hide an upstream change as 4xx noise.
         if login.user.login != "SUCCESS":
             raise UpstreamError(detail=f"PESU Academy did not report a successful login for user={username}.")
         return login

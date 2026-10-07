@@ -113,7 +113,7 @@ AUTHENTICATION_RESULTS = MetricFamily(
 )
 PROFILE_PARSE_ERRORS = MetricFamily(
     f"{METRIC_PREFIX}profile_parse_errors_total",
-    "Profile parse failures, keyed by what could not be parsed or mapped.",
+    "Profile problems, keyed by what was missing, unreadable or unmapped.",
     "counter",
     ("reason",),
 )

@@ -377,7 +377,7 @@ If you get stuck or have questions:
 
 If you discover a security vulnerability, **please do not open a public issue**.
 
-Instead, report it privately as described in [SECURITY.md](SECURITY.md). We take all security concerns seriously and will
+Instead, report it as described in [SECURITY.md](SECURITY.md). We take all security concerns seriously and will
 respond promptly.
 
 This service handles students' PESU passwords on every request, so changes must never log, store or return a password,
