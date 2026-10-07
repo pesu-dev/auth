@@ -273,7 +273,7 @@ uv run python analyze_benchmark.py -f ../../benchmark/results/benchmark_requests
 
 `benchmark_requests.py` signs in with `TEST_PRN` and `TEST_PASSWORD` from your `.env`, so every request
 is a real login to PESU Academy through the API you point it at. Keep `--num-requests` small, and do not
-run it alongside the live tests.
+run it alongside the live tests: both wait on PESU Academy, so each skews the other's timings.
 
 ### Writing Tests
 
