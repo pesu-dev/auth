@@ -1131,12 +1131,15 @@ async def test_a_field_sent_without_a_value_is_null_but_not_counted(
     pesu, upstream, make_response, login_payload, profile_payload, collector, empty
 ):
     """PESU sending a key with no value is PESU having no value for this student, not a change to its API."""
-    profile_payload["STUDENT_INFO"].update(ClassName=empty, SectionName=empty)
+    # A student with no SRN, no class and no recorded gender
+    profile_payload["STUDENT_INFO"].update(SRN=empty, ClassName=empty, SectionName=empty)
     profile_payload["STUDENT_PHOTO"]["gender"] = empty
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
-    assert (profile["semester"], profile["section"], profile["gender"]) == (None, None, None)
+    assert (profile["srn"], profile["semester"], profile["section"], profile["gender"]) == (None, None, None, None)
+    # The PRN is unaffected
+    assert profile["prn"] == "PES2202500001"
     assert list(collector.snapshot().samples(PROFILE_PARSE_ERRORS.name)) == []
 
 
