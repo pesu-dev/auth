@@ -1188,3 +1188,27 @@ async def test_blood_group_is_never_returned(pesu, upstream, make_response, logi
 def test_every_profile_field_has_a_test_variable(profile_variables):
     """Every field has a TEST_* variable, so the live tests compare each one with the test account's value."""
     assert list(profile_variables) == PESUAcademy.DEFAULT_FIELDS
+
+
+def test_an_empty_test_variable_expects_null(monkeypatch, request, profile_variables):
+    """A TEST_* variable left empty stands for a field the account has no value for, so the live tests expect null."""
+    for variable in profile_variables.values():
+        monkeypatch.setenv(variable, "1")
+    monkeypatch.setenv(profile_variables["middleName"], "")
+    monkeypatch.setenv(profile_variables["campusCode"], "")
+
+    expected = request.getfixturevalue("expected_profile")
+
+    assert expected["middleName"] is None
+    assert expected["campusCode"] is None
+    assert expected["name"] == "1"
+
+
+def test_an_unset_test_variable_is_an_error(monkeypatch, request, profile_variables):
+    """Only an empty variable means null: one missing from the environment is a mistake, and says which."""
+    for variable in profile_variables.values():
+        monkeypatch.setenv(variable, "1")
+    monkeypatch.delenv(profile_variables["middleName"])
+
+    with pytest.raises(AssertionError, match="TEST_MIDDLE_NAME environment variable not set"):
+        request.getfixturevalue("expected_profile")
