@@ -3,15 +3,14 @@
 
 # Repository owner review for critical files
 
-## GitHub Configuration and Templates
+## GitHub Configuration, Workflows and Templates
 .github/ @aditeyabaral
 
 ## Project Configuration
 .pre-commit-config.yaml @aditeyabaral
 .env.example @aditeyabaral
 
-## Documentation and Legal
-README.md @aditeyabaral
+## Legal
 LICENSE @aditeyabaral
 
 ## Infrastructure and Deployment
@@ -19,3 +18,9 @@ Dockerfile @aditeyabaral
 
 ## Testing
 tests/ @aditeyabaral
+scripts/run_tests.py @aditeyabaral
+
+## Agent Instructions (synced from pesu-dev/skills)
+AGENTS.md @aditeyabaral
+.agents/ @aditeyabaral
+.gitmodules @aditeyabaral
