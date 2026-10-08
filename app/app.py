@@ -15,6 +15,7 @@ import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.routing import APIRoute
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -104,12 +105,16 @@ def _openapi_without_phantom_validation_errors() -> dict[str, Any]:
     Only the auto-generated ones are removed. `/authenticate` genuinely returns a 422 for a profile
     response it cannot parse and documents it with `ResponseModel`, so it is matched on its schema and kept.
 
+    The documented response examples are also put back as written: FastAPI drops every null from the
+    schema, examples included, which would show a profile field with no value as absent, not null.
+
     Returns:
         dict[str, Any]: The OpenAPI schema, cached on the app after the first call.
     """
     if app.openapi_schema:
         return app.openapi_schema
     schema = _build_openapi_schema()
+    _restore_documented_examples(schema)
     phantom = "#/components/schemas/HTTPValidationError"
     for operations in schema.get("paths", {}).values():
         for operation in operations.values():
@@ -122,6 +127,23 @@ def _openapi_without_phantom_validation_errors() -> dict[str, Any]:
         schema.get("components", {}).get("schemas", {}).pop(name, None)
     app.openapi_schema = schema
     return schema
+
+
+def _restore_documented_examples(schema: dict[str, Any]) -> None:
+    """Put each route's documented response examples back into the schema exactly as written.
+
+    Args:
+        schema (dict[str, Any]): The OpenAPI schema FastAPI built, changed in place.
+    """
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        for method in route.methods:
+            responses = schema["paths"][route.path][method.lower()]["responses"]
+            for code, documented in route.responses.items():
+                for media_type, content in documented.get("content", {}).items():
+                    examples = {key: content[key] for key in ("example", "examples") if key in content}
+                    responses[str(code)]["content"][media_type].update(examples)
 
 
 app.openapi = _openapi_without_phantom_validation_errors

@@ -90,6 +90,38 @@ authenticate_docs = ApiDocs(
                                 },
                             },
                         },
+                        "authentication_with_profile_graduated": {
+                            "summary": "Authentication with Full Profile, Graduated Student",
+                            "description": (
+                                "A student who has graduated: PESU Academy has no current semester or section for "
+                                "them, so those are null, as is middleName for a student with none. For students "
+                                "who joined before SRNs existed, srn is the same as prn."
+                            ),
+                            "value": {
+                                "status": True,
+                                "message": "Login successful.",
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                                "profile": {
+                                    "name": "Jane Smith",
+                                    "prn": "PES1201800001",
+                                    "srn": "PES1201800001",
+                                    "program": "B.Tech.",
+                                    "branch": "Electronics and Communication Engineering",
+                                    "semester": None,
+                                    "section": None,
+                                    "email": "janesmith@gmail.com",
+                                    "mobile": "9876543210",
+                                    "campusCode": 1,
+                                    "campus": "PES University (Ring Road)",
+                                    "firstName": "Jane",
+                                    "middleName": None,
+                                    "lastName": "Smith",
+                                    "branchShortCode": "ECE",
+                                    "gender": "Female",
+                                    "dateOfBirth": "2000-05-14",
+                                },
+                            },
+                        },
                         "authentication_with_selected_fields": {
                             "summary": "Authentication with Selected Fields",
                             "description": "Only the requested fields, in the order the full profile lists them.",
@@ -114,16 +146,56 @@ authenticate_docs = ApiDocs(
         },
         400: {
             "description": (
-                "Bad Request - The request body failed validation: a missing, empty or invalid username or "
-                "password, a value of the wrong type, an unknown key, or an unknown profile field."
+                "Bad Request - The request body failed validation: a body that is not valid JSON, a missing, empty "
+                "or invalid username or password, a value of the wrong type, an unknown key, an unknown profile "
+                "field, or an empty fields list. The message names each field that failed and why."
             ),
             "model": ResponseModel,
             "content": {
                 "application/json": {
-                    "example": {
-                        "status": False,
-                        "message": "Could not validate request data - body.password: Field required",
-                        "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                    "examples": {
+                        "missing_field": {
+                            "summary": "Missing password",
+                            "value": {
+                                "status": False,
+                                "message": "Could not validate request data - body.password: Field required",
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                        "empty_username": {
+                            "summary": "Empty username",
+                            "value": {
+                                "status": False,
+                                "message": (
+                                    "Could not validate request data - body.username: Value error, Username cannot "
+                                    "be empty."
+                                ),
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                        "unknown_key": {
+                            "summary": "Unknown key in the request body",
+                            "value": {
+                                "status": False,
+                                "message": (
+                                    "Could not validate request data - body.extra: Extra inputs are not permitted"
+                                ),
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                        "unknown_profile_field": {
+                            "summary": "Unknown profile field",
+                            "value": {
+                                "status": False,
+                                "message": (
+                                    "Could not validate request data - body.fields.0: Input should be 'name', "
+                                    "'prn', 'srn', 'program', 'branch', 'semester', 'section', 'email', 'mobile', "
+                                    "'campusCode', 'campus', 'firstName', 'middleName', 'lastName', "
+                                    "'branchShortCode', 'gender' or 'dateOfBirth'"
+                                ),
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
                     }
                 }
             },
@@ -175,7 +247,7 @@ authenticate_docs = ApiDocs(
         502: {
             "description": (
                 "Bad Gateway - PESU Academy could not be reached, timed out, or answered the login or profile request "
-                "unexpectedly."
+                "unexpectedly, or declined to serve the profile."
             ),
             "model": ResponseModel,
             "content": {
@@ -191,6 +263,10 @@ authenticate_docs = ApiDocs(
                         },
                         "profile_fetch_error": {
                             "summary": "Profile fetching failed",
+                            "description": (
+                                "The login succeeded, but the profile could not be fetched, or PESU Academy declined "
+                                "to serve it, as it does for an account that is not a student's."
+                            ),
                             "value": {
                                 "status": False,
                                 "message": "Failed to fetch the student profile from PESU Academy.",

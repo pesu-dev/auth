@@ -82,12 +82,16 @@ def test_json_examples_validate_against_the_model_they_claim(schema, documented_
             content = response.get("content", {}).get("application/json", {})
             ref = content.get("schema", {}).get("$ref", "")
             model = documented_models.get(ref.rsplit("/", 1)[-1])
-            if model is None or "example" not in content:
+            if model is None:
                 continue
-            model.model_validate_json(json.dumps(content["example"]))
-            model.model_validate(content["example"])
-            checked += 1
-    assert checked >= 8, f"only {checked} examples were checked; the sweep is not doing its job"
+            # A response documents either one example or several named ones; both are checked
+            examples = [content["example"]] if "example" in content else []
+            examples += [example["value"] for example in content.get("examples", {}).values()]
+            for example in examples:
+                model.model_validate_json(json.dumps(example))
+                model.model_validate(example)
+                checked += 1
+    assert checked >= 16, f"only {checked} examples were checked; the sweep is not doing its job"
 
 
 def test_request_examples_validate_against_the_request_model(schema):
@@ -245,10 +249,49 @@ def _authenticate_examples(schema, code):
     return {"example": content["example"]}
 
 
-def test_the_documented_full_profile_has_every_default_field(schema):
-    """The full-profile example is what callers copy, so it must show exactly what they get by default."""
-    example = _authenticate_examples(schema, 200)["authentication_with_profile"]
+@pytest.mark.parametrize("name", ["authentication_with_profile", "authentication_with_profile_graduated"])
+def test_the_documented_full_profiles_have_every_default_field(schema, name):
+    """The full-profile examples are what callers copy, so they must show exactly what they get by default."""
+    example = _authenticate_examples(schema, 200)[name]
     assert list(example["profile"]) == PESUAcademy.DEFAULT_FIELDS
+
+
+def test_a_documented_full_profile_shows_null_values(schema):
+    """A field with no value is null rather than absent, which a caller should see in an example."""
+    example = _authenticate_examples(schema, 200)["authentication_with_profile_graduated"]
+    assert {field for field, value in example["profile"].items() if value is None} == {
+        "semester",
+        "section",
+        "middleName",
+    }
+
+
+@pytest.mark.parametrize(
+    ("name", "body"),
+    [
+        ("missing_field", {"username": "u"}),
+        ("empty_username", {"username": "  ", "password": "p"}),
+        ("unknown_key", {"username": "u", "password": "p", "extra": 1}),
+        ("unknown_profile_field", {"username": "u", "password": "p", "profile": True, "fields": ["phone"]}),
+    ],
+)
+def test_each_documented_authenticate_400_matches_a_real_response(client, schema, name, body):
+    """Each 400 example is the body a caller gets for the mistake it names."""
+    documented = _authenticate_examples(schema, 400)[name]
+    response = client.post("/authenticate", json=body)
+    assert response.status_code == 400
+    assert response.json()["message"] == documented["message"]
+    assert set(response.json()) == set(documented)
+
+
+def test_the_documented_readme_redirect_matches_a_real_response(client, schema):
+    """The redirect has no body; where it goes is in the Location header, as documented."""
+    documented = schema["paths"]["/readme"]["get"]["responses"]["308"]
+    response = client.get("/readme", follow_redirects=False)
+    assert response.status_code == 308
+    assert response.content == b""
+    assert "content" not in documented
+    assert response.headers["location"] == documented["headers"]["Location"]["schema"]["example"]
 
 
 def test_the_profile_model_documents_every_field(schema):

@@ -119,7 +119,7 @@ _JSON_EXAMPLE = {
     "validationErrorsByField": {"password": 4, "username": 8},
     "authenticationResults": {"failure": 169, "success": 604},
     "profileFieldFiltering": {"false": 90, "true": 40},
-    "profileParseErrors": {"unknown_campus_code": 3},
+    "profileParseErrors": {"missing_field": 2, "unexpected_value": 1, "unknown_campus_code": 3},
     "upstream": {
         "login": {
             "success": 771,
