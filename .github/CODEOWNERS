@@ -18,7 +18,7 @@ Dockerfile @aditeyabaral
 
 ## Testing
 tests/ @pesu-dev/auth-maintainers @aditeyabaral
-scripts/run_tests.py @aditeyabaral
+scripts/run_tests.py @pesu-dev/auth-maintainers @aditeyabaral
 
 ## Agent Instructions (synced from pesu-dev/skills)
 AGENTS.md @aditeyabaral
