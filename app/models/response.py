@@ -9,7 +9,11 @@ from app.models import ProfileModel
 
 
 class ResponseModel(BaseModel):
-    """Model representing the response after a student's authentication request."""
+    """The body of every /authenticate response, and of every error this API renders.
+
+    On success, status is true and profile is present if it was requested. On an error, status is
+    false, the message says what went wrong, and there is no profile.
+    """
 
     model_config = ConfigDict(strict=True, alias_generator=to_camel, populate_by_name=True)
 
@@ -35,12 +39,12 @@ class ResponseModel(BaseModel):
         # to validate with it, and forced the documentation tests into JSON mode to compensate.
         strict=False,
         title="Authentication Timestamp",
-        description="Timestamp of the authentication attempt with timezone info.",
+        description="Timestamp of the authentication attempt, in IST (UTC+05:30).",
         json_schema_extra={"example": "2024-07-28T22:30:10.103368+05:30"},
     )
 
     profile: ProfileModel | None = Field(
         None,
         title="User Profile Data",
-        description="The user's profile data returned only if authentication succeeds and profile data was requested.",
+        description="The user's profile, present only when the login succeeded and the profile was requested.",
     )

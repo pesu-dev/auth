@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi import APIRouter
@@ -29,12 +29,8 @@ def client(monkeypatch):
     order, which would make such a bug look stable locally and fail elsewhere.
     """
     monkeypatch.setattr("app.app.metrics", MetricsCollector())
-    with (
-        patch("app.app.pesu_academy.prefetch_client_with_csrf_token", new_callable=AsyncMock),
-        patch("app.app.pesu_academy.close_client", new_callable=AsyncMock),
-    ):
-        with TestClient(app, raise_server_exceptions=False) as test_client:
-            yield test_client
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        yield test_client
 
 
 def test_prometheus_endpoint_content_type(client):
@@ -68,12 +64,19 @@ def test_json_format_shape(client):
         "profileFieldFiltering",
         "profileParseErrors",
         "upstream",
-        "csrfCache",
-        "csrfRefreshes",
-        "prefetchTasks",
         "httpClients",
         "lifespanEvents",
     }
+
+
+def test_the_removed_csrf_metrics_are_gone(client):
+    """The CSRF cache, refresh loop and prefetch tasks went with the web login; so did their metrics."""
+    payload = client.get("/metrics?fmt=json").json()
+    for key in ("csrfCache", "csrfRefreshes", "prefetchTasks"):
+        assert key not in payload
+    prometheus = client.get("/metrics").text
+    for name in ("csrf_cache_total", "csrf_refreshes_total", "prefetch_tasks_total", "csrf_fetch"):
+        assert name not in prometheus
 
 
 def test_every_metric_family_appears_in_both_views(client):

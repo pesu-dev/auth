@@ -27,13 +27,13 @@ pesu_auth_requests_total 1284
 pesu_auth_requests_success_total 1102
 # HELP pesu_auth_requests_failed_total HTTP requests answered with a status of 400 or above.
 # TYPE pesu_auth_requests_failed_total counter
-pesu_auth_requests_failed_total 182
+pesu_auth_requests_failed_total 181
 # HELP pesu_auth_responses_total HTTP responses, by status code.
 # TYPE pesu_auth_responses_total counter
 pesu_auth_responses_total{status="200"} 1094
 # HELP pesu_auth_route_requests_total HTTP requests, by matched route and method.
 # TYPE pesu_auth_route_requests_total counter
-pesu_auth_route_requests_total{method="GET",route="/health"} 302
+pesu_auth_route_requests_total{method="GET",route="/"} 8
 # HELP pesu_auth_errors_total Errors rendered by an exception handler, by exception class.
 # TYPE pesu_auth_errors_total counter
 pesu_auth_errors_total{type="AuthenticationError"} 160
@@ -42,13 +42,13 @@ pesu_auth_errors_total{type="AuthenticationError"} 160
 pesu_auth_authentication_requests_total{profile="false"} 640
 # HELP pesu_auth_authentication_results_total Authentication attempts, by outcome. errors_total says why one failed.
 # TYPE pesu_auth_authentication_results_total counter
-pesu_auth_authentication_results_total{result="failure"} 162
+pesu_auth_authentication_results_total{result="failure"} 169
 # HELP pesu_auth_profile_field_filtering_total Profile fetches, by whether the caller narrowed the fields returned.
 # TYPE pesu_auth_profile_field_filtering_total counter
-pesu_auth_profile_field_filtering_total{enabled="false"} 94
-# HELP pesu_auth_profile_parse_errors_total Profile page parse failures, by what could not be parsed.
+pesu_auth_profile_field_filtering_total{enabled="false"} 90
+# HELP pesu_auth_profile_parse_errors_total Profile problems, keyed by what was missing, unreadable or unmapped.
 # TYPE pesu_auth_profile_parse_errors_total counter
-pesu_auth_profile_parse_errors_total{reason="unknown_field"} 3
+pesu_auth_profile_parse_errors_total{reason="unknown_campus_code"} 3
 # HELP pesu_auth_validation_errors_total Request validation failures, by the field that failed.
 # TYPE pesu_auth_validation_errors_total counter
 pesu_auth_validation_errors_total{field="password"} 4
@@ -57,34 +57,25 @@ pesu_auth_validation_errors_total{field="password"} 4
 pesu_auth_failures_total{fault="client"} 172
 # HELP pesu_auth_request_latency_seconds Seconds from receiving a request to starting its response.
 # TYPE pesu_auth_request_latency_seconds summary
-pesu_auth_request_latency_seconds_sum 742.1841932
-pesu_auth_request_latency_seconds_count 1284
+pesu_auth_request_latency_seconds_sum 1651.761
+pesu_auth_request_latency_seconds_count 1283
 # HELP pesu_auth_route_latency_seconds Seconds from receiving a request to starting its response, by route.
 # TYPE pesu_auth_route_latency_seconds summary
-pesu_auth_route_latency_seconds_sum{method="GET",route="/health"} 0.413
-pesu_auth_route_latency_seconds_count{method="GET",route="/health"} 302
+pesu_auth_route_latency_seconds_sum{method="GET",route="/"} 0.08
+pesu_auth_route_latency_seconds_count{method="GET",route="/"} 8
 # HELP pesu_auth_upstream_requests_total Requests made to PESU Academy, by operation and outcome.
 # TYPE pesu_auth_upstream_requests_total counter
-pesu_auth_upstream_requests_total{operation="csrf_fetch",outcome="error"} 3
+pesu_auth_upstream_requests_total{operation="login",outcome="error"} 2
 # HELP pesu_auth_upstream_responses_total Responses from PESU Academy, by operation and status code.
 # TYPE pesu_auth_upstream_responses_total counter
-pesu_auth_upstream_responses_total{operation="csrf_fetch",status="200"} 790
+pesu_auth_upstream_responses_total{operation="login",status="200"} 611
 # HELP pesu_auth_upstream_latency_seconds Seconds spent waiting on PESU Academy, by operation.
 # TYPE pesu_auth_upstream_latency_seconds summary
-pesu_auth_upstream_latency_seconds_sum{operation="csrf_fetch"} 210.4
-pesu_auth_upstream_latency_seconds_count{operation="csrf_fetch"} 793
-# HELP pesu_auth_csrf_cache_total Lookups of the cached unauthenticated CSRF client, by whether the cache was warm.
-# TYPE pesu_auth_csrf_cache_total counter
-pesu_auth_csrf_cache_total{outcome="hit"} 760
-# HELP pesu_auth_csrf_refreshes_total Periodic background refreshes of the unauthenticated CSRF token, by outcome.
-# TYPE pesu_auth_csrf_refreshes_total counter
-pesu_auth_csrf_refreshes_total{outcome="failure"} 1
-# HELP pesu_auth_prefetch_tasks_total Background CSRF prefetch tasks, by outcome.
-# TYPE pesu_auth_prefetch_tasks_total counter
-pesu_auth_prefetch_tasks_total{outcome="failure"} 4
+pesu_auth_upstream_latency_seconds_sum{operation="login"} 1586.7
+pesu_auth_upstream_latency_seconds_count{operation="login"} 773
 # HELP pesu_auth_http_clients_total Upstream HTTP client lifecycle. created minus closed is how many are still open.
 # TYPE pesu_auth_http_clients_total counter
-pesu_auth_http_clients_total{event="closed"} 775
+pesu_auth_http_clients_total{event="closed"} 773
 # HELP pesu_auth_lifespan_events_total Application lifespan events, by kind.
 # TYPE pesu_auth_lifespan_events_total counter
 pesu_auth_lifespan_events_total{event="startup"} 1
@@ -98,55 +89,54 @@ pesu_auth_process_start_time_seconds 1757660400.12
 
 _JSON_EXAMPLE = {
     "startTimeSeconds": 1757660400.12,
-    "uptimeSeconds": 0.0,
-    "requests": {"total": 1284, "success": 1102, "failed": 182},
-    "latency": {"sumSeconds": 742.1841932, "count": 1284, "averageSeconds": 0.5780250725856698},
+    "uptimeSeconds": 86400.0,
+    "requests": {"total": 1284, "success": 1102, "failed": 181},
+    "latency": {"sumSeconds": 1651.761, "count": 1283, "averageSeconds": 1.2874208885424785},
     "authentication": {"total": 774, "withProfile": 134, "withoutProfile": 640},
-    "responsesByStatus": {"200": 1094, "308": 8, "400": 12, "401": 160, "500": 4, "502": 6},
+    "responsesByStatus": {"200": 1094, "308": 8, "400": 12, "401": 160, "500": 4, "502": 5},
     "requestsByRoute": {
+        "GET /": {"requests": 8, "latency": {"sumSeconds": 0.08, "count": 8, "averageSeconds": 0.01}},
         "GET /health": {
             "requests": 302,
             "latency": {"sumSeconds": 0.413, "count": 302, "averageSeconds": 0.0013675496688741722},
         },
+        "GET /metrics": {"requests": 180, "latency": {"sumSeconds": 0.36, "count": 180, "averageSeconds": 0.002}},
+        "GET /readme": {"requests": 8, "latency": {"sumSeconds": 0.008, "count": 8, "averageSeconds": 0.001}},
         "POST /authenticate": {
-            "requests": 774,
-            "latency": {"sumSeconds": 741.2118, "count": 774, "averageSeconds": 0.957637984496124},
+            "requests": 786,
+            "latency": {"sumSeconds": 1650.9, "count": 785, "averageSeconds": 2.1030573248407642},
         },
     },
-    "errorsByType": {"AuthenticationError": 160, "ProfileFetchError": 2, "RequestValidationError": 12},
+    "errorsByType": {
+        "AuthenticationError": 160,
+        "ProfileFetchError": 3,
+        "RequestValidationError": 12,
+        "RuntimeError": 4,
+        "UpstreamError": 2,
+    },
     "requestsInFlight": 1,
-    "failuresByFault": {"client": 172, "server": 10},
+    "failuresByFault": {"client": 172, "server": 9},
     "validationErrorsByField": {"password": 4, "username": 8},
-    "authenticationResults": {"failure": 162, "success": 612},
-    "profileFieldFiltering": {"false": 94, "true": 40},
-    "profileParseErrors": {"unknown_field": 3},
+    "authenticationResults": {"failure": 169, "success": 604},
+    "profileFieldFiltering": {"false": 90, "true": 40},
+    "profileParseErrors": {"missing_field": 2, "unexpected_value": 1, "unknown_campus_code": 3},
     "upstream": {
-        "csrf_fetch": {
-            "success": 790,
-            "error": 3,
-            "cancelled": 0,
-            "latency": {"sumSeconds": 210.4, "count": 793, "averageSeconds": 0.26532156368221943},
-            "responsesByStatus": {"200": 790},
-        },
         "login": {
-            "success": 774,
+            "success": 771,
             "error": 2,
-            "cancelled": 1,
-            "latency": {"sumSeconds": 620.4, "count": 776, "averageSeconds": 0.7994845360824742},
-            "responsesByStatus": {"200": 774},
+            "cancelled": 0,
+            "latency": {"sumSeconds": 1586.7, "count": 773, "averageSeconds": 2.0526520051746444},
+            "responsesByStatus": {"200": 611, "401": 160},
         },
         "profile_fetch": {
-            "success": 134,
+            "success": 132,
             "error": 1,
             "cancelled": 0,
-            "latency": {"sumSeconds": 190.2, "count": 135, "averageSeconds": 1.4088888888888889},
-            "responsesByStatus": {"200": 134},
+            "latency": {"sumSeconds": 53.2, "count": 133, "averageSeconds": 0.4},
+            "responsesByStatus": {"200": 130, "502": 2},
         },
     },
-    "csrfCache": {"hit": 760, "miss": 14},
-    "csrfRefreshes": {"failure": 1, "success": 45},
-    "prefetchTasks": {"failure": 4, "success": 770},
-    "httpClients": {"closed": 775, "created": 776},
+    "httpClients": {"closed": 773, "created": 774},
     "lifespanEvents": {"startup": 1},
 }
 

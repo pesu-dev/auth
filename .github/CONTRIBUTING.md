@@ -8,6 +8,8 @@ your development environment and contributing to the project.
 
 - [🤝 Contributing to auth](#-contributing-to-auth)
 - [🚧 Getting Started](#-getting-started)
+  - [🌐 Deployment Environment](#-deployment-environment)
+  - [🔄 Development Workflow](#-development-workflow)
 - [🛠️ Development Environment Setup](#-development-environment-setup)
   - [Prerequisites](#prerequisites)
   - [Setting Up Your Environment](#setting-up-your-environment)
@@ -25,6 +27,7 @@ your development environment and contributing to the project.
 - [🚀 Submitting Changes](#-submitting-changes)
   - [🔀 Create a Branch](#-create-a-branch)
   - [✏️ Make and Commit Changes](#-make-and-commit-changes)
+  - [🔢 Bump the Version](#-bump-the-version)
   - [📤 Push and Open a Pull Request](#-push-and-open-a-pull-request)
 - [❓ Need Help?](#-need-help)
 - [🔐 Security](#-security)
@@ -118,8 +121,12 @@ projects.
    ```
 
 1. **Configure your test credentials:**
-   Open the `.env` file and replace all `<YOUR_..._HERE>` placeholders with your actual test user details. Each variable
-   has been documented in the `.env.example` file for clarity.
+   Open the `.env` file and replace the example values with the details of a PESU Academy account you can test with.
+   Each variable is documented in `.env.example`. There is a `TEST_*` variable for every profile field, and the live
+   tests compare each one exactly with what the API returns for that account. Leave a variable empty when the account
+   has no value for that field (for example `TEST_MIDDLE_NAME`, or `TEST_SEMESTER` and `TEST_SECTION` if the account
+   has graduated), since the API then returns `null`. CI reads the same variables from the repository's
+   secrets, where such a field simply has no secret. The file is gitignored: never commit it or paste its values anywhere.
 
 ### Pre-commit Hooks
 
@@ -190,7 +197,8 @@ The following checks are enforced:
 - ✅ `mdformat` to format Markdown files (with GFM support)
 - ✅ `end-of-file-fixer`, `trailing-whitespace`, `check-yaml`, `check-toml`, `check-added-large-files` for formatting
 - ✅ `name-tests-test` to enforce test naming conventions
-- ✅ `debug-statements` to prevent committed `print()` or `pdb`
+- ✅ `debug-statements` to prevent committed debugger calls, such as `pdb` or `breakpoint()`
+- ✅ `sync-agents` to check that `.github/agents/` matches the roles in the agent submodule
 - ✅ A local `pytest` hook that runs the full test suite
 
 > [!WARNING]
@@ -221,20 +229,32 @@ To check coverage:
 uv run pytest --cov
 ```
 
+Coverage is measured over every Python file outside `tests/` (`app/`, `scripts/` and
+`.github/scripts/`), counting branches as well as lines, and the gate is **100%**. It is configured
+once, under `[tool.coverage]` in `pyproject.toml`, so the command above, the pre-commit hook and CI
+all enforce the same thing. Only the `if __name__ == "__main__":` line of a script is excluded; keep
+its logic in a function that a test can call.
+
 > [!NOTE]
 > The pre-commit hook runs `python scripts/run_tests.py`, which uses the same underlying `pytest` runner.
 
 ### Tests that need credentials
 
-Eleven tests are marked `secret_required` and log in to PESU Academy for real. They need the
+The tests marked `secret_required` log in to PESU Academy for real. They need the
 `TEST_*` variables in your `.env`; without them `scripts/run_tests.py` deselects those tests, warns
 that it has done so, and still enforces the coverage gate on the rest.
 
-The test account allows **one active session**, so never run the live tests while another run is in
-flight -- including CI. A second login is rejected and shows up as a puzzling `401`.
+The live tests all sign in to the same PESU Academy account. PESU Academy accepts more than one session for an
+account at a time, so a run does not fail because another is in flight, but every run makes real logins to PESU
+Academy: run them when you need them, not in a loop.
+
+The live tests compare the profile PESU Academy returns with the `TEST_*` values field by field, so a
+failure there after a PESU Academy release usually means their mobile API changed rather than our code.
+The tests that are not marked `secret_required` still call PESU Academy (with invalid credentials), so
+only `tests/unit/` runs offline.
 
 In CI, pull requests come from forks, and GitHub withholds secrets from fork pull requests. So
-*Pre-Commit Checks* runs the reduced suite on every pull request -- it says so in the run's summary
+the *Test suite & coverage* job of the *CI Checks* workflow runs the reduced suite on every pull request -- it says so in the run's summary
 -- and the live tests only run once the change reaches `dev`. Run them locally before you open a
 pull request; CI will not cover them for you.
 
@@ -245,11 +265,22 @@ repository root, named `{script}_{date}_{time}.{ext}`. Pass `--output-dir` to wr
 `--tag` to label an experimental run, or `--output` to name one file explicitly. All of it is
 gitignored.
 
+Each row of `benchmark_requests.py`'s CSV is one request: `status` (1 for a success), `time` (its latency in seconds)
+and `start` (when it started, in seconds from the start of the run). Throughput comes from elapsed time, never from the
+sum of the latencies, which overlap in a `--parallel` run: `benchmark_requests.py` times the whole run, and
+`analyze_benchmark.py` measures from the first request's start to the last one's end. It still reads an older CSV
+without `start`, and says when it has had to fall back to adding the latencies up, which is only right for a
+sequential run.
+
 ```bash
 cd scripts/benchmark
 uv run python benchmark_requests.py --num-requests 100 --parallel --tag baseline
 uv run python analyze_benchmark.py -f ../../benchmark/results/benchmark_requests_*.csv
 ```
+
+`benchmark_requests.py` signs in with `TEST_PRN` and `TEST_PASSWORD` from your `.env`, so every request
+is a real login to PESU Academy through the API you point it at. Keep `--num-requests` small, and do not
+run it alongside the live tests: both wait on PESU Academy, so each skews the other's timings.
 
 ### Writing Tests
 
@@ -257,6 +288,23 @@ uv run python analyze_benchmark.py -f ../../benchmark/results/benchmark_requests
 - Place them in the `tests/` directory
 - Name your test files and functions with the `test_` prefix (required by `pytest` and validated by pre-commit)
 - Keep test cases small, meaningful, and well-named
+- Never let a unit test reach PESU Academy. `tests/unit/conftest.py` has fixtures for this:
+  `upstream` replaces the client's `post()`, and `wire` serves responses at the transport layer so a
+  test can inspect the exact requests sent, through the whole app if needed
+  (`tests/unit/test_authenticate_flow.py`)
+- Put assertions about an exception after its `with pytest.raises(...)` block, not inside it, where
+  they never run
+- Adding a profile field? Read it in the model for its block in `app/models/upstream.py`, return it from
+  `PESUAcademy._build_profile`, and add it to `ProfileField` and `ProfileModel` in `app/models/profile.py`,
+  whose descriptions become the Swagger docs. Add it to both full-profile examples in `app/docs/authenticate.py`
+  and to the README's `ProfileObject` table, and to the fixture payloads and `FULL_PROFILE` in
+  `tests/unit/conftest.py`; tests check that each lists every field, in order
+- For the live tests, give a new field a `TEST_*` variable named after it (`TEST_BRANCH_SHORT_CODE` for
+  `branchShortCode`) in `.env.example` and in `PROFILE_VARIABLES` in
+  `tests/conftest.py`, so they compare it with the test account's real value; a unit test fails until every
+  field has one. If the field is an integer, also list it in `INTEGER_FIELDS` there. Add the variable to the
+  test job's `env` in `.github/workflows/ci_checks.yml`, and ask a maintainer to add the matching repository
+  secret
 
 ## 🚀 Submitting Changes
 
@@ -292,6 +340,21 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
 | `test:`     | Adding or modifying tests                      |
 | `chore:`    | Maintenance (build, deps, etc.)                |
 
+### 🔢 Bump the Version
+
+Every pull request raises `version` in `pyproject.toml` by exactly one step from `dev`'s, once for the whole pull
+request, and runs `uv lock` so `uv.lock` records the same version. For example, if the version on `dev` is `4.18.0`, the
+new version is one of:
+
+| Bump  | Next version | Use for…                                                                                                                                                  |
+| ----- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| minor | `4.19.0`     | The default, whatever the change                                                                                                                          |
+| patch | `4.18.1`     | Anything that was meant to be part of the last minor release but was missed or split out into its own pull request, whether a feature, fix, docs or tests |
+| major | `5.0.0`      | A backwards-incompatible API or schema change                                                                                                             |
+
+The *Version check* in CI fails on anything else: an unchanged version, a skipped one such as `4.20.0`, or one that
+does not reset the numbers to its right, such as `4.19.1`.
+
 ### 📤 Push and Open a Pull Request
 
 1. Push your branch to your fork:
@@ -304,7 +367,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
 
 1. In your PR:
 
-   - Use a clear and descriptive title
+   - Use a [Conventional Commit](https://www.conventionalcommits.org/) title, such as `feat: add X` or `fix: handle Y`
+     (`feat!:` or `fix!:` for a breaking change), as the pull request template describes
    - Include a summary of your changes
    - Link any related issues using `Closes #issue-number`
    - Add screenshots, terminal output, or examples if relevant
@@ -312,7 +376,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit 
 After your PR is merged into `dev`, all `pre-commit` checks will run automatically. If they pass, deployment to staging is triggered.
 The maintainers will review your PR, provide feedback, and may request changes. Once approved, your PR will be merged
 into the `dev` branch and deployed to staging for testing. After successful validation, changes will be promoted to
-production which is manually trigerred by authorized maintainers.
+production, which is triggered manually by authorized maintainers.
 
 ## ❓ Need Help?
 
@@ -330,8 +394,11 @@ If you get stuck or have questions:
 
 If you discover a security vulnerability, **please do not open a public issue**.
 
-Instead, report it privately by contacting the maintainers. We take all security concerns seriously and will respond
-promptly.
+Instead, report it as described in [SECURITY.md](SECURITY.md). We take all security concerns seriously and will
+respond promptly.
+
+This service handles students' PESU passwords on every request, so changes must never log, store or return a password,
+the access token PESU Academy issues, or any personal data beyond what the API already returns.
 
 ## ✨ Code Style Guide
 
@@ -344,6 +411,9 @@ To keep the codebase clean and maintainable, please follow these conventions:
 - Avoid large functions; keep logic modular and composable
 - Use Python 3.14+ syntax when appropriate (e.g., `match`, `|` union types)
 - Keep imports sorted and remove unused ones (handled automatically via `ruff`)
+- Report a failure by raising a `PESUAcademyError` subclass. Its `message` is what the caller receives, so keep it
+  to the fixed text the API documents; put the specifics, such as the username or what PESU Academy answered, in
+  `detail=`, which only the log sees
 
 ### 📝 Docstrings & Comments
 
@@ -356,14 +426,13 @@ Example:
 
 ```python
 def send_otp(email: str) -> bool:
-    """
-    Sends a one-time password to the given email.
+    """Send a one-time password to the given email address.
 
     Args:
-        email (str): User's email address
+        email (str): The user's email address.
 
     Returns:
-        bool: True if the OTP was sent successfully, False otherwise
+        bool: True if the OTP was sent, False otherwise.
     """
 ```
 
@@ -393,7 +462,6 @@ each label means:
 | Label         | Description                                             |
 | ------------- | ------------------------------------------------------- |
 | `enhancement` | 🟢 A request or proposal for improvement or new feature |
-| `feature`     | 🌟 Work related to adding a new capability              |
 | `question`    | ❓ Request for clarification or discussion              |
 
 ### 📚 Documentation
@@ -410,18 +478,17 @@ each label means:
 
 ### 🔒 Authentication & Core
 
-| Label             | Description                                               |
-| ----------------- | --------------------------------------------------------- |
-| `authentication`  | 🔐 Login, CSRF, token handling, error flows               |
-| `pesuacademy`     | 🎓 PESUAcademy client, authentication, and scraping logic |
-| `student profile` | 🧑‍🎓 HTML parsing & profile field extraction logic          |
+| Label             | Description                                              |
+| ----------------- | -------------------------------------------------------- |
+| `authentication`  | 🔐 Login, token handling, error flows                    |
+| `pesuacademy`     | 🎓 PESUAcademy client, authentication, and profile logic |
+| `student profile` | 🧑‍🎓 Profile response parsing & field mapping logic        |
 
 ### 🧠 Meta / Organization
 
-| Label        | Description                                        |
-| ------------ | -------------------------------------------------- |
-| `api`        | ⚙️ Core FastAPI application and route handlers     |
-| `discussion` | 🗣️ Open-ended conversation about project direction |
+| Label | Description                                    |
+| ----- | ---------------------------------------------- |
+| `api` | ⚙️ Core FastAPI application and route handlers |
 
 > [!NOTE]
 > When opening or triaging issues and PRs, feel free to suggest an appropriate label. Maintainers will review

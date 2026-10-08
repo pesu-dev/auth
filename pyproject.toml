@@ -1,6 +1,6 @@
 [project]
 name = "pesu-auth"
-version = "4.18.0"
+version = "5.0.0"
 description = "A simple API to authenticate PESU credentials using PESU Academy."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -13,14 +13,11 @@ dependencies = [
     "uvicorn>=0.52.4",
     "httpx2>=2.12.0",
     "pydantic>=2.13.5",
-    "selectolax>=0.4.11",
 ]
 
 [dependency-groups]
 dev = [
     "matplotlib>=3.11.2",
-    "mdformat>=1.0.0",
-    "mdformat-gfm>=1.0.0",
     "numpy>=2.5.3",
     "pandas>=3.0.5",
     "pre-commit>=4.6.2",
@@ -39,6 +36,18 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
+
+[tool.coverage.run]
+# Every Python file outside tests/, not just the app: the scripts are run by CI and by
+# contributors, and a file no test imports would otherwise be missing from the report entirely
+source = ["app", "scripts", ".github/scripts"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+# Only the entry point itself; everything it calls lives in a function that is tested
+exclude_also = ['if __name__ == "__main__":']
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

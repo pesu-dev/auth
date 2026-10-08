@@ -6,13 +6,10 @@ from pydantic.alias_generators import to_camel
 from app.metrics.collector import (
     AUTHENTICATION_REQUESTS,
     AUTHENTICATION_RESULTS,
-    CSRF_CACHE,
-    CSRF_REFRESHES,
     ERRORS_BY_TYPE,
     FAILURES_BY_FAULT,
     HTTP_CLIENTS,
     LIFESPAN_EVENTS,
-    PREFETCH_TASKS,
     PROCESS_START_TIME,
     PROFILE_FIELD_FILTERING,
     PROFILE_PARSE_ERRORS,
@@ -339,8 +336,11 @@ class MetricsModel(BaseModel):
     profile_parse_errors: dict[str, int] = Field(
         ...,
         title="Profile Parse Errors",
-        description="Profile page parse failures keyed by what could not be parsed.",
-        json_schema_extra={"example": {"unknown_field": 3}},
+        description=(
+            "Profile response problems keyed by reason: response_structure, unknown_campus_code, missing_field "
+            "or unexpected_value. The last two are counted once per field."
+        ),
+        json_schema_extra={"example": {"unknown_campus_code": 3}},
     )
 
     upstream: dict[str, UpstreamOperationModel] = Field(
@@ -357,27 +357,6 @@ class MetricsModel(BaseModel):
                 }
             }
         },
-    )
-
-    csrf_cache: dict[str, int] = Field(
-        ...,
-        title="CSRF Cache",
-        description='Lookups of the prefetched CSRF client, keyed by "hit" or "miss".',
-        json_schema_extra={"example": {"hit": 760, "miss": 14}},
-    )
-
-    csrf_refreshes: dict[str, int] = Field(
-        ...,
-        title="CSRF Refreshes",
-        description="Periodic background token refreshes keyed by outcome.",
-        json_schema_extra={"example": {"success": 45, "failure": 1}},
-    )
-
-    prefetch_tasks: dict[str, int] = Field(
-        ...,
-        title="Prefetch Tasks",
-        description="Background CSRF prefetch tasks keyed by outcome.",
-        json_schema_extra={"example": {"success": 770, "failure": 4, "cancelled": 1}},
     )
 
     http_clients: dict[str, int] = Field(
@@ -441,9 +420,6 @@ class MetricsModel(BaseModel):
             profile_field_filtering=_counts(snapshot, PROFILE_FIELD_FILTERING.name, "enabled"),
             profile_parse_errors=_counts(snapshot, PROFILE_PARSE_ERRORS.name, "reason"),
             upstream=_upstream(snapshot),
-            csrf_cache=_counts(snapshot, CSRF_CACHE.name, "outcome"),
-            csrf_refreshes=_counts(snapshot, CSRF_REFRESHES.name, "outcome"),
-            prefetch_tasks=_counts(snapshot, PREFETCH_TASKS.name, "outcome"),
             http_clients=_counts(snapshot, HTTP_CLIENTS.name, "event"),
             lifespan_events=_counts(snapshot, LIFESPAN_EVENTS.name, "event"),
         )

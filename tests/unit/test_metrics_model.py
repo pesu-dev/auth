@@ -121,23 +121,22 @@ def test_upstream_operations_are_grouped(collector):
     collector.increment(UPSTREAM_REQUESTS, operation="login", outcome="error")
     collector.increment(UPSTREAM_RESPONSES, operation="login", status="200")
     collector.observe(UPSTREAM_LATENCY, 0.4, operation="login")
-    collector.increment(UPSTREAM_REQUESTS, operation="csrf_fetch", outcome="success")
+    collector.increment(UPSTREAM_REQUESTS, operation="profile_fetch", outcome="success")
 
     upstream = MetricsModel.from_snapshot(collector.snapshot()).upstream
-    assert set(upstream) == {"login", "csrf_fetch"}
+    assert set(upstream) == {"login", "profile_fetch"}
     assert upstream["login"].success == 1
     assert upstream["login"].error == 1
     assert upstream["login"].responses_by_status == {"200": 1}
     assert upstream["login"].latency.average_seconds == 0.4
     # An operation that raised before any response has no status codes, and must not be dropped
-    assert upstream["csrf_fetch"].responses_by_status == {}
-    assert upstream["csrf_fetch"].error == 0
+    assert upstream["profile_fetch"].responses_by_status == {}
+    assert upstream["profile_fetch"].error == 0
 
 
 def test_single_label_families_collapse_to_mappings(collector):
     from app.metrics.collector import (
         AUTHENTICATION_RESULTS,
-        CSRF_CACHE,
         FAILURES_BY_FAULT,
         HTTP_CLIENTS,
         PROFILE_PARSE_ERRORS,
@@ -147,16 +146,14 @@ def test_single_label_families_collapse_to_mappings(collector):
     collector.increment(FAILURES_BY_FAULT, fault="client")
     collector.increment(VALIDATION_ERRORS, field="username")
     collector.increment(AUTHENTICATION_RESULTS, result="failure")
-    collector.increment(PROFILE_PARSE_ERRORS, reason="unknown_field")
-    collector.increment(CSRF_CACHE, outcome="hit")
+    collector.increment(PROFILE_PARSE_ERRORS, reason="unknown_campus_code")
     collector.increment(HTTP_CLIENTS, event="created")
 
     model = MetricsModel.from_snapshot(collector.snapshot())
     assert model.failures_by_fault == {"client": 1}
     assert model.validation_errors_by_field == {"username": 1}
     assert model.authentication_results == {"failure": 1}
-    assert model.profile_parse_errors == {"unknown_field": 1}
-    assert model.csrf_cache == {"hit": 1}
+    assert model.profile_parse_errors == {"unknown_campus_code": 1}
     assert model.http_clients == {"created": 1}
 
 

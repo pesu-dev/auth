@@ -15,7 +15,7 @@ body:
     id: summary
     attributes:
       label: 📌 Feature Summary
-      placeholder: e.g. "Add support for fetching date of birth from PESU Academy"
+      placeholder: e.g. "Report the API version on /health"
     validations:
       required: true
 
@@ -42,7 +42,7 @@ body:
       options:
         - Low (Simple addition, e.g., new route or doc update)
         - Medium (Changes multiple files, some model updates)
-        - High (Refactor, scraping updates, or major design change)
+        - High (Refactor, PESU Academy API updates, or major design change)
       multiple: false
     validations:
       required: false

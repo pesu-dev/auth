@@ -17,7 +17,12 @@ if TYPE_CHECKING:
 
 
 def analyze_benchmark(df: pd.DataFrame) -> None:
-    """Analyze benchmark CSV output and print a summary."""
+    """Analyze benchmark CSV output and print a summary.
+
+    Args:
+        df (pd.DataFrame): One benchmark's results, with `status` and `time` columns, and the
+            `start` column benchmark_requests.py writes.
+    """
     total_requests = df.shape[0]
     success_count = df[df["status"] == 1].shape[0]
     failed_count = total_requests - success_count
@@ -29,8 +34,16 @@ def analyze_benchmark(df: pd.DataFrame) -> None:
     min_time = df["time"].min()
     max_time = df["time"].max()
     median_time = statistics.median(df["time"])
-    total_time = df["time"].sum()
-    throughput = total_requests / total_time if total_time else float("inf")
+    # From the first request's start to the last one's end. Adding up the latencies instead is right
+    # only for a sequential run: in a parallel one they overlap, and the sum is many times the run.
+    if "start" in df.columns:
+        elapsed = (df["start"] + df["time"]).max() - df["start"].min()
+        elapsed_note = ""
+    else:
+        # A CSV from before the start column was written
+        elapsed = df["time"].sum()
+        elapsed_note = " (sum of latencies: no start times, so only right for a sequential run)"
+    throughput = total_requests / elapsed if elapsed else float("inf")
 
     p90 = np.percentile(df["time"], 90)
     p95 = np.percentile(df["time"], 95)
@@ -48,7 +61,7 @@ def analyze_benchmark(df: pd.DataFrame) -> None:
     print(f"🔼 Max time             : {max_time:.3f} sec")
     print(f"⏳ Median time          : {median_time:.3f} sec")
     print(f"🚀 Throughput           : {throughput:.2f} requests/sec")
-    print(f"⏰ Total time taken     : {total_time:.3f} sec")
+    print(f"⏰ Elapsed time         : {elapsed:.3f} sec{elapsed_note}")
     print(f"📊 90th percentile time : {p90:.3f} sec")
     print(f"📊 95th percentile time : {p95:.3f} sec")
     print(f"📊 99th percentile time : {p99:.3f} sec")
@@ -114,7 +127,8 @@ def plot_response_time_over_requests(dfs: list[pd.DataFrame], files: list[str], 
     plt.close()
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Summarise and plot benchmark CSV files from the command line."""
     parser = argparse.ArgumentParser(description="Analyze benchmark CSV output.")
     # Required: without it args.files is None and the read below fails with a bare TypeError
     parser.add_argument("--files", "-f", help="Path to the benchmark CSV files", nargs="+", required=True)
@@ -150,3 +164,7 @@ if __name__ == "__main__":
                 tag=args.tag,
             ),
         )
+
+
+if __name__ == "__main__":
+    main()

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Check that a pull request raises the project version and keeps uv.lock in step.
+"""Check that a pull request raises the project version by exactly one step and keeps uv.lock in step.
 
-Used by .github/workflows/ci_checks.yml. Compares the ``project.version`` in the base
-branch's pyproject.toml against the pull request's, and requires the latter to be strictly
-greater. Also checks that uv.lock records the same version, since bumping pyproject.toml without
+Used by .github/workflows/ci_checks.yml. Compares the ``project.version`` in the base branch's
+pyproject.toml against the pull request's. From a base of MAJOR.MINOR.PATCH, the pull request's must
+be the next patch (MAJOR.MINOR.PATCH+1), the next minor (MAJOR.MINOR+1.0) or the next major
+(MAJOR+1.0.0): anything else either leaves the version where it was or skips a version that never
+reaches dev. Also checks that uv.lock records the same version, since bumping pyproject.toml without
 re-running ``uv lock`` leaves the lockfile stale.
 """
 
@@ -15,6 +17,7 @@ import sys
 import tomllib
 from pathlib import Path
 
+VERSION_PATTERN = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 LOCK_VERSION_PATTERN = re.compile(
     r'^name = "pesu-auth"\nversion = "(?P<version>[^"]+)"',
     re.MULTILINE,
@@ -47,21 +50,53 @@ def read_lock_version(path: Path) -> str | None:
     return match.group("version") if match else None
 
 
-def parse_version(version: str) -> tuple[int, ...]:
-    """Parse a dotted version string into a comparable tuple of integers.
+def parse_version(version: str) -> tuple[int, int, int]:
+    """Parse a MAJOR.MINOR.PATCH version string into a tuple of integers.
 
     Args:
         version (str): A version such as "4.0.1".
 
     Returns:
-        tuple[int, ...]: The numeric components, e.g. (4, 0, 1).
+        tuple[int, int, int]: The major, minor and patch numbers, e.g. (4, 0, 1).
 
     Raises:
-        SystemExit: If the version is not a plain dotted-numeric string.
+        SystemExit: If the version is not three dot-separated numbers.
     """
-    if not re.fullmatch(r"\d+(\.\d+)*", version):
-        raise SystemExit(f"❌ Cannot compare non-numeric version {version!r}.")
-    return tuple(int(part) for part in version.split("."))
+    if not (match := VERSION_PATTERN.fullmatch(version)):
+        raise SystemExit(f"❌ {version!r} is not a MAJOR.MINOR.PATCH version, such as 5.0.0.")
+    major, minor, patch = (int(part) for part in match.groups())
+    return major, minor, patch
+
+
+def next_versions(version: tuple[int, int, int]) -> dict[str, tuple[int, int, int]]:
+    """List the versions one step above a version, by the kind of bump each one is.
+
+    A bump resets every number to its right, so after 4.18.1 come 4.18.2, 4.19.0 and 5.0.0.
+
+    Args:
+        version (tuple[int, int, int]): The base version.
+
+    Returns:
+        dict[str, tuple[int, int, int]]: The next patch, minor and major versions.
+    """
+    major, minor, patch = version
+    return {
+        "patch": (major, minor, patch + 1),
+        "minor": (major, minor + 1, 0),
+        "major": (major + 1, 0, 0),
+    }
+
+
+def format_version(version: tuple[int, int, int]) -> str:
+    """Write a version tuple back as a string.
+
+    Args:
+        version (tuple[int, int, int]): The version, e.g. (5, 0, 0).
+
+    Returns:
+        str: The dotted version, e.g. "5.0.0".
+    """
+    return ".".join(str(part) for part in version)
 
 
 def main() -> int:
@@ -85,14 +120,17 @@ def main() -> int:
     print(f"this PR's version : {head_version}")
     print(f"uv.lock version   : {lock_version}")
 
-    if parse_version(head_version) <= parse_version(base_version):
+    allowed = next_versions(parse_version(base_version))
+    bump = next((kind for kind, version in allowed.items() if version == parse_version(head_version)), None)
+    if bump is None:
         print(
-            f"\n❌ The project version must be raised above {base_version}, but this PR leaves it "
-            f"at {head_version}.\n\n"
+            f"\n❌ The project version must go up by exactly one step from {base_version}, but this PR "
+            f"sets it to {head_version}.\n\n"
             "   Every pull request raises `version` in pyproject.toml exactly once, so that what\n"
-            "   is deployed can be identified. One merge to dev is one bump:\n\n"
-            "     minor (x.Y.0) - the default. Raise the minor by one, whatever the change.\n"
-            "     major (X.0.0) - reserved for a backwards-incompatible API or schema change.\n\n"
+            "   is deployed can be identified. One merge to dev is one bump, to one of:\n\n"
+            f"     {format_version(allowed['minor']):<8} minor - the default, whatever the change.\n"
+            f"     {format_version(allowed['patch']):<8} patch - work meant for the last minor, missed or split out.\n"
+            f"     {format_version(allowed['major']):<8} major - a backwards-incompatible API or schema change.\n\n"
             "   Bump once per pull request, not once per feature within it -- a second bump\n"
             "   skips a version that never reaches dev.\n\n"
             "   Then run `uv lock` so uv.lock records the new version, and commit both files.",
@@ -107,7 +145,7 @@ def main() -> int:
         )
         return 1
 
-    print(f"\n✅ Version raised from {base_version} to {head_version}, with uv.lock in step.")
+    print(f"\n✅ Version raised from {base_version} to {head_version} (a {bump} bump), with uv.lock in step.")
     return 0
 
 

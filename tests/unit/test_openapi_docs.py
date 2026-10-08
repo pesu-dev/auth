@@ -6,16 +6,20 @@ models it claims to follow, and against real responses.
 """
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.app import app
-from app.exceptions.authentication import AuthenticationError
-from app.models import MetricsModel, RequestModel, ResponseModel
-
-MODELS = {"ResponseModel": ResponseModel, "MetricsModel": MetricsModel}
+from app.exceptions.authentication import (
+    AuthenticationError,
+    ProfileFetchError,
+    ProfileParseError,
+    UpstreamError,
+)
+from app.models import MetricsModel, ProfileModel, RequestModel, ResponseModel
+from app.pesu import PESUAcademy
 
 
 @pytest.fixture(scope="module")
@@ -28,12 +32,8 @@ def schema():
 
 @pytest.fixture
 def client():
-    with (
-        patch("app.app.pesu_academy.prefetch_client_with_csrf_token", new_callable=AsyncMock),
-        patch("app.app.pesu_academy.close_client", new_callable=AsyncMock),
-    ):
-        with TestClient(app, raise_server_exceptions=False) as test_client:
-            yield test_client
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        yield test_client
 
 
 def _operations(schema):
@@ -69,7 +69,7 @@ def test_every_documented_response_has_a_schema(schema):
                 assert "schema" in content, f"{verb} {path} {code} {media_type} has no schema"
 
 
-def test_json_examples_validate_against_the_model_they_claim(schema):
+def test_json_examples_validate_against_the_model_they_claim(schema, documented_models):
     """An example its own declared model rejects would mislead every reader.
 
     Validated **both** ways. JSON mode is what a caller parsing a response body is in; Python mode
@@ -81,13 +81,17 @@ def test_json_examples_validate_against_the_model_they_claim(schema):
         for code, response in operation["responses"].items():
             content = response.get("content", {}).get("application/json", {})
             ref = content.get("schema", {}).get("$ref", "")
-            model = MODELS.get(ref.rsplit("/", 1)[-1])
-            if model is None or "example" not in content:
+            model = documented_models.get(ref.rsplit("/", 1)[-1])
+            if model is None:
                 continue
-            model.model_validate_json(json.dumps(content["example"]))
-            model.model_validate(content["example"])
-            checked += 1
-    assert checked >= 8, f"only {checked} examples were checked; the sweep is not doing its job"
+            # A response documents either one example or several named ones; both are checked
+            examples = [content["example"]] if "example" in content else []
+            examples += [example["value"] for example in content.get("examples", {}).values()]
+            for example in examples:
+                model.model_validate_json(json.dumps(example))
+                model.model_validate(example)
+                checked += 1
+    assert checked >= 16, f"only {checked} examples were checked; the sweep is not doing its job"
 
 
 def test_request_examples_validate_against_the_request_model(schema):
@@ -236,3 +240,120 @@ def test_the_model_still_rejects_a_wrong_type_elsewhere(client):
     body = client.get("/health").json()
     with pytest.raises(Exception, match="status"):
         ResponseModel.model_validate({**body, "status": "not-a-bool"})
+
+
+def _authenticate_examples(schema, code):
+    content = schema["paths"]["/authenticate"]["post"]["responses"][str(code)]["content"]["application/json"]
+    if "examples" in content:
+        return {name: example["value"] for name, example in content["examples"].items()}
+    return {"example": content["example"]}
+
+
+@pytest.mark.parametrize("name", ["authentication_with_profile", "authentication_with_profile_graduated"])
+def test_the_documented_full_profiles_have_every_default_field(schema, name):
+    """The full-profile examples are what callers copy, so they must show exactly what they get by default."""
+    example = _authenticate_examples(schema, 200)[name]
+    assert list(example["profile"]) == PESUAcademy.DEFAULT_FIELDS
+
+
+def test_a_documented_full_profile_shows_null_values(schema):
+    """A field with no value is null rather than absent, which a caller should see in an example."""
+    example = _authenticate_examples(schema, 200)["authentication_with_profile_graduated"]
+    assert {field for field, value in example["profile"].items() if value is None} == {
+        "semester",
+        "section",
+        "middleName",
+    }
+
+
+@pytest.mark.parametrize(
+    ("name", "body"),
+    [
+        ("missing_field", {"username": "u"}),
+        ("empty_username", {"username": "  ", "password": "p"}),
+        ("unknown_key", {"username": "u", "password": "p", "extra": 1}),
+        ("unknown_profile_field", {"username": "u", "password": "p", "profile": True, "fields": ["phone"]}),
+    ],
+)
+def test_each_documented_authenticate_400_matches_a_real_response(client, schema, name, body):
+    """Each 400 example is the body a caller gets for the mistake it names."""
+    documented = _authenticate_examples(schema, 400)[name]
+    response = client.post("/authenticate", json=body)
+    assert response.status_code == 400
+    assert response.json()["message"] == documented["message"]
+    assert set(response.json()) == set(documented)
+
+
+def test_the_documented_readme_redirect_matches_a_real_response(client, schema):
+    """The redirect has no body; where it goes is in the Location header, as documented."""
+    documented = schema["paths"]["/readme"]["get"]["responses"]["308"]
+    response = client.get("/readme", follow_redirects=False)
+    assert response.status_code == 308
+    assert response.content == b""
+    assert "content" not in documented
+    assert response.headers["location"] == documented["headers"]["Location"]["schema"]["example"]
+
+
+def test_the_profile_model_documents_every_field(schema):
+    """Every field a caller can request is in the published model, in order."""
+    from typing import get_args
+
+    from app.models.profile import ProfileField
+
+    documented_fields = [field.alias for field in ProfileModel.model_fields.values()]
+    assert documented_fields == list(get_args(ProfileField))
+    assert list(schema["components"]["schemas"]["ProfileModel"]["properties"]) == documented_fields
+
+
+def test_the_readme_documents_every_profile_field(schema, repository_root):
+    """The README's ProfileObject table is the other place callers read; it lists every field, in order, typed."""
+    import re
+
+    readme = (repository_root / "README.md").read_text()
+    section = readme.split("##### `ProfileObject`", 1)[1].split("\n### ", 1)[0]
+    rows = re.findall(r"^\| `(\w+)` +\| `(\w+)` +\|", section, flags=re.MULTILINE)
+    assert [field for field, _ in rows] == PESUAcademy.DEFAULT_FIELDS
+
+    json_types = {"str": "string", "int": "integer"}
+    properties = schema["components"]["schemas"]["ProfileModel"]["properties"]
+    for field, readme_type in rows:
+        schema_types = {option.get("type") for option in properties[field]["anyOf"]} - {"null"}
+        assert schema_types == {json_types[readme_type]}, f"{field} is typed differently in the README"
+
+
+def test_each_documented_field_request_has_a_matching_response(schema):
+    """Every request example that names fields is answered by a response example with exactly those."""
+    body = schema["paths"]["/authenticate"]["post"]["requestBody"]["content"]["application/json"]
+    requested = [set(e["value"]["fields"]) for e in body["examples"].values() if "fields" in e["value"]]
+    answered = [set(e["profile"]) for e in _authenticate_examples(schema, 200).values() if "profile" in e]
+    assert requested, "no request example uses fields"
+    for fields in requested:
+        assert fields in answered, f"no response example returns exactly {sorted(fields)}"
+
+
+@pytest.mark.parametrize(
+    ("code", "errors"),
+    [
+        (401, (AuthenticationError,)),
+        (422, (ProfileParseError,)),
+        (502, (UpstreamError, ProfileFetchError)),
+    ],
+)
+def test_the_documented_upstream_errors_match_the_exceptions(schema, code, errors):
+    """Each documented failure is one this API can raise, with that exception's own message."""
+    documented = {example["message"] for example in _authenticate_examples(schema, code).values()}
+    assert documented == {error().message for error in errors}
+    assert {error().status_code for error in errors} == {code}
+
+
+@pytest.mark.parametrize("error", [UpstreamError, ProfileFetchError, ProfileParseError])
+@patch("app.app.pesu_academy.authenticate")
+def test_the_documented_upstream_errors_match_a_real_response(mock_authenticate, client, schema, error):
+    mock_authenticate.side_effect = error()
+    response = client.post("/authenticate", json={"username": "u", "password": "p"})
+    examples = _authenticate_examples(schema, response.status_code).values()
+    # Matched by message rather than position: 502 documents two errors
+    documented = next((example for example in examples if example["message"] == error().message), None)
+    assert documented is not None, f"no {response.status_code} example documents {error.__name__}'s message"
+    assert set(response.json()) == set(documented)
+    assert response.json()["message"] == documented["message"]

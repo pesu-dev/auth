@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import datetime
 import logging
 import os
@@ -16,9 +15,10 @@ import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.routing import APIRoute
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator
 
     from fastapi.requests import Request
     from fastapi.responses import Response
@@ -32,7 +32,6 @@ from app.metrics.auth import require_metrics_token
 from app.metrics.collector import (
     AUTHENTICATION_REQUESTS,
     AUTHENTICATION_RESULTS,
-    CSRF_REFRESHES,
     ERRORS_BY_TYPE,
     LIFESPAN_EVENTS,
     VALIDATION_ERRORS,
@@ -44,62 +43,21 @@ from app.models import MetricsModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
 IST = ZoneInfo("Asia/Kolkata")
-CSRF_TOKEN_REFRESH_INTERVAL_SECONDS = 45 * 60
 # Validation failures are labelled by field, so the label set has to be closed against a caller who
 # can put anything in the request body
 KNOWN_REQUEST_FIELDS = frozenset({"username", "password", "profile", "fields", "fmt", "body"})
 
 
-async def _refresh_csrf_token() -> None:
-    """Refresh the cached unauthenticated CSRF token and client."""
-    await pesu_academy.prefetch_client_with_csrf_token()
-    logging.info("Unauthenticated CSRF token refreshed successfully.")
-
-
-async def _csrf_token_refresh_loop() -> None:
-    """Background task to refresh the CSRF token periodically."""
-    while True:
-        # Sleep first. `lifespan` has already primed the cache by the time this task starts, so
-        # refreshing immediately would fetch a second token and throw away the one just prefetched
-        # -- an extra upstream round trip on every single startup.
-        await asyncio.sleep(CSRF_TOKEN_REFRESH_INTERVAL_SECONDS)
-        try:
-            logging.debug("Refreshing unauthenticated CSRF token...")
-            await _refresh_csrf_token()
-        except Exception:
-            metrics.increment(CSRF_REFRESHES, outcome="failure")
-            logging.exception("Failed to refresh unauthenticated CSRF token in the background.")
-        else:
-            metrics.increment(CSRF_REFRESHES, outcome="success")
-
-
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Lifespan event handler for startup and shutdown events."""
     # Startup
     metrics.increment(LIFESPAN_EVENTS, event="startup")
     logging.info("PESUAuth API startup")
 
-    # Prefetch PESUAcademy client for first request
-    await pesu_academy.prefetch_client_with_csrf_token()
-    logging.info("Prefetched a new PESUAcademy client with an unauthenticated CSRF token.")
-
-    # Start the periodic CSRF token refresh background task
-    refresh_task = asyncio.create_task(_csrf_token_refresh_loop())
-    logging.info("Started the unauthenticated CSRF token refresh background task.")
-
     yield
 
     # Shutdown
-    refresh_task.cancel()
-    try:
-        await refresh_task
-    except asyncio.CancelledError:
-        logging.debug("Unauthenticated CSRF token refresh background task cancelled.")
-    except Exception:
-        logging.exception("Failed to cancel unauthenticated CSRF token refresh background task.")
-
-    await pesu_academy.close_client()
     metrics.increment(LIFESPAN_EVENTS, event="shutdown")
     logging.info("PESUAuth API shutdown.")
 
@@ -117,7 +75,7 @@ app = FastAPI(
         },
         {
             "name": "Documentation",
-            "description": "Render the README and other developer-facing docs.",
+            "description": "Redirect to the project's README on GitHub.",
         },
         {
             "name": "Monitoring",
@@ -145,7 +103,10 @@ def _openapi_without_phantom_validation_errors() -> dict[str, Any]:
     document a response that cannot occur, in a shape this API never emits.
 
     Only the auto-generated ones are removed. `/authenticate` genuinely returns a 422 for a profile
-    parse failure and documents it with `ResponseModel`, so it is matched on its schema and kept.
+    response it cannot parse and documents it with `ResponseModel`, so it is matched on its schema and kept.
+
+    The documented response examples are also put back as written: FastAPI drops every null from the
+    schema, examples included, which would show a profile field with no value as absent, not null.
 
     Returns:
         dict[str, Any]: The OpenAPI schema, cached on the app after the first call.
@@ -153,6 +114,7 @@ def _openapi_without_phantom_validation_errors() -> dict[str, Any]:
     if app.openapi_schema:
         return app.openapi_schema
     schema = _build_openapi_schema()
+    _restore_documented_examples(schema)
     phantom = "#/components/schemas/HTTPValidationError"
     for operations in schema.get("paths", {}).values():
         for operation in operations.values():
@@ -165,6 +127,23 @@ def _openapi_without_phantom_validation_errors() -> dict[str, Any]:
         schema.get("components", {}).get("schemas", {}).pop(name, None)
     app.openapi_schema = schema
     return schema
+
+
+def _restore_documented_examples(schema: dict[str, Any]) -> None:
+    """Put each route's documented response examples back into the schema exactly as written.
+
+    Args:
+        schema (dict[str, Any]): The OpenAPI schema FastAPI built, changed in place.
+    """
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        for method in route.methods:
+            responses = schema["paths"][route.path][method.lower()]["responses"]
+            for code, documented in route.responses.items():
+                for media_type, content in documented.get("content", {}).items():
+                    examples = {key: content[key] for key in ("example", "examples") if key in content}
+                    responses[str(code)]["content"][media_type].update(examples)
 
 
 app.openapi = _openapi_without_phantom_validation_errors
@@ -214,10 +193,12 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
     # Severity follows the status code. A 4xx is an expected outcome -- a wrong password is the
     # API working correctly -- and logging one at ERROR with a traceback both buries real faults
     # and pages whoever alerts on the error rate. Only 5xx gets a stack trace.
+    # The detail, where there is one, is for the log only: it names the user and says what PESU
+    # Academy answered. The caller gets the fixed message the API documents.
     if exc.status_code < 500:
-        logging.warning(f"{type(exc).__name__}: {exc.message}")
+        logging.warning(f"{type(exc).__name__}: {exc.detail or exc.message}")
     else:
-        logging.exception(f"{type(exc).__name__}: {exc.message}")
+        logging.exception(f"{type(exc).__name__}: {exc.detail or exc.message}")
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -265,6 +246,7 @@ async def health() -> JSONResponse:
 
 @app.get(
     "/metrics",
+    summary="Metrics",
     # The response type depends on ?fmt, so it cannot be declared once. Both shapes are documented
     # in responses= instead, which is what Swagger renders anyway.
     response_model=None,
@@ -315,13 +297,23 @@ async def readme() -> RedirectResponse:
     tags=["Authentication"],
 )
 async def authenticate(payload: RequestModel) -> JSONResponse:
-    """Authenticate a user using their PESU credentials via the PESU Academy service.
+    """Authenticate a user with their PESU credentials, and optionally return their profile.
+
+    The credentials are checked by signing in to PESU Academy. They are sent only there, and the
+    password is never stored or logged.
 
     Request body parameters:
     - username (str): The user's SRN, PRN, email address, or phone number.
     - password (str): The user's password.
-    - profile (bool, optional): Flag indicating whether to retrieve the user's profile information.
-    - fields (List[str], optional): Specific profile fields to include in the response.
+    - profile (bool, optional): Whether to also return the user's profile. Fetching it is a second
+      call to PESU Academy, so the request takes longer. Defaults to false.
+    - fields (List[str], optional): Which profile fields to return, from those listed in
+      `ProfileModel`. Every field is returned when it is omitted. Only used when `profile` is true.
+      Fields come back in `ProfileModel`'s order, whatever order they are asked for in, and a name
+      that is not in `ProfileModel` is a 400.
+
+    Every requested profile field is in the response, and is `null` when PESU Academy has no value
+    for it, does not send it, or sends it in an unexpected shape.
     """
     current_time = datetime.datetime.now(IST)
     # Input has already been validated by the RequestModel
@@ -363,7 +355,10 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
     try:
         authentication_result = ResponseModel.model_validate(authentication_result)
         logging.info(f"Returning auth result for user={username}: {authentication_result}")
-        authentication_result = authentication_result.model_dump(by_alias=True, exclude_none=True)
+        # exclude_unset rather than exclude_none, so that a requested profile field with no value is
+        # still returned, as null. What was never set stays out of the response: the profile when it
+        # was not requested, and any profile field the caller did not ask for.
+        authentication_result = authentication_result.model_dump(by_alias=True, exclude_unset=True)
         authentication_result["timestamp"] = current_time.isoformat()
         return JSONResponse(
             status_code=200,
@@ -378,7 +373,11 @@ async def authenticate(payload: RequestModel) -> JSONResponse:
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    # Set up argument parser for command line arguments
+    """Build the command line parser for running the API.
+
+    Returns:
+        argparse.ArgumentParser: The parser, with --host, --port and --debug.
+    """
     parser = argparse.ArgumentParser(
         description="PESUAuth API - A simple API to authenticate PESU credentials using PESU Academy.",
     )

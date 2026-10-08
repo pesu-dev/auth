@@ -3,7 +3,27 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 
-from app.pesu import ProfileField
+from app.models.profile import ProfileField
+
+
+def _require_valid_text(value: str, label: str) -> None:
+    """Reject a string that cannot be sent to PESU Academy.
+
+    JSON can carry an unpaired surrogate (an escaped code point from U+D800 to U+DFFF), which decodes
+    into a str that cannot be encoded as UTF-8. Left alone it fails while the login request is built,
+    as a 500 for what is the caller's mistake.
+
+    Args:
+        value (str): The value to check.
+        label (str): The field's name, for the error message. The value itself is never included.
+
+    Raises:
+        ValueError: If the value cannot be encoded as UTF-8.
+    """
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        raise ValueError(f"{label} contains characters that are not valid text.") from None
 
 
 class RequestModel(BaseModel):
@@ -21,40 +41,49 @@ class RequestModel(BaseModel):
     password: str = Field(
         ...,
         title="Password",
-        description="User's password for authentication.",
+        description="User's password. It is sent only to PESU Academy, and never stored or logged.",
         json_schema_extra={"example": "mySecurePassword123"},
     )
 
     profile: bool = Field(
         False,
         title="Profile Flag",
-        description="Whether to fetch the user's profile information.",
+        description=(
+            "Whether to also return the user's profile. Fetching it is a second call to PESU Academy, so the "
+            "request takes longer."
+        ),
         json_schema_extra={"example": True},
     )
 
     fields: list[ProfileField] | None = Field(
         None,
         title="Profile Fields",
-        description="List of profile fields to fetch. If omitted, all default fields will be returned.",
-        json_schema_extra={"example": ["name", "email", "campus", "branch", "semester"]},
+        description=(
+            "Which profile fields to return, from those listed in ProfileModel. Every field is returned when "
+            "this is omitted. Only used when profile is true. Fields come back in ProfileModel's order, whatever "
+            "order they are asked for in, and a name that is not in ProfileModel is rejected."
+        ),
+        json_schema_extra={"example": ["name", "email", "campus", "branch", "semester", "firstName", "mobile"]},
     )
 
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
-        """Validate that username is not empty after stripping whitespace."""
+        """Validate that username is valid and not empty after stripping whitespace."""
         v = v.strip()
         if not v:
             raise ValueError("Username cannot be empty.")
+        _require_valid_text(v, "Username")
         return v
 
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        """Validate that password is not empty after stripping whitespace."""
+        """Validate that password is valid and not empty after stripping whitespace."""
         v = v.strip()
         if not v:
             raise ValueError("Password cannot be empty.")
+        _require_valid_text(v, "Password")
         return v
 
     @field_validator("fields")

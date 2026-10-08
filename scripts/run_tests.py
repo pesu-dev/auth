@@ -1,6 +1,5 @@
-"""Script to run all the tests with coverage."""
-
 #!/usr/bin/env python3
+"""Script to run all the tests with coverage."""
 
 import logging
 import os
@@ -9,11 +8,9 @@ import sys
 
 from dotenv import load_dotenv
 
-COVERAGE_ARGS = [
-    "--cov=app",
-    "--cov-report=term-missing",
-    "--cov-fail-under=95",
-]
+# What is measured, branch coverage and the 100% gate are configured in [tool.coverage] in
+# pyproject.toml, so a plain `pytest --cov` measures exactly what this runner and CI enforce
+COVERAGE_ARGS = ["--cov", "--cov-report=term-missing"]
 
 
 def announce_skipped_live_tests() -> None:
@@ -38,7 +35,8 @@ def run_tests() -> int:
     """Run all the tests with coverage and return the exit code."""
     load_dotenv()
 
-    test_username = os.getenv("TEST_EMAIL") and os.getenv("TEST_PRN") and os.getenv("TEST_PHONE")
+    # Every username the live tests log in with: one missing would send None as a username
+    test_username = all(os.getenv(name) for name in ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_MOBILE"))
     test_password = os.getenv("TEST_PASSWORD")
 
     command = ["pytest", *COVERAGE_ARGS, "--disable-warnings", "-v", "-s"]
