@@ -15,7 +15,7 @@ PROFILE_VARIABLES = {
     "semester": "TEST_SEMESTER",
     "section": "TEST_SECTION",
     "email": "TEST_EMAIL",
-    "mobile": "TEST_PHONE",
+    "mobile": "TEST_MOBILE",
     "campusCode": "TEST_CAMPUS_CODE",
     "campus": "TEST_CAMPUS",
     "firstName": "TEST_FIRST_NAME",

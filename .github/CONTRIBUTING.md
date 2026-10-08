@@ -299,7 +299,8 @@ run it alongside the live tests: both wait on PESU Academy, so each skews the ot
   whose descriptions become the Swagger docs. Add it to both full-profile examples in `app/docs/authenticate.py`
   and to the README's `ProfileObject` table, and to the fixture payloads and `FULL_PROFILE` in
   `tests/unit/conftest.py`; tests check that each lists every field, in order
-- For the live tests, give a new field a `TEST_*` variable in `.env.example` and in `PROFILE_VARIABLES` in
+- For the live tests, give a new field a `TEST_*` variable named after it (`TEST_BRANCH_SHORT_CODE` for
+  `branchShortCode`) in `.env.example` and in `PROFILE_VARIABLES` in
   `tests/conftest.py`, so they compare it with the test account's real value; a unit test fails until every
   field has one. If the field is an integer, also list it in `INTEGER_FIELDS` there. Add the variable to the
   test job's `env` in `.github/workflows/ci_checks.yml`, and ask a maintainer to add the matching repository

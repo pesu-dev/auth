@@ -4,6 +4,7 @@ import asyncio
 
 import httpx2
 import pytest
+from pydantic.alias_generators import to_snake
 
 from app.exceptions.authentication import (
     AuthenticationError,
@@ -1188,6 +1189,11 @@ async def test_blood_group_is_never_returned(pesu, upstream, make_response, logi
 def test_every_profile_field_has_a_test_variable(profile_variables):
     """Every field has a TEST_* variable, so the live tests compare each one with the test account's value."""
     assert list(profile_variables) == PESUAcademy.DEFAULT_FIELDS
+
+
+def test_each_test_variable_is_named_after_its_field(profile_variables):
+    """branchShortCode is TEST_BRANCH_SHORT_CODE, so the variable for a field never needs looking up."""
+    assert profile_variables == {field: f"TEST_{to_snake(field).upper()}" for field in profile_variables}
 
 
 def test_an_empty_test_variable_expects_null(monkeypatch, request, profile_variables):

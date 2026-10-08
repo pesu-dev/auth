@@ -58,9 +58,9 @@ def test_integration_authenticate_success_username_prn(client):
 
 
 @pytest.mark.secret_required
-def test_integration_authenticate_success_username_phone(client):
+def test_integration_authenticate_success_username_mobile(client):
     payload = {
-        "username": os.getenv("TEST_PHONE"),
+        "username": os.getenv("TEST_MOBILE"),
         "password": os.getenv("TEST_PASSWORD"),
         "profile": False,
     }

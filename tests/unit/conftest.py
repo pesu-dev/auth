@@ -18,7 +18,7 @@ VERSION_CHECK_SCRIPT = REPOSITORY_ROOT / ".github" / "scripts" / "check_version_
 # The offset of every timestamp this API returns
 IST_OFFSET = timedelta(hours=5, minutes=30)
 # The variables scripts/run_tests.py needs before it runs the live tests
-CREDENTIAL_VARIABLES = ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_PHONE", "TEST_PASSWORD")
+CREDENTIAL_VARIABLES = ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_MOBILE", "TEST_PASSWORD")
 METRICS_TOKEN = "test-metrics-token"
 # The models the OpenAPI docs refer to by name
 DOCUMENTED_MODELS = {"ResponseModel": ResponseModel, "MetricsModel": MetricsModel}

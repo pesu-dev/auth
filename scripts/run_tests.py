@@ -36,7 +36,7 @@ def run_tests() -> int:
     load_dotenv()
 
     # Every username the live tests log in with: one missing would send None as a username
-    test_username = all(os.getenv(name) for name in ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_PHONE"))
+    test_username = all(os.getenv(name) for name in ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_MOBILE"))
     test_password = os.getenv("TEST_PASSWORD")
 
     command = ["pytest", *COVERAGE_ARGS, "--disable-warnings", "-v", "-s"]

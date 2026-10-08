@@ -103,7 +103,7 @@ jobs:
       TEST_SEMESTER: ${{ secrets.TEST_SEMESTER }}
       TEST_SECTION: ${{ secrets.TEST_SECTION }}
       TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
-      TEST_PHONE: ${{ secrets.TEST_PHONE }}
+      TEST_MOBILE: ${{ secrets.TEST_MOBILE }}
       TEST_CAMPUS: ${{ secrets.TEST_CAMPUS }}
       TEST_CAMPUS_CODE: ${{ secrets.TEST_CAMPUS_CODE }}
       TEST_FIRST_NAME: ${{ secrets.TEST_FIRST_NAME }}

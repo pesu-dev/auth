@@ -41,13 +41,13 @@ async def test_authenticate_success_username_prn(pesu_academy: PESUAcademy):
 
 @pytest.mark.secret_required
 @pytest.mark.asyncio
-async def test_authenticate_success_username_phone(pesu_academy: PESUAcademy):
-    phone = os.getenv("TEST_PHONE")
+async def test_authenticate_success_username_mobile(pesu_academy: PESUAcademy):
+    mobile = os.getenv("TEST_MOBILE")
     password = os.getenv("TEST_PASSWORD")
-    assert phone is not None, "TEST_PHONE environment variable not set"
+    assert mobile is not None, "TEST_MOBILE environment variable not set"
     assert password is not None, "TEST_PASSWORD environment variable not set"
 
-    result = await pesu_academy.authenticate(phone, password, profile=False, fields=None)
+    result = await pesu_academy.authenticate(mobile, password, profile=False, fields=None)
     assert result["status"] is True
     assert "Login successful" in result["message"]
     assert "profile" not in result
