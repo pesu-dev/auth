@@ -15,22 +15,17 @@ returns the user's profile information. No personal data is stored.
 
 ### How it works
 
-PESUAuth signs in to [PESU Academy](https://www.pesuacademy.com/) on the user's behalf, through the same API that the
-PESU Academy mobile app uses:
+PESUAuth checks the username and password with [PESU Academy](https://www.pesuacademy.com/), through the same API
+that the PESU Academy mobile app uses. If PESU Academy accepts them, the request succeeds; if it rejects them,
+PESUAuth answers `401`. If you ask for the profile, PESUAuth fetches it too and returns it as a
+[`ProfileObject`](#profileobject).
 
-1. The username and password are sent to PESU Academy's login endpoint. If PESU Academy accepts them, the request
-   succeeds; if it rejects them, PESUAuth answers `401`.
-1. If the profile was requested, a second call fetches it with the access token that the login returned, and the result
-   is mapped into the [`ProfileObject`](#profileobject) described below.
-
-Credentials are only ever sent to PESU Academy, over HTTPS. The password is never stored or logged, and neither is the
-access token PESU Academy issues. Every request uses its own connection to PESU Academy, closed before PESUAuth
-responds, so nothing from one user's sign-in is shared with another's.
+Credentials are only ever sent to PESU Academy, over HTTPS, and are never stored or logged. Nothing from one user's
+sign-in is shared with another's.
 
 > [!NOTE]
 > PESU Academy's mobile API is not publicly documented and can change without notice. If it does, `/authenticate`
 > may answer `422` or `502`, or return `null` for the profile fields that changed, until PESUAuth is updated to match.
-> [`/metrics`](#metrics) counts those fields as `missing_field` or `unexpected_value`.
 
 ## PESUAuth LIVE Deployment
 
@@ -166,14 +161,14 @@ the string `"true"` for `profile`), an unknown key, an empty `fields` list, or a
 
 #### Responses
 
-| **Code** | **When**                                                                                                                                                                |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `200`    | The credentials are valid. `profile` is included if it was requested                                                                                                    |
-| `400`    | The request body failed validation, as described above                                                                                                                  |
-| `401`    | PESU Academy rejected the credentials: a wrong password, or a user that does not exist                                                                                  |
-| `422`    | PESU Academy's profile response could not be parsed, or reported success without any `STUDENT_INFO`, which means their API changed. Only when the profile was requested |
-| `500`    | An unexpected failure, rendered by the catch-all handler                                                                                                                |
-| `502`    | PESU Academy could not be reached, timed out, or answered the login or profile request unexpectedly                                                                     |
+| **Code** | **When**                                                                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `200`    | The credentials are valid. `profile` is included if it was requested                                                                       |
+| `400`    | The request body failed validation, as described above                                                                                     |
+| `401`    | PESU Academy rejected the credentials: a wrong password, or a user that does not exist                                                     |
+| `422`    | PESU Academy's profile response could not be parsed or held no profile, which means their API changed. Only when the profile was requested |
+| `500`    | An unexpected failure, rendered by the catch-all handler                                                                                   |
+| `502`    | PESU Academy could not be reached, timed out, or answered the login or profile request unexpectedly                                        |
 
 Every error this API renders carries the same `{status, message, timestamp}` body, with `status` set to `false`. The
 only exceptions are an unknown path or an unsupported method, which get the framework's own `404` or `405` with a
@@ -201,13 +196,8 @@ Only the fields in the table below can be requested; any other name in `fields` 
 present, and **any field can be `null`** when PESU Academy has no value for it, does not send it, or sends it in an
 unexpected shape. For example, a student who has graduated has a `null` `semester` and `section`. PESU Academy marks a
 missing value with `null` or an empty string, and both become `null`; any other text, `"NA"` included, is returned as
-PESU Academy wrote it, with surrounding whitespace trimmed. A requested field is never left out for having no value;
+PESU Academy stores it, with surrounding whitespace trimmed. A requested field is never left out for having no value;
 only the fields not asked for in `fields` are, and fields come back in the order of the table below.
-
-Every field is taken from the `STUDENT_INFO` block of PESU Academy's profile response, as PESU Academy sends it, except
-`campus` and `gender` (from `STUDENT_PHOTO`, since `STUDENT_INFO` does not have them) and `campusCode` (mapped from
-`campus`). No other part of PESU Academy's responses stands in for a value its source lacks, so that field is `null`; a
-successful profile response whose `STUDENT_INFO` is missing or holds no usable value is a `422`.
 
 | **Field**         | **Type** | **Description**                                                                                                                                                                                                                                                 |
 | ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -229,7 +219,7 @@ successful profile response whose `STUDENT_INFO` is missing or holds no usable v
 | `gender`          | `str`    | Gender of the user, as recorded by PESU                                                                                                                                                                                                                         |
 | `dateOfBirth`     | `str`    | Date of birth, as `YYYY-MM-DD`                                                                                                                                                                                                                                  |
 
-Everything else in PESU Academy's responses, such as the photo, blood group, addresses, parents' details and marks, is
+Everything else in PESU Academy's profile information, such as the photo, blood group, addresses, parents' details and marks, is
 discarded and never returned, and cannot be requested in `fields`.
 
 ### `/health`
@@ -250,8 +240,8 @@ does not take any request parameters.
 ### `/metrics`
 
 This endpoint exposes counters describing the traffic this process has served and the work it did to serve it. It takes
-no request parameters other than the format selector below. It is open by default and can be put behind a bearer token
-— see [Protecting the endpoint](#protecting-the-endpoint).
+no request parameters other than the format selector below. It is open by default and can be put behind a bearer token;
+see [Protecting the endpoint](#protecting-the-endpoint).
 
 #### Query Parameters
 
@@ -279,7 +269,7 @@ curl http://localhost:5000/metrics?fmt=json | jq    # the same numbers, for a hu
 #### How collection works
 
 Everything is counted **in this process, in memory**. There is no database and no external dependency, and the counters
-**reset to zero when the process restarts** — which on the hosted environments is often. The process start time
+**reset to zero when the process restarts**, which on the hosted environments is often. The process start time
 (`startTimeSeconds` in JSON, `process_start_time_seconds` in Prometheus) is exposed so a dashboard can tell a restart
 apart from a drop in traffic.
 
@@ -292,7 +282,7 @@ Collection happens at three layers, and which layer records what is deliberate:
 | **`app/pesu.py`**      | upstream calls, client lifecycle, profile parsing               | These are not HTTP requests to this API at all, so nothing above could see them                                                                                                                  |
 
 The middleware and the handlers write to **different metric families**, so a single failed request contributes exactly
-one status sample and exactly one error sample — never two of either.
+one status sample and exactly one error sample, never two of either.
 
 Two accounting rules hold at all times, and are the quickest way to tell whether the numbers are trustworthy:
 
@@ -348,7 +338,7 @@ A few definitions that are easy to assume wrongly:
 | Metric                                   | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `authentication_requests_total{profile}` | Authentication requests, split by whether profile data was asked for                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `authentication_results_total{result}`   | Attempts by outcome: `success` or `failure`. Deliberately only those two — `errors_total` already names the exception class, and recording the reason here too would put one fact in two places. This family exists for the login **success rate**, where success and failure share a denominator                                                                                                                                                                                                                                                                                                                                                                                       |
+| `authentication_results_total{result}`   | Attempts by outcome: `success` or `failure`. Deliberately only those two; `errors_total` already names the exception class, and recording the reason here too would put one fact in two places. This family exists for the login **success rate**, where success and failure share a denominator                                                                                                                                                                                                                                                                                                                                                                                        |
 | `profile_field_filtering_total{enabled}` | Profile fetches, split by whether the caller narrowed the returned fields. Recorded where the branch is taken, so a caller passing exactly the default list counts as `false`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `profile_parse_errors_total{reason}`     | Profile response problems by what broke: `response_structure` (the response could not be parsed, a `422`), `unknown_campus_code` (a campus name with no known campus code), `missing_field` (a field PESU Academy did not send at all) and `unexpected_value` (a field sent in an unexpected shape). The last two are counted once per field, returned to the caller as `null`, and named in the log. `response_structure`, `missing_field` and `unexpected_value` mean PESU Academy's API changed; `unknown_campus_code` usually means a new campus, or a new way of writing a campus's name. A field PESU Academy sends with no value is not counted: that is a student with no value |
 
@@ -358,23 +348,23 @@ PESU Academy is the only dependency this service has, and the only thing that ca
 measured separately from the API's own, so a slow request can be attributed rather than guessed at. Two operations,
 both calls to PESU Academy's mobile API: `login`, and `profile_fetch` (made only when a profile is requested).
 
-| Metric                                       | Meaning                                                                                                                                                              |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `upstream_requests_total{operation,outcome}` | Calls by outcome: `success`, `error` (raised, including timeouts), `cancelled` (we walked away — a disconnect or a shutdown, deliberately *not* counted as an error) |
-| `upstream_responses_total{operation,status}` | The status code PESU Academy returned                                                                                                                                |
-| `upstream_latency_seconds{operation}`        | Seconds spent waiting on each operation                                                                                                                              |
+| Metric                                       | Meaning                                                                                                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `upstream_requests_total{operation,outcome}` | Calls by outcome: `success`, `error` (raised, including timeouts), `cancelled` (we walked away: a disconnect or a shutdown, deliberately *not* counted as an error) |
+| `upstream_responses_total{operation,status}` | The status code PESU Academy returned                                                                                                                               |
+| `upstream_latency_seconds{operation}`        | Seconds spent waiting on each operation                                                                                                                             |
 
 A wrong password counts as a **successful** `login` call: PESU answered, with a `401`. The call worked; the
-credentials did not. Likewise a profile response we cannot parse is a successful `profile_fetch` — the fetch worked and
+credentials did not. Likewise a profile response we cannot parse is a successful `profile_fetch`; the fetch worked and
 our parsing of it did not.
 
 **Internals**
 
-| Metric                         | Meaning                                                                                                                                                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `http_clients_total{event}`    | `created`, `closed`, `close_failed`. **`created` minus `closed` is how many are still open**, which should be `0` at rest — each login closes its own client. A number that climbs is a connection-pool leak |
-| `lifespan_events_total{event}` | `startup` and `shutdown` seen by this process                                                                                                                                                                |
-| `process_start_time_seconds`   | Start time since the Unix epoch. A gauge, so restarts are visible                                                                                                                                            |
+| Metric                         | Meaning                                                                                                                                                                                                     |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `http_clients_total{event}`    | `created`, `closed`, `close_failed`. **`created` minus `closed` is how many are still open**, which should be `0` at rest; each login closes its own client. A number that climbs is a connection-pool leak |
+| `lifespan_events_total{event}` | `startup` and `shutdown` seen by this process                                                                                                                                                               |
+| `process_start_time_seconds`   | Start time since the Unix epoch. A gauge, so restarts are visible                                                                                                                                           |
 
 #### Prometheus response
 
@@ -489,7 +479,7 @@ pesu_auth_process_start_time_seconds 1757660400.12
 
 #### JSON response
 
-The same numbers, with labels folded into object keys — `responsesByStatus` keyed by status code, `requestsByRoute` by
+The same numbers, with labels folded into object keys: `responsesByStatus` keyed by status code, `requestsByRoute` by
 `"METHOD route-template"`, `errorsByType` by exception class. Latency objects add a pre-computed `averageSeconds`,
 which is `null` rather than absent when nothing has been recorded yet, so the shape is stable.
 
@@ -639,11 +629,11 @@ which is `null` rather than absent when nothing has been recorded yet, so the sh
 `/metrics` is **open unless a token is configured**, through the `METRICS_TOKEN` environment
 variable.
 
-| `METRICS_TOKEN` | Behaviour of `/metrics`                                                |
-| --------------- | ---------------------------------------------------------------------- |
-| unset           | Open. A credential sent anyway is **ignored, not rejected**            |
-| blank           | Same as unset — an empty value means "no token", not "the empty token" |
-| set             | Every request must carry that token, in both formats                   |
+| `METRICS_TOKEN` | Behaviour of `/metrics`                                               |
+| --------------- | --------------------------------------------------------------------- |
+| unset           | Open. A credential sent anyway is **ignored, not rejected**           |
+| blank           | Same as unset; an empty value means "no token", not "the empty token" |
+| set             | Every request must carry that token, in both formats                  |
 
 ```bash
 # Deployed: an environment variable on the service
@@ -667,7 +657,7 @@ The interactive docs at `/` carry an **Authorize** button for it. Paste the toke
 `Bearer ` prefix; Swagger adds that itself.
 
 The variable is read once at startup, so changing it needs a restart. No other endpoint is
-affected — `/health` in particular stays open, since uptime monitors and the hosting platform's own
+affected; `/health` in particular stays open, since uptime monitors and the hosting platform's own
 health check send no credentials.
 
 #### Scraping the endpoint
@@ -766,7 +756,7 @@ curl -X POST http://localhost:5000/authenticate \
 #### Requesting specific fields
 
 Pass `fields` to receive only some of the profile, in any order; they come back in the order of the table above. A
-requested field that the user has no value for is `null` — here, a student who has graduated and has no middle
+requested field that the user has no value for is `null`: here, a student who has graduated and has no middle
 name.
 
 ```bash
