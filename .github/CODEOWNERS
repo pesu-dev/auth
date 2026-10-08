@@ -7,8 +7,6 @@
 .github/ @aditeyabaral
 
 ## Project Configuration
-pyproject.toml @aditeyabaral
-uv.lock @aditeyabaral
 .pre-commit-config.yaml @aditeyabaral
 .env.example @aditeyabaral
 
