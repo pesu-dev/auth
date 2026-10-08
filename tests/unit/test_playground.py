@@ -29,3 +29,4 @@ def test_request_only_controls():
     assert "### Example request" not in PLAYGROUND_HTML
     assert 'id="reloadBtn"' in PLAYGROUND_HTML
     assert 'id="dotGrid"' in PLAYGROUND_HTML
+    

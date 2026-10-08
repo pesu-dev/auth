@@ -611,7 +611,7 @@ PLAYGROUND_HTML = r"""<!doctype html>
         box-shadow: var(--shadow);
         display: flex;
         flex-direction: column;
-        gap: 3px; 
+        gap: 3px;
       }
       .select-option {
         display: block;
@@ -1251,12 +1251,18 @@ PLAYGROUND_HTML = r"""<!doctype html>
                 : (media.schema ? schemaTree(media.schema) : "");
               const id = `response-${code}-${index}`;
               const selector = examples.length > 1
-                ? `<label for="${id}">Example</label><select id="${id}" data-response-code="${esc(code)}" data-response-type="${esc(type)}">${examples.map(([key, item]) => `<option value="${esc(key)}">${esc(item.summary || key)}</option>`).join("")}</select>`
+                ? `<label for="${id}">Example</label><select id="${id}" data-response-code="${esc(code)}"`
+                  + ` data-response-type="${esc(type)}">${examples.map(([key, item]) =>
+                  `<option value="${esc(key)}">${esc(item.summary || key)}</option>`).join("")}</select>`
                 : "";
               const note = example === media.example ? "" : examples[0]?.[1]?.description || "";
-              return `<div class="response-media"><span class="response-media-type">${esc(type)}</span>${selector}<div class="example-description">${renderMarkdown(note)}</div>${shown !== "" ? `<pre class="schema">${esc(shown)}</pre>` : ""}</div>`;
+              return `<div class="response-media"><span class="response-media-type">${esc(type)}</span>${selector}`
+                + `<div class="example-description">${renderMarkdown(note)}</div>`
+                + `${shown !== "" ? `<pre class="schema">${esc(shown)}</pre>` : ""}</div>`;
             }).join("");
-            return `<details class="response-code"><summary>${label}</summary><div class="response-body">${renderMarkdown(r.description || "Response")}${blocks}</div></details>`;
+            return `<details class="response-code"><summary>${label}</summary>`
+              + `<div class="response-body">${renderMarkdown(r.description || "Response")}`
+              + `${blocks}</div></details>`;
           }).join("");
         const animateResponse = (details, opening) => {
           const start = details.getBoundingClientRect().height;
@@ -1350,7 +1356,9 @@ PLAYGROUND_HTML = r"""<!doctype html>
               menu.appendChild(item);
             });
             const height = menu.getBoundingClientRect().height;
-            menu.style.top = `${rect.bottom + height + 4 <= innerHeight ? rect.bottom + 4 : Math.max(4, rect.top - height - 4)}px`;
+            menu.style.top = `${rect.bottom + height + 4 <= innerHeight
+              ? rect.bottom + 4
+              : Math.max(4, rect.top - height - 4)}px`;
             trigger.setAttribute("aria-expanded", "true");
             const outside = (event) => {
               if (!menu.contains(event.target) && !trigger.contains(event.target)) closeDropdown();
@@ -1372,7 +1380,9 @@ PLAYGROUND_HTML = r"""<!doctype html>
               const index = items.indexOf(document.activeElement);
               if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
                 event.preventDefault();
-                const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+                const next = event.key === "Home" ? 0 : event.key === "End"
+                  ? items.length - 1
+                  : (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
                 items[next]?.focus();
               } else if (event.key === "Escape" || event.key === "Tab") {
                 closeDropdown();
@@ -1416,8 +1426,13 @@ PLAYGROUND_HTML = r"""<!doctype html>
         $("tag").textContent = (op.tags || ["API reference"])[0];
         $("title").textContent =
           op.summary || `${method.toUpperCase()} ${path}`;
+        const sectionSplit = new RegExp(
+          "\\n\\s*(?:#{1,6}\\s*)?(?:(?:Request body|Query)\\s+)?"
+            + "(?:Parameters|Args|Arguments|Returns|Raises|Responses)\\s*:?\\s*\\n",
+          "i",
+        );
         const desc = (op.description || "")
-          .split(/\n\s*(?:#{1,6}\s*)?(?:(?:Request body|Query)\s+)?(?:Parameters|Args|Arguments|Returns|Raises|Responses)\s*:?\s*\n/i)[0]
+          .split(sectionSplit)[0]
           .replaceAll("—", ",")
           .trim();
         $("description").innerHTML = desc
