@@ -17,7 +17,7 @@ LICENSE @aditeyabaral
 Dockerfile @aditeyabaral
 
 ## Testing
-tests/ @aditeyabaral
+tests/ @pesu-dev/auth-maintainers @aditeyabaral
 scripts/run_tests.py @aditeyabaral
 
 ## Agent Instructions (synced from pesu-dev/skills)
