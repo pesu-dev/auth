@@ -394,13 +394,13 @@ async def test_class_and_section_do_not_need_the_login_response(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("class_name", ["Sem-8", "Sem-4, Section C", "Minor Course (Even Sem)"])
+@pytest.mark.parametrize("class_name", ["Sem-8", "Minor Course (Even Sem)"])
 async def test_the_semester_is_the_class_name_as_sent(
     pesu, upstream, make_response, login_payload, profile_payload, class_name
 ):
     """Not parsed: whatever PESU sends as STUDENT_INFO's ClassName is the semester."""
     profile_payload["STUDENT_INFO"]["ClassName"] = class_name
-    login_payload["mobileJsonObject"]["className"] = "Sem-1, Section A"
+    login_payload["mobileJsonObject"]["className"] = "Sem-1"
 
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 

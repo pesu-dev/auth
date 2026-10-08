@@ -45,7 +45,7 @@ LOGIN_PAYLOAD = {
         "email": "john.doe@example.com",
         "program": "B.Tech.",
         "branch": "Branch:CSE",
-        "className": "Sem-4, Section C",
+        "className": "Sem-4",
         "sectionName": "Section C",
         "loginId": "PES2202500001",
         "departmentId": "0",

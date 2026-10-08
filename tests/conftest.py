@@ -6,11 +6,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# In a TEST_* profile variable, "NA" stands for a value the test account does not have (it has
-# graduated, so no semester or section), which the API returns as null. A sentinel is needed
-# because GitHub secrets cannot be empty. It is this file's convention only: the API returns an "NA"
-# that PESU sends as text, so a test account whose real value is "NA" could not be described here.
-ABSENT = "NA"
 PROFILE_VARIABLES = {
     "name": "TEST_NAME",
     "prn": "TEST_PRN",
@@ -36,12 +31,17 @@ INTEGER_FIELDS = ("campusCode",)
 
 @pytest.fixture
 def expected_profile():
-    """The test account's profile from the TEST_* variables, with None for a field that must be null."""
+    """The test account's profile from the TEST_* variables, with None for a field that must be null.
+
+    An empty variable stands for a field the account has no value for, which the API returns as null.
+    A variable can hold only text, and GitHub Actions reads a secret that does not exist as empty, so
+    such a field needs no secret at all. A variable missing from the environment is still an error.
+    """
     profile = {}
     for field, variable in PROFILE_VARIABLES.items():
         value = os.getenv(variable)
         assert value is not None, f"{variable} environment variable not set"
-        profile[field] = None if value == ABSENT else value
+        profile[field] = value or None
     for field in INTEGER_FIELDS:
         if profile[field] is not None:
             profile[field] = int(profile[field])

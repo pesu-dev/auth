@@ -123,10 +123,10 @@ projects.
 1. **Configure your test credentials:**
    Open the `.env` file and replace the example values with the details of a PESU Academy account you can test with.
    Each variable is documented in `.env.example`. There is a `TEST_*` variable for every profile field, and the live
-   tests compare each one exactly with what the API returns for that account. Set a variable to `NA` when the account
+   tests compare each one exactly with what the API returns for that account. Leave a variable empty when the account
    has no value for that field (for example `TEST_MIDDLE_NAME`, or `TEST_SEMESTER` and `TEST_SECTION` if the account
    has graduated), since the API then returns `null`. CI reads the same variables from the repository's
-   secrets. The file is gitignored: never commit it or paste its values anywhere.
+   secrets, where such a field simply has no secret. The file is gitignored: never commit it or paste its values anywhere.
 
 ### Pre-commit Hooks
 
@@ -296,7 +296,7 @@ run it alongside the live tests: both wait on PESU Academy, so each skews the ot
   they never run
 - Adding a profile field? Read it in the model for its block in `app/models/upstream.py`, return it from
   `PESUAcademy._build_profile`, and add it to `ProfileField` and `ProfileModel` in `app/models/profile.py`,
-  whose descriptions become the Swagger docs. Add it to the full-profile example in `app/docs/authenticate.py`
+  whose descriptions become the Swagger docs. Add it to both full-profile examples in `app/docs/authenticate.py`
   and to the README's `ProfileObject` table, and to the fixture payloads and `FULL_PROFILE` in
   `tests/unit/conftest.py`; tests check that each lists every field, in order
 - For the live tests, give a new field a `TEST_*` variable in `.env.example` and in `PROFILE_VARIABLES` in

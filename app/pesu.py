@@ -408,8 +408,7 @@ class PESUAcademy:
             # here would be a guess that clients can make better themselves
             "program": info.program,
             "branch": info.branch,
-            # Such as "Sem-4". The login response's className adds the section ("Sem-4, Section C"),
-            # but STUDENT_INFO's is the semester alone.
+            # Such as "Sem-4"
             "semester": info.class_name,
             "section": info.section_name,
             "email": info.email,
