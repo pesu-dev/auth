@@ -13,6 +13,7 @@ dependencies = [
     "uvicorn>=0.52.4",
     "httpx2>=2.12.0",
     "pydantic>=2.13.5",
+    "tzdata>=2026.5",
 ]
 
 [dependency-groups]

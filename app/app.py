@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.routing import APIRoute
 
 if TYPE_CHECKING:
@@ -41,6 +41,7 @@ from app.metrics.middleware import record_request_metrics
 from app.metrics.prometheus import PROMETHEUS_CONTENT_TYPE, MetricsFormat, render_prometheus
 from app.models import MetricsModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
+from app.playground import PLAYGROUND_HTML
 
 IST = ZoneInfo("Asia/Kolkata")
 # Validation failures are labelled by field, so the label set has to be closed against a caller who
@@ -66,7 +67,7 @@ app = FastAPI(
     title="PESUAuth API",
     description="A simple and lightweight API to authenticate PESU credentials using PESU Academy",
     version=version("pesu-auth"),
-    docs_url="/",
+    docs_url=None,
     lifespan=lifespan,
     openapi_tags=[
         {
@@ -147,6 +148,14 @@ def _restore_documented_examples(schema: dict[str, Any]) -> None:
 
 
 app.openapi = _openapi_without_phantom_validation_errors
+
+
+async def playground(request: Request) -> HTMLResponse:
+    """Serve the interactive API explorer."""
+    return HTMLResponse(PLAYGROUND_HTML)
+
+
+app.add_route("/", playground, methods=["GET"], include_in_schema=False)
 
 
 @app.middleware("http")

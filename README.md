@@ -135,7 +135,7 @@ The API provides multiple endpoints for authentication, documentation, and monit
 
 | **Endpoint**    | **Method** | **Description**                                        |
 | --------------- | ---------- | ------------------------------------------------------ |
-| `/`             | `GET`      | Serves the interactive API documentation (Swagger UI). |
+| `/`             | `GET`      | Serves the interactive API Explorer. |
 | `/authenticate` | `POST`     | Authenticates a user using their PESU credentials.     |
 | `/health`       | `GET`      | A health check endpoint to monitor the API's status.   |
 | `/metrics`      | `GET`      | Exposes traffic and error counters. See `fmt` below.   |
@@ -653,8 +653,8 @@ curl http://localhost:5000/metrics                                   # 401
 curl -H "Authorization: Bearer <token>" http://localhost:5000/metrics  # 200
 ```
 
-The interactive docs at `/` carry an **Authorize** button for it. Paste the token there with no
-`Bearer ` prefix; Swagger adds that itself.
+The API Explorer at `/` does not send tokens. To call `/metrics` when `METRICS_TOKEN` is set, use
+`curl` with the `Authorization: Bearer <token>` header as shown above.
 
 The variable is read once at startup, so changing it needs a restart. No other endpoint is
 affected; `/health` in particular stays open, since uptime monitors and the hosting platform's own
