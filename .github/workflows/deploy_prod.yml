@@ -1,15 +1,29 @@
+# Releases dev's latest commit to production. Started by hand on dev only (the environments allow no other branch).
+#
+#   1. resolve_version     reads the version and commit from dev; stops unless CI passed on that commit, the version is
+#                          newer than the latest release and Docker Hub credentials are set
+#   2. await_approval      waits for a reviewer set on the promote-gate environment
+#   3. record_production   records the commit live on production, to roll back to
+#   4. build_and_push_image builds the commit's image and pushes it to GHCR as :<sha>
+#   5. deploy_prod         deploys the exact commit on Render; rollback_prod redeploys step 3's commit if this fails
+#   6. release             tags the image vX.Y.Z, latest and prod on GHCR and Docker Hub; creates the tag and Release
+#   7. sync_main           fast-forwards main to the released commit, only after everything above worked
+#
+# If release or sync_main fails, production already runs the new commit: fix the cause and use "Re-run failed jobs".
+# Cancelling the run while deploy_prod waits does not stop the Render deploy or roll it back, so production may still
+# switch to the new commit with nothing released: roll back from the Render dashboard, or start a new run to release it.
 name: Deploy to Production
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/pesu-auth
 
+# One production release at a time; a running release is never cancelled.
 concurrency:
   group: deploy_production
   cancel-in-progress: false
@@ -18,6 +32,9 @@ jobs:
   resolve_version:
     name: Resolve version tag
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     outputs:
       version: ${{ steps.version_info.outputs.version }}
       version_tag: ${{ steps.version_info.outputs.version_tag }}
@@ -27,6 +44,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: dev
+          fetch-depth: 0
 
       - name: Resolve project version
         id: version_info
@@ -39,6 +57,62 @@ jobs:
           echo "commit_sha=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
           echo "Resolved version: ${VERSION} (tag: v${VERSION}) at ${COMMIT_SHA}"
 
+      # The run for dev's push of this commit; a re-run updates the same run, so its latest conclusion counts.
+      - name: Check CI passed on the commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ steps.version_info.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          CONCLUSION=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci_checks.yml/runs?head_sha=${COMMIT_SHA}&event=push&branch=dev" \
+            --jq '.workflow_runs[0] | (.conclusion // .status) // "missing"')
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::CI Checks on dev for ${COMMIT_SHA} is '${CONCLUSION}', not 'success'; deployment stopped."
+            exit 1
+          fi
+          echo "CI Checks passed on ${COMMIT_SHA}."
+
+      # Every release needs a new version: the release job tags it, and a repeated version would only fail there,
+      # after production is deployed.
+      - name: Check the version is newer than the latest release
+        env:
+          VERSION_TAG: ${{ steps.version_info.outputs.version_tag }}
+          COMMIT_SHA: ${{ steps.version_info.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No earlier release tag; ${VERSION_TAG} is the first."
+            exit 0
+          fi
+          if [ "$VERSION_TAG" = "$LATEST_TAG" ]; then
+            # Re-running a release that already tagged this commit is allowed; reusing its version for new code is not.
+            if [ "$(git rev-list -n 1 "$LATEST_TAG")" != "$COMMIT_SHA" ]; then
+              echo "::error::${VERSION_TAG} is already released on another commit; bump the version on dev."
+              exit 1
+            fi
+            echo "${VERSION_TAG} is already tagged on ${COMMIT_SHA}; re-running its release."
+            exit 0
+          fi
+          NEWEST=$(printf '%s\n%s\n' "$LATEST_TAG" "$VERSION_TAG" | sort -V | tail -n 1)
+          if [ "$NEWEST" != "$VERSION_TAG" ]; then
+            echo "::error::${VERSION_TAG} is older than the latest release ${LATEST_TAG}; bump the version on dev."
+            exit 1
+          fi
+          echo "${VERSION_TAG} is newer than the latest release ${LATEST_TAG}."
+
+      # The release job publishes to Docker Hub after production is deployed; checking here stops before anything changes.
+      - name: Check Docker Hub credentials are configured
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          if [ -z "${DOCKER_USER}" ] || [ -z "${DOCKER_PASS}" ]; then
+            echo "::error::Docker Hub credentials must be configured to publish the release image; deployment stopped."
+            exit 1
+          fi
+
+  # Reviewers are set on the promote-gate environment (repository settings), not here.
   await_approval:
     name: Approve ${{ needs.resolve_version.outputs.version_tag }}
     needs: [resolve_version]
@@ -46,32 +120,21 @@ jobs:
     environment: promote-gate
     steps:
       - name: Production promotion approved
+        env:
+          VERSION_TAG: ${{ needs.resolve_version.outputs.version_tag }}
+          COMMIT_SHA: ${{ needs.resolve_version.outputs.commit_sha }}
         run: |
-          echo "✅ Approved ${{ needs.resolve_version.outputs.version_tag }} (commit ${{ needs.resolve_version.outputs.commit_sha }}) for production deployment."
+          echo "✅ Approved ${VERSION_TAG} (commit ${COMMIT_SHA}) for production deployment."
 
-  sync_main:
-    name: Promote the approved commit to main
+  # Recorded after approval, so it is the commit live right before this release deploys.
+  record_production:
+    name: Record the commit live on production
     outputs:
       previous_sha: ${{ steps.current_production.outputs.commit_sha }}
-    needs: [resolve_version, await_approval]
+    needs: [await_approval]
     runs-on: ubuntu-latest
     environment: production
-    env:
-      TARGET_SHA: ${{ needs.resolve_version.outputs.commit_sha }}
     steps:
-      - name: Generate release bot token
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          client-id: ${{ secrets.RELEASE_BOT_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
-
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          fetch-depth: 0
-
       - name: Record the commit currently live on production
         id: current_production
         env:
@@ -93,25 +156,13 @@ jobs:
           fi
           echo "commit_sha=$CURRENT_SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Fast-forward main to the approved commit
-        id: promote
-        run: |
-          set -euo pipefail
-          git fetch origin dev main --prune
-          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
-          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
-          git checkout main
-          # dev may advance during approval; promote only the approved commit.
-          git merge --ff-only "$TARGET_SHA"
-          if [ "$(git rev-parse HEAD)" != "$TARGET_SHA" ]; then
-            echo "::error::main is ahead of the approved commit; promotion stopped."
-            exit 1
-          fi
-          git push origin main
-
+  # The only image build in the pipeline; Render builds its own from the commit, so this image is for Docker Hub and GHCR.
   build_and_push_image:
     name: Publish the approved commit image
-    needs: [resolve_version, sync_main]
+    needs: [resolve_version, record_production]
+    permissions:
+      contents: read
+      packages: write
     uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
     with:
       ref: ${{ needs.resolve_version.outputs.commit_sha }}
@@ -120,37 +171,34 @@ jobs:
       platforms: linux/amd64,linux/arm64
       push: true
 
-  deploy_staging:
-    name: Deploy the approved commit to staging
-    needs: [resolve_version, build_and_push_image]
-    uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
-    with:
-      environment: staging
-      commit_sha: ${{ needs.resolve_version.outputs.commit_sha }}
-      wait_for_completion: true
-    secrets: inherit
-
+  # Render deploys the exact commit even though main has not moved yet (main moves last, in sync_main). 30 minutes
+  # leaves room for slow Render deploys; a timeout counts as a failure and rolls back.
   deploy_prod:
     name: Deploy to Render Production
-    needs: [resolve_version, deploy_staging]
+    needs: [resolve_version, build_and_push_image]
     uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
     with:
       environment: production
       commit_sha: ${{ needs.resolve_version.outputs.commit_sha }}
       wait_for_completion: true
+      timeout_seconds: 1800
     secrets: inherit
 
+  # main has not moved, so a rollback only needs to redeploy the recorded commit. It runs on failure only, not when the
+  # run is cancelled (see the note at the top).
   rollback_prod:
     name: Redeploy the previous production commit
-    needs: [deploy_prod, sync_main]
+    needs: [deploy_prod, record_production]
     if: failure() && needs.deploy_prod.result == 'failure'
     uses: pesu-dev/actions/.github/workflows/deploy_render.yml@v1
     with:
       environment: production
-      commit_sha: ${{ needs.sync_main.outputs.previous_sha }}
+      commit_sha: ${{ needs.record_production.outputs.previous_sha }}
       wait_for_completion: true
+      timeout_seconds: 1800
     secrets: inherit
 
+  # Keeps the run marked failed after a rollback, even when the rollback itself succeeded.
   fail_after_rollback:
     name: Mark deployment as failed after rollback
     needs: [deploy_prod, rollback_prod]
@@ -160,13 +208,15 @@ jobs:
       - name: Fail the workflow
         run: exit 1
 
+  # Runs only once production is live on the new commit, so published images always match what production runs.
   release:
     name: Create release and retag published images
     needs: [resolve_version, deploy_prod]
     if: needs.deploy_prod.result == 'success'
     runs-on: ubuntu-latest
+    # GITHUB_TOKEN is only used for GHCR; the tag and Release are created with the release bot token.
     permissions:
-      contents: write
+      contents: read
       packages: write
     env:
       TARGET_SHA: ${{ needs.resolve_version.outputs.commit_sha }}
@@ -213,9 +263,12 @@ jobs:
             "${IMAGE}:${TARGET_SHA}"
 
       - name: Retag Docker Hub image as version, latest, and prod
-        if: env.DOCKER_USER != '' && env.DOCKER_PASS != ''
         run: |
           set -euo pipefail
+          if [ -z "${DOCKER_USER}" ] || [ -z "${DOCKER_PASS}" ]; then
+            echo "::error::Docker Hub credentials must be configured to publish the release image."
+            exit 1
+          fi
           echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
           DOCKERHUB_IMAGE="${DOCKER_USER}/pesu-auth"
 
@@ -234,6 +287,7 @@ jobs:
             --tag "${DOCKERHUB_IMAGE}:prod" \
             "${IMAGE}:${TARGET_SHA}"
 
+      # sync_main moves main only after this step, so it must leave both the tag and a published Release in place.
       - name: Create git tag and GitHub Release if needed
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -243,12 +297,57 @@ jobs:
 
           if git rev-parse -q --verify "refs/tags/${TAG}"; then
             TAGGED_SHA="$(git rev-list -n 1 "${TAG}")"
-            if [ "${TAGGED_SHA}" = "${TARGET_SHA}" ]; then
-              echo "Git tag ${TAG} already points at ${TARGET_SHA}; skipping release create."
+            if [ "${TAGGED_SHA}" != "${TARGET_SHA}" ]; then
+              echo "::error::Git tag ${TAG} already exists on ${TAGGED_SHA}, not ${TARGET_SHA}."
+              exit 1
+            fi
+            if [ "$(gh release view "${TAG}" --json isDraft --jq .isDraft 2>/dev/null)" = "false" ]; then
+              echo "Git tag ${TAG} and its Release already exist on ${TARGET_SHA}; nothing to create."
               exit 0
             fi
-            echo "Git tag ${TAG} already exists on ${TAGGED_SHA}, not ${TARGET_SHA}."
-            exit 1
+            # A re-run, a hand-pushed tag or a deleted Release can leave the tag without a published Release.
+            echo "Git tag ${TAG} points at ${TARGET_SHA} but has no published Release; creating it from the tag."
+            gh release create "${TAG}" --verify-tag --generate-notes --title "${TAG}"
+            exit 0
           fi
 
           gh release create "${TAG}" --generate-notes --target "${TARGET_SHA}" --title "${TAG}"
+
+  # Last, so main only ever points at a commit that production runs and that was fully released. The release bot can
+  # push to the protected main branch.
+  sync_main:
+    name: Promote the released commit to main
+    needs: [resolve_version, release]
+    runs-on: ubuntu-latest
+    env:
+      TARGET_SHA: ${{ needs.resolve_version.outputs.commit_sha }}
+    steps:
+      - name: Generate release bot token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Fast-forward main to the released commit
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          git fetch origin dev main --prune
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${APP_SLUG}[bot]@users.noreply.github.com"
+          git checkout main
+          # dev may advance during the release; promote only the released commit.
+          git merge --ff-only "$TARGET_SHA"
+          if [ "$(git rev-parse HEAD)" != "$TARGET_SHA" ]; then
+            echo "::error::main is ahead of the released commit; promotion stopped."
+            exit 1
+          fi
+          git push origin main

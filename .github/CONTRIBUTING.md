@@ -58,11 +58,13 @@ rollback. Configure staging with branch `dev`, production with branch `main`, Au
 Dockerfile. Enable automatic PR previews only on staging. Keep the existing Render environment credentials,
 `promote-gate` approval, and release App credentials.
 
-Production promotion advances `main` to the approved commit, publishes its image, and deploys staging before
-production. Before promotion, the workflow records the commit currently live on Render production. On production
-deployment failure, the shared action redeploys that commit. Rollback does not rewind `main`.
-For the first production run after migration, select `dev` in the Run workflow branch selector so the updated workflow
-is used before it reaches `main`.
+Production promotion releases the latest commit on `dev`. It stops before approval unless CI Checks passed on that
+commit and its version is newer than the latest release. After approval by an `auth-maintainers` member, it records the
+commit currently live on Render production, builds the image and deploys production. On production deployment failure,
+the shared action redeploys the recorded commit. On success, it publishes the image to Docker Hub and GHCR, creates the
+GitHub Release, and only then fast-forwards `main` to the released commit. Staging builds no image: Docker Hub and GHCR
+images are published only by production promotion.
+Always select `dev` in the Run workflow branch selector: the deployment environments only allow `dev`.
 
 ### 🔄 Development Workflow
 
