@@ -135,11 +135,23 @@ The API provides multiple endpoints for authentication, documentation, and monit
 
 | **Endpoint**    | **Method** | **Description**                                        |
 | --------------- | ---------- | ------------------------------------------------------ |
-| `/`             | `GET`      | Serves the interactive API Explorer. |
-| `/authenticate` | `POST`     | Authenticates a user using their PESU credentials.     |
-| `/health`       | `GET`      | A health check endpoint to monitor the API's status.   |
-| `/metrics`      | `GET`      | Exposes traffic and error counters. See `fmt` below.   |
-| `/readme`       | `GET`      | Redirects to the project's official GitHub repository. |
+| `/`             | `GET`      | Serves the interactive API Explorer.                    |
+| `/docs`         | `GET`      | Serves the standard Swagger UI documentation.           |
+| `/redoc`        | `GET`      | Serves the ReDoc API documentation.                      |
+| `/openapi.json` | `GET`      | Serves the OpenAPI specification used by both UIs.       |
+| `/authenticate` | `POST`     | Authenticates a user using their PESU credentials.       |
+| `/health`       | `GET`      | A health check endpoint to monitor the API's status.     |
+| `/metrics`      | `GET`      | Exposes traffic and error counters. See `fmt` below.     |
+| `/readme`       | `GET`      | Redirects to the project's official GitHub repository.   |
+
+The Explorer builds request controls and response examples from `/openapi.json`. Enter the
+required credentials, choose whether to fetch a profile, and optionally select profile fields.
+Unselected fields are omitted, so requesting a profile with no fields selected returns the full
+profile. **Copy request** copies a curl command for the current inputs; **Send request** calls the
+API. The response's **Copy** button copies only the body, without its status or timing.
+
+The Explorer's HTML, styles, and scripts live in `app/templates/playground.html` and are served
+directly from that file. It requires no frontend build step or third-party UI dependencies.
 
 ### `/authenticate`
 
@@ -653,8 +665,12 @@ curl http://localhost:5000/metrics                                   # 401
 curl -H "Authorization: Bearer <token>" http://localhost:5000/metrics  # 200
 ```
 
-The API Explorer at `/` does not send tokens. To call `/metrics` when `METRICS_TOKEN` is set, use
-`curl` with the `Authorization: Bearer <token>` header as shown above.
+The API Explorer at `/` shows a **Bearer token** password field for operations marked with bearer
+security in the OpenAPI specification. When `METRICS_TOKEN` is set, enter it before sending the
+request. A nonempty token is sent in the `Authorization: Bearer <token>` header and included in
+**Copy request**. It is never saved to browser storage and is cleared when switching endpoints.
+Copied commands contain any credentials you entered; do not share them publicly. Swagger UI at
+`/docs` also supports tokens through its **Authorize** button.
 
 The variable is read once at startup, so changing it needs a restart. No other endpoint is
 affected; `/health` in particular stays open, since uptime monitors and the hosting platform's own

@@ -219,16 +219,15 @@
       }
       .workspace {
         display: grid;
-        grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr);
+        grid-template-columns: 220px minmax(420px, 1fr) minmax(340px, 0.75fr);
         max-width: 1380px;
         margin: auto;
         min-height: calc(100vh - 62px);
         background: transparent;
       }
       .sidebar {
-        grid-column: 1 / -1;
-        border-bottom: 1px solid var(--line);
-        padding: 20px 24px;
+        border-right: 1px solid var(--line);
+        padding: 28px 16px;
         background: var(--surface);
       }
       .main {
@@ -252,8 +251,7 @@
       }
       .endpoint-list {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px;
+        gap: 6px;
         margin-top: 16px;
       }
       .endpoint {
@@ -262,17 +260,15 @@
         grid-template-columns: 44px 1fr;
         gap: 8px;
         align-items: center;
-        min-height: 54px;
-        border: 1px solid var(--line);
-        background: var(--bg);
+        border: 1px solid transparent;
+        background: transparent;
         text-align: left;
-        padding: 11px 12px;
+        padding: 10px;
         border-radius: 6px;
         cursor: pointer;
       }
       .endpoint:hover {
         background: var(--surface-soft);
-        border-color: var(--line-strong);
       }
       .endpoint.active {
         background: var(--surface-soft);
@@ -471,7 +467,8 @@
       }
       .field-choices {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px 12px;
       }
       .choice {
         display: flex;
@@ -866,10 +863,10 @@
       }
       @media (max-width: 1040px) {
         .workspace {
-          grid-template-columns: minmax(0, 1fr);
+          grid-template-columns: 210px 1fr;
         }
         .request-panel {
-          grid-column: auto;
+          grid-column: 1 / -1;
           border-left: 0;
           border-top: 1px solid var(--line);
           display: grid;
