@@ -84,4 +84,3 @@ def test_explorer_document_is_separate_html():
     """The explorer is served from its standalone HTML template."""
     document = Path(__file__).parents[2] / "app" / "templates" / "playground.html"
     assert PLAYGROUND_HTML == document.read_text(encoding="utf-8")
-    
