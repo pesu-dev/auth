@@ -17,15 +17,18 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "matplotlib>=3.11.2",
-    "numpy>=2.5.3",
-    "pandas>=3.0.5",
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "python-dotenv>=1.2.3",
-    "ruff>=0.16.7",
+    "ruff>=0.16.7"
+]
+
+benchmark = [
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.3",
+    "pandas>=3.0.5",
     "seaborn>=0.13.2",
     "tqdm>=4.70.1",
 ]

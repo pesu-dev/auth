@@ -78,7 +78,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen --all-groups
+        run: uv sync --locked --all-groups
 
       - name: Run Ruff Lint
         run: uv run ruff check . --output-format=github
@@ -123,7 +123,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen --all-groups
+        run: uv sync --locked --all-groups
 
       - name: Run tests with coverage
         run: uv run python scripts/run_tests.py
