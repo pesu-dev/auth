@@ -1,6 +1,4 @@
-"""HTML for the interactive PESUAuth API Explorer."""
-
-PLAYGROUND_HTML = r"""<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -8,7 +6,10 @@ PLAYGROUND_HTML = r"""<!doctype html>
     <meta name="description" content="Explore and test the PESUAuth API." />
     <meta name="color-scheme" content="light dark" />
     <meta property="og:title" content="PESUAuth API Explorer" />
-    <meta property="og:description" content="Explore and test the PESUAuth API." />
+    <meta
+      property="og:description"
+      content="Explore and test the PESUAuth API."
+    />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary" />
     <title>PESUAuth API Explorer</title>
@@ -40,6 +41,12 @@ PLAYGROUND_HTML = r"""<!doctype html>
         --post: #a45d13;
         --danger: #b63e34;
         --code: #f0f0ec;
+        --json-key: #6a4291;
+        --json-string: #286548;
+        --json-number: #965018;
+        --json-literal: #235b98;
+        --success: #286548;
+        --warning: #965018;
         --shadow: 0 10px 35px rgba(30, 31, 28, 0.06);
       }
       :root[data-theme="dark"] {
@@ -58,6 +65,12 @@ PLAYGROUND_HTML = r"""<!doctype html>
         --post: #d6a466;
         --danger: #e48c84;
         --code: #141514;
+        --json-key: #cbb0e5;
+        --json-string: #a9cebb;
+        --json-number: #e6bc91;
+        --json-literal: #a8c8ef;
+        --success: #a9cebb;
+        --warning: #e6bc91;
         --shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
       }
       * {
@@ -206,15 +219,16 @@ PLAYGROUND_HTML = r"""<!doctype html>
       }
       .workspace {
         display: grid;
-        grid-template-columns: 220px minmax(420px, 1fr) minmax(340px, 0.75fr);
+        grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr);
         max-width: 1380px;
         margin: auto;
         min-height: calc(100vh - 62px);
         background: transparent;
       }
       .sidebar {
-        border-right: 1px solid var(--line);
-        padding: 28px 16px;
+        grid-column: 1 / -1;
+        border-bottom: 1px solid var(--line);
+        padding: 20px 24px;
         background: var(--surface);
       }
       .main {
@@ -238,7 +252,8 @@ PLAYGROUND_HTML = r"""<!doctype html>
       }
       .endpoint-list {
         display: grid;
-        gap: 6px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
         margin-top: 16px;
       }
       .endpoint {
@@ -247,15 +262,17 @@ PLAYGROUND_HTML = r"""<!doctype html>
         grid-template-columns: 44px 1fr;
         gap: 8px;
         align-items: center;
-        border: 1px solid transparent;
-        background: transparent;
+        min-height: 54px;
+        border: 1px solid var(--line);
+        background: var(--bg);
         text-align: left;
-        padding: 10px;
+        padding: 11px 12px;
         border-radius: 6px;
         cursor: pointer;
       }
       .endpoint:hover {
         background: var(--surface-soft);
+        border-color: var(--line-strong);
       }
       .endpoint.active {
         background: var(--surface-soft);
@@ -375,7 +392,7 @@ PLAYGROUND_HTML = r"""<!doctype html>
       }
       .field-row {
         display: grid;
-        grid-template-columns: 135px 72px 1fr;
+        grid-template-columns: minmax(90px, 1fr) 75px minmax(0, 2fr);
         gap: 15px;
         padding: 13px 0;
         border-bottom: 1px solid var(--line);
@@ -384,6 +401,105 @@ PLAYGROUND_HTML = r"""<!doctype html>
       .field-row code {
         font-family: "SFMono-Regular", Consolas, monospace;
         overflow-wrap: anywhere;
+      }
+      .field-name {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 6px;
+      }
+      .required-label {
+        font:
+          9px Arial,
+          sans-serif;
+        color: var(--muted);
+      }
+      .field-type {
+        color: var(--soft);
+      }
+      .json-key {
+        color: var(--json-key);
+      }
+      .json-string {
+        color: var(--json-string);
+      }
+      .json-number {
+        color: var(--json-number);
+      }
+      .json-literal {
+        color: var(--json-literal);
+      }
+      .status-chip {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 5px 8px;
+        border: 1px solid currentColor;
+        border-radius: 4px;
+        font:
+          10px/1.5 "SFMono-Regular",
+          Consolas,
+          monospace;
+        color: var(--muted);
+      }
+      .status-chip.success {
+        color: var(--success);
+      }
+      .status-chip.warning {
+        color: var(--warning);
+      }
+      .status-chip.error {
+        color: var(--danger);
+      }
+      .form-group {
+        border: 0;
+        padding: 0;
+        margin: 18px 0 0;
+        min-width: 0;
+      }
+      .form-group legend {
+        font:
+          11px "SFMono-Regular",
+          Consolas,
+          monospace;
+        color: var(--soft);
+      }
+      .choices {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        margin-top: 10px;
+      }
+      .field-choices {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .choice {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        margin: 0;
+        font:
+          11px/1.5 "SFMono-Regular",
+          Consolas,
+          monospace;
+        text-transform: none;
+      }
+      .choice input {
+        margin: 0;
+        accent-color: var(--button);
+      }
+      .form-group:disabled .choice {
+        opacity: 0.5;
+      }
+      .request-copy {
+        width: 100%;
+        margin-top: 20px;
+        padding: 11px;
+      }
+      .form-note {
+        font-size: 11px;
+        color: var(--muted);
+        margin: 8px 0;
       }
       .field-row span {
         color: var(--muted);
@@ -400,7 +516,10 @@ PLAYGROUND_HTML = r"""<!doctype html>
         border: 1px solid var(--line);
         border-radius: 4px;
         background: var(--code);
-        font: 11px/1.65 "SFMono-Regular", Consolas, monospace;
+        font:
+          11px/1.65 "SFMono-Regular",
+          Consolas,
+          monospace;
         white-space: pre;
         overflow-x: auto;
         max-height: 360px;
@@ -417,7 +536,10 @@ PLAYGROUND_HTML = r"""<!doctype html>
       }
       .response-body {
         padding: 14px;
-        font: 13px/1.6 Arial, Helvetica, sans-serif;
+        font:
+          13px/1.6 Arial,
+          Helvetica,
+          sans-serif;
       }
       .response-body p {
         margin: 0 0 10px;
@@ -431,7 +553,10 @@ PLAYGROUND_HTML = r"""<!doctype html>
       .response-media-type {
         display: block;
         color: var(--muted);
-        font: 10px/1.5 "SFMono-Regular", Consolas, monospace;
+        font:
+          10px/1.5 "SFMono-Regular",
+          Consolas,
+          monospace;
       }
       .response-body label {
         margin-top: 10px;
@@ -714,7 +839,7 @@ PLAYGROUND_HTML = r"""<!doctype html>
         position: fixed;
         right: 20px;
         bottom: 20px;
-        z-index: 100;
+        z-index: 11000;
         background: var(--text);
         color: var(--bg);
         padding: 9px 12px;
@@ -741,10 +866,10 @@ PLAYGROUND_HTML = r"""<!doctype html>
       }
       @media (max-width: 1040px) {
         .workspace {
-          grid-template-columns: 210px 1fr;
+          grid-template-columns: minmax(0, 1fr);
         }
         .request-panel {
-          grid-column: 1/-1;
+          grid-column: auto;
           border-left: 0;
           border-top: 1px solid var(--line);
           display: grid;
@@ -773,13 +898,13 @@ PLAYGROUND_HTML = r"""<!doctype html>
           display: block;
         }
         .sidebar {
-          border-right: 0;
-          border-bottom: 1px solid var(--line);
-          padding: 16px 14px;
+          padding: 16px 18px;
         }
         .endpoint-list {
           display: flex;
           overflow: auto;
+          margin-right: -18px;
+          padding-right: 18px;
         }
         .endpoint {
           min-width: 175px;
@@ -927,51 +1052,35 @@ PLAYGROUND_HTML = r"""<!doctype html>
             <div class="section-title">Responses</div>
             <div id="responses" class="responses"></div>
           </section>
-          <hr class="rule" />
-          <section>
-            <div class="section-title">Example request</div>
-            <article id="explanation" class="explanation"></article>
-          </section>
         </main>
         <aside class="request-panel">
-          <div>
-            <div class="panel-head">
-              <strong>Request</strong
-              ><button
-                id="reloadBtn"
-                class="icon-button"
-                type="button"
-                aria-label="Reload endpoints"
-                title="Reload endpoints"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M20 12a8 8 0 0 0-14.93-4" />
-                  <path d="M4 4v4h4" />
-                  <path d="M4 12a8 8 0 0 0 14.93 4" />
-                  <path d="M20 20v-4h-4" />
-                </svg>
-              </button>
-            </div>
+          <form id="requestForm" autocomplete="off">
+            <div class="panel-head"><strong>Request</strong></div>
             <div id="queryFields"></div>
-            <label for="body">Request body</label
-            ><textarea id="body" spellcheck="false" aria-label="Request body">
-{}</textarea
-            ><button id="sendBtn" class="action" type="button">
+            <div id="bodyFields"></div>
+            <div id="authWrap" hidden>
+              <label for="token">Bearer token</label>
+              <input
+                id="token"
+                class="control"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <button id="copyRequestBtn" class="copy request-copy" type="button">
+              Copy request
+            </button>
+            <button id="sendBtn" class="action" type="submit" disabled>
               Send request
             </button>
-          </div>
+          </form>
           <div class="result">
             <div class="result-toolbar">
               <span class="section-title">Response</span
               ><button id="copyBtn" class="copy" type="button">Copy</button>
             </div>
+            <span id="status" class="status-chip" role="status" hidden></span>
             <pre id="output" class="output">No response yet.</pre>
           </div>
         </aside>
@@ -985,6 +1094,7 @@ PLAYGROUND_HTML = r"""<!doctype html>
         method: null,
         operation: null,
         selectedIndex: 0,
+        responseBody: "",
       };
       const $ = (id) => document.getElementById(id);
       const esc = (s) =>
@@ -1030,12 +1140,33 @@ PLAYGROUND_HTML = r"""<!doctype html>
             applyTheme("system");
         },
       );
-      function schemaType(s = {}) {
-        s = resolveSchema(s);
+      function concreteSchema(schema = {}) {
+        const resolved = resolveSchema(schema);
+        const variants = resolved.anyOf || resolved.oneOf;
+        return variants
+          ? concreteSchema(variants.find((v) => v.type !== "null") || {})
+          : resolved;
+      }
+      function schemaType(schema = {}) {
+        const s = resolveSchema(schema);
         const variants = s.anyOf || s.oneOf;
-        if (variants) return variants.map((v) => schemaType(v)).join(" | ");
-        if (s.type === "array") return `array<${schemaType(s.items || {})}>`;
+        if (variants)
+          return variants
+            .filter((v) => v.type !== "null")
+            .map(schemaType)
+            .join(" | ");
+        if (s.type === "array") return `${schemaType(s.items || {})}[]`;
         return s.type || s.title || "object";
+      }
+      function fieldDescription(schema, description = "") {
+        const s = concreteSchema(schema);
+        const values = s.enum || concreteSchema(s.items || {}).enum;
+        return [
+          description || s.description || "",
+          values ? `Allowed values: ${values.join(", ")}.` : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
       }
       function resolveSchema(s = {}, depth = 0) {
         while (s && s.$ref && depth < 10) {
@@ -1056,7 +1187,8 @@ PLAYGROUND_HTML = r"""<!doctype html>
         }
         if (s.type === "array")
           return `array<${schemaTree(s.items || {}, indent, depth)}>`;
-        if (!s.properties || depth > 3) return s.format || s.type || s.title || "any";
+        if (!s.properties || depth > 3)
+          return s.format || s.type || s.title || "any";
         const req = s.required || [];
         const pad = indent.repeat(depth + 1);
         const lines = Object.entries(s.properties).map(
@@ -1071,7 +1203,9 @@ PLAYGROUND_HTML = r"""<!doctype html>
         if (schema.example !== undefined) return schema.example;
         if (schema.default !== undefined) return schema.default;
         if (schema.enum) return schema.enum[0];
-        const variant = (schema.anyOf || schema.oneOf || []).find((v) => v.type !== "null");
+        const variant = (schema.anyOf || schema.oneOf || []).find(
+          (v) => v.type !== "null",
+        );
         if (variant) return exampleForSchema(variant, depth + 1);
         if (schema.type === "object" || schema.properties) {
           const o = {};
@@ -1092,7 +1226,12 @@ PLAYGROUND_HTML = r"""<!doctype html>
         const content = op.requestBody?.content?.["application/json"];
         const examples = content?.examples;
         if (examples) {
-          const first = Object.values(examples)[0];
+          const first =
+            Object.values(examples).find(
+              (item) =>
+                typeof item.value?.username === "string" &&
+                item.value.username.includes("@"),
+            ) || Object.values(examples)[0];
           if (first?.value) return first.value;
         }
         if (content?.example) return content.example;
@@ -1105,15 +1244,21 @@ PLAYGROUND_HTML = r"""<!doctype html>
             name: p.name,
             type: schemaType(p.schema),
             required: p.required,
-            description: p.description || [
-              `${p.in} parameter.`,
-              resolveSchema(p.schema).enum
-                ? `Allowed values: ${resolveSchema(p.schema).enum.join(", ")}.`
-                : "",
-              resolveSchema(p.schema).default !== undefined
-                ? `Default: ${resolveSchema(p.schema).default}.`
-                : "",
-            ].filter(Boolean).join(" "),
+            description: fieldDescription(
+              p.schema,
+              p.description ||
+                [
+                  `${p.in} parameter.`,
+                  resolveSchema(p.schema).enum
+                    ? `Allowed values: ${resolveSchema(p.schema).enum.join(", ")}.`
+                    : "",
+                  resolveSchema(p.schema).default !== undefined
+                    ? `Default: ${resolveSchema(p.schema).default}.`
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" "),
+            ),
           }),
         );
         const schema = requestSchema(op);
@@ -1121,45 +1266,143 @@ PLAYGROUND_HTML = r"""<!doctype html>
         for (const [name, s] of Object.entries(bodySchema?.properties || {}))
           rows.push({
             name,
-            type: name === "fields" ? "List[str]" : schemaType(s),
-            required: (bodySchema.required || []).includes(name),
-            description: s.description || "Request body field",
+            type: schemaType(s),
+            required:
+              (bodySchema.required || []).includes(name) &&
+              !(s.anyOf || []).some((v) => v.type === "null"),
+            description: fieldDescription(
+              s,
+              s.description || "Request body field",
+            ),
           });
         $("fields").innerHTML = rows.length
           ? rows
               .map(
                 (r) =>
-                  `<div class="field-row"><code>${esc(r.name)}</code>` +
-                  `<span>${esc(r.type)}${r.required ? " *" : ""}</span>` +
+                  `<div class="field-row"><div class="field-name"><code>${esc(r.name)}</code>` +
+                  `${r.required ? '<small class="required-label">required</small>' : ""}</div>` +
+                  `<code class="field-type">${esc(r.type)}</code>` +
                   `<p>${esc(r.description)}</p></div>`,
               )
               .join("")
           : '<p class="empty">No input parameters.</p>';
       }
-      function curlExample(path, method, op) {
-        const example = requestExample(op);
-        const query = (op.parameters || [])
-          .filter((p) => p.in === "query")
-          .map(
-            (p, i) =>
-              `${encodeURIComponent(p.name)}=` +
-              encodeURIComponent(
-                resolveSchema(p.schema).default ?? resolveSchema(p.schema).enum?.[0] ?? `value${i + 1}`,
-              ),
-          )
-          .join("&");
-        const url = `${location.origin}${path}${query ? "?" + query : ""}`;
-        let curl = `curl -X ${method.toUpperCase()} '${url}'`;
-        if (example !== null)
-          curl += ` \\\n  -H 'Content-Type: application/json' \\\n  -d '${JSON.stringify(example)}'`;
-        return curl;
+      function hasBearerSecurity(op) {
+        return (op.security ?? state.spec.security ?? []).some((requirement) =>
+          Object.keys(requirement).some((name) => {
+            const scheme = state.spec.components?.securitySchemes?.[name];
+            return (
+              scheme?.type === "http" &&
+              scheme.scheme?.toLowerCase() === "bearer"
+            );
+          }),
+        );
       }
-      function markdownFor(path, method, op) {
-        return [
-          "```bash",
-          curlExample(path, method, op),
-          "```",
-        ].join("\n");
+      function renderBody(op) {
+        const schema = concreteSchema(requestSchema(op) || {});
+        const example = requestExample(op) || {};
+        $("bodyFields").innerHTML = Object.entries(schema.properties || {})
+          .map(([name, raw]) => {
+            const item = concreteSchema(raw);
+            const id = `body-${name}`;
+            const required = (schema.required || []).includes(name);
+            const label = `<label for="${esc(id)}">${esc(name)}${required ? " (required)" : ""}</label>`;
+            if (item.type === "boolean") {
+              return (
+                `<fieldset class="form-group"><legend>${esc(name)}</legend><div class="choices">` +
+                [false, true]
+                  .map(
+                    (value) =>
+                      `<label class="choice"><input type="radio"` +
+                      ` name="${esc(id)}" data-body="${esc(name)}" value="${value}"` +
+                      `${value === (item.default ?? false) ? " checked" : ""}>${value}</label>`,
+                  )
+                  .join("") +
+                "</div></fieldset>"
+              );
+            }
+            if (item.type === "array") {
+              const values = concreteSchema(item.items).enum || [];
+              return (
+                `<fieldset id="${esc(id)}" class="form-group"><legend>${esc(name)}</legend>` +
+                `<div class="choices field-choices">` +
+                values
+                  .map(
+                    (value) =>
+                      `<label class="choice"><input type="checkbox" data-body="${esc(name)}"` +
+                      ` value="${esc(value)}">${esc(value)}</label>`,
+                  )
+                  .join("") +
+                "</div></fieldset>"
+              );
+            }
+            const placeholder = example[name] ?? item.example ?? "";
+            const type = name === "password" ? "password" : "text";
+            return (
+              label +
+              `<input id="${esc(id)}" class="control" data-body="${esc(name)}"` +
+              ` type="${type}" placeholder="${esc(placeholder)}" autocomplete="off" spellcheck="false"` +
+              `${required ? " required" : ""}>`
+            );
+          })
+          .join("");
+        const syncFields = () => {
+          const fields = $("body-fields");
+          if (fields)
+            fields.disabled =
+              document.querySelector('[data-body="profile"]:checked')?.value !==
+              "true";
+        };
+        document
+          .querySelectorAll('[data-body="profile"]')
+          .forEach((el) => el.addEventListener("change", syncFields));
+        syncFields();
+      }
+      function buildRequest() {
+        const url = new URL(state.path, location.origin);
+        document.querySelectorAll("[data-query]").forEach((el) => {
+          if (el.value !== "") url.searchParams.set(el.dataset.query, el.value);
+        });
+        const headers = {};
+        if (hasBearerSecurity(state.operation) && $("token").value.trim())
+          headers.Authorization = `Bearer ${$("token").value.trim()}`;
+        const opts = { method: state.method.toUpperCase(), headers };
+        if (
+          requestSchema(state.operation) &&
+          !["GET", "HEAD"].includes(opts.method)
+        ) {
+          const body = {};
+          const schema = concreteSchema(requestSchema(state.operation));
+          for (const [name, raw] of Object.entries(schema.properties || {})) {
+            const item = concreteSchema(raw);
+            const controls = Array.from(
+              document.querySelectorAll("[data-body]"),
+            ).filter((el) => el.dataset.body === name);
+            if (item.type === "boolean")
+              body[name] = controls.find((el) => el.checked)?.value === "true";
+            else if (item.type === "array") {
+              const selected = controls
+                .filter((el) => el.checked && !el.matches(":disabled"))
+                .map((el) => el.value);
+              if (selected.length) body[name] = selected;
+            } else if (controls[0]) body[name] = controls[0].value;
+          }
+          headers["Content-Type"] = "application/json";
+          opts.body = JSON.stringify(body);
+        }
+        return { url, opts };
+      }
+      function shellQuote(value) {
+        return "'" + String(value).replaceAll("'", "'\"'\"'") + "'";
+      }
+      function currentCurl() {
+        const { url, opts } = buildRequest();
+        const parts = [`curl -X ${opts.method} ${shellQuote(url.href)}`];
+        Object.entries(opts.headers).forEach(([key, value]) =>
+          parts.push(`-H ${shellQuote(`${key}: ${value}`)}`),
+        );
+        if (opts.body) parts.push(`-d ${shellQuote(opts.body)}`);
+        return parts.join(" " + String.fromCharCode(92, 10) + "  ");
       }
       function renderMarkdown(md) {
         let html = "",
@@ -1233,44 +1476,93 @@ PLAYGROUND_HTML = r"""<!doctype html>
         }
         return value;
       }
+      function highlightJson(text) {
+        const escaped = esc(text);
+        return escaped.replace(
+          /(&quot;(?:\\.|(?!&quot;)[^\\])*&quot;)(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
+          (token, string, colon, literal) => {
+            const kind = colon
+              ? "key"
+              : string
+                ? "string"
+                : literal
+                  ? "literal"
+                  : "number";
+            return `<span class="json-${kind}">${token}</span>`;
+          },
+        );
+      }
+      function responseHtml(text, type) {
+        if (/\bjson\b/i.test(type)) {
+          try {
+            JSON.parse(text);
+            return highlightJson(text);
+          } catch {}
+        }
+        return esc(text);
+      }
       function renderResponses(op) {
         const statusNames = {
-          200: "OK", 308: "Permanent redirect", 400: "Bad request",
-          401: "Unauthorized", 422: "Unprocessable entity",
-          500: "Internal server error", 502: "Bad gateway",
+          200: "OK",
+          308: "Permanent redirect",
+          400: "Bad request",
+          401: "Unauthorized",
+          422: "Unprocessable entity",
+          500: "Internal server error",
+          502: "Bad gateway",
         };
         $("responses").innerHTML = Object.entries(op.responses || {})
           .map(([code, r]) => {
             const label = `${esc(code)} · ${esc(statusNames[code] || "Response")}`;
-            const blocks = Object.entries(r.content || {}).map(([type, media], index) => {
-              const examples = Object.entries(media.examples || {})
-                .filter(([, example]) => example.value !== undefined);
-              const example = media.example ?? examples[0]?.[1]?.value;
-              const shown = example !== undefined
-                ? formatResponse(example, type)
-                : (media.schema ? schemaTree(media.schema) : "");
-              const id = `response-${code}-${index}`;
-              const selector = examples.length > 1
-                ? `<label for="${id}">Example</label><select id="${id}" data-response-code="${esc(code)}"`
-                  + ` data-response-type="${esc(type)}">${examples.map(([key, item]) =>
-                  `<option value="${esc(key)}">${esc(item.summary || key)}</option>`).join("")}</select>`
-                : "";
-              const note = example === media.example ? "" : examples[0]?.[1]?.description || "";
-              return `<div class="response-media"><span class="response-media-type">${esc(type)}</span>${selector}`
-                + `<div class="example-description">${renderMarkdown(note)}</div>`
-                + `${shown !== "" ? `<pre class="schema">${esc(shown)}</pre>` : ""}</div>`;
-            }).join("");
-            return `<details class="response-code"><summary>${label}</summary>`
-              + `<div class="response-body">${renderMarkdown(r.description || "Response")}`
-              + `${blocks}</div></details>`;
-          }).join("");
+            const blocks = Object.entries(r.content || {})
+              .map(([type, media], index) => {
+                const examples = Object.entries(media.examples || {}).filter(
+                  ([, example]) => example.value !== undefined,
+                );
+                const example = media.example ?? examples[0]?.[1]?.value;
+                const shown =
+                  example !== undefined
+                    ? formatResponse(example, type)
+                    : media.schema
+                      ? schemaTree(media.schema)
+                      : "";
+                const id = `response-${code}-${index}`;
+                const selector =
+                  examples.length > 1
+                    ? `<label for="${id}">Example</label><select id="${id}" data-response-code="${esc(code)}"` +
+                      ` data-response-type="${esc(type)}">${examples
+                        .map(
+                          ([key, item]) =>
+                            `<option value="${esc(key)}">${esc(item.summary || key)}</option>`,
+                        )
+                        .join("")}</select>`
+                    : "";
+                const note =
+                  example === media.example
+                    ? ""
+                    : examples[0]?.[1]?.description || "";
+                return (
+                  `<div class="response-media"><span class="response-media-type">${esc(type)}</span>${selector}` +
+                  `<div class="example-description">${renderMarkdown(note)}</div>` +
+                  `${shown !== "" ? `<pre class="schema">${responseHtml(shown, type)}</pre>` : ""}</div>`
+                );
+              })
+              .join("");
+            return (
+              `<details class="response-code"><summary>${label}</summary>` +
+              `<div class="response-body">${renderMarkdown(r.description || "Response")}` +
+              `${blocks}</div></details>`
+            );
+          })
+          .join("");
         const animateResponse = (details, opening) => {
           const start = details.getBoundingClientRect().height;
           details._animation?.cancel();
           details.open = true;
           const end = opening
             ? details.getBoundingClientRect().height
-            : details.querySelector("summary").getBoundingClientRect().height + 2;
+            : details.querySelector("summary").getBoundingClientRect().height +
+              2;
           if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
             details.open = opening;
             return;
@@ -1285,27 +1577,43 @@ PLAYGROUND_HTML = r"""<!doctype html>
           };
           details._opening = opening;
         };
-        $("responses").querySelectorAll("details").forEach((details) => {
-          details.querySelector("summary").onclick = (event) => {
-            event.preventDefault();
-            const opening = !(details._animation ? details._opening : details.open);
-            if (opening) {
-              $("responses").querySelectorAll("details").forEach((other) => {
-                if (other !== details && other.open) animateResponse(other, false);
-              });
-            }
-            animateResponse(details, opening);
-          };
-        });
-        $("responses").querySelectorAll("select").forEach((select) => {
-          select.onchange = () => {
-            const media = op.responses[select.dataset.responseCode].content[select.dataset.responseType];
-            const example = media.examples[select.value];
-            const container = select.closest(".response-media");
-            container.querySelector("pre").textContent = formatResponse(example.value, select.dataset.responseType);
-            container.querySelector(".example-description").innerHTML = renderMarkdown(example.description || "");
-          };
-        });
+        $("responses")
+          .querySelectorAll("details")
+          .forEach((details) => {
+            details.querySelector("summary").onclick = (event) => {
+              event.preventDefault();
+              const opening = !(details._animation
+                ? details._opening
+                : details.open);
+              if (opening) {
+                $("responses")
+                  .querySelectorAll("details")
+                  .forEach((other) => {
+                    if (other !== details && other.open)
+                      animateResponse(other, false);
+                  });
+              }
+              animateResponse(details, opening);
+            };
+          });
+        $("responses")
+          .querySelectorAll("select")
+          .forEach((select) => {
+            select.onchange = () => {
+              const media =
+                op.responses[select.dataset.responseCode].content[
+                  select.dataset.responseType
+                ];
+              const example = media.examples[select.value];
+              const container = select.closest(".response-media");
+              container.querySelector("pre").innerHTML = responseHtml(
+                formatResponse(example.value, select.dataset.responseType),
+                select.dataset.responseType,
+              );
+              container.querySelector(".example-description").innerHTML =
+                renderMarkdown(example.description || "");
+            };
+          });
       }
       let closeDropdown = () => {};
       function styleDropdowns() {
@@ -1322,7 +1630,8 @@ PLAYGROUND_HTML = r"""<!doctype html>
           const label = document.querySelector(`label[for="${select.id}"]`);
           trigger.setAttribute("aria-label", label?.textContent || "Example");
           const sync = () => {
-            trigger.textContent = select.selectedOptions[0]?.textContent || "Select";
+            trigger.textContent =
+              select.selectedOptions[0]?.textContent || "Select";
           };
           sync();
           select.addEventListener("change", sync);
@@ -1356,14 +1665,22 @@ PLAYGROUND_HTML = r"""<!doctype html>
               menu.appendChild(item);
             });
             const height = menu.getBoundingClientRect().height;
-            menu.style.top = `${rect.bottom + height + 4 <= innerHeight
-              ? rect.bottom + 4
-              : Math.max(4, rect.top - height - 4)}px`;
+            menu.style.top = `${
+              rect.bottom + height + 4 <= innerHeight
+                ? rect.bottom + 4
+                : Math.max(4, rect.top - height - 4)
+            }px`;
             trigger.setAttribute("aria-expanded", "true");
             const outside = (event) => {
-              if (!menu.contains(event.target) && !trigger.contains(event.target)) closeDropdown();
+              if (
+                !menu.contains(event.target) &&
+                !trigger.contains(event.target)
+              )
+                closeDropdown();
             };
-            const scroll = (event) => { if (!menu.contains(event.target)) closeDropdown(); };
+            const scroll = (event) => {
+              if (!menu.contains(event.target)) closeDropdown();
+            };
             closeDropdown = () => {
               menu.remove();
               trigger.setAttribute("aria-expanded", "false");
@@ -1380,9 +1697,15 @@ PLAYGROUND_HTML = r"""<!doctype html>
               const index = items.indexOf(document.activeElement);
               if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
                 event.preventDefault();
-                const next = event.key === "Home" ? 0 : event.key === "End"
-                  ? items.length - 1
-                  : (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+                const next =
+                  event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? items.length - 1
+                      : (index +
+                          (event.key === "ArrowDown" ? 1 : -1) +
+                          items.length) %
+                        items.length;
                 items[next]?.focus();
               } else if (event.key === "Escape" || event.key === "Tab") {
                 closeDropdown();
@@ -1401,18 +1724,31 @@ PLAYGROUND_HTML = r"""<!doctype html>
       }
       function renderQuery(op) {
         const params = (op.parameters || []).filter((p) => p.in === "query");
-        $("queryFields").innerHTML = params.map((p) => {
-          const schema = resolveSchema(p.schema);
-          const value = schema.default ?? schema.enum?.[0] ?? "";
-          const label = `<label for="q-${esc(p.name)}">${esc(p.name)}${p.required ? " *" : ""}</label>`;
-          const attrs = `id="q-${esc(p.name)}" data-query="${esc(p.name)}" class="control"`;
-          if (schema.enum) {
-            return label + `<select ${attrs}>` + schema.enum.map((v) =>
-              `<option value="${esc(v)}"${v === value ? " selected" : ""}>${esc(v)}</option>`
-            ).join("") + "</select>";
-          }
-          return label + `<input ${attrs} value="${esc(value)}"${p.required ? " required" : ""}>`;
-        }).join("");
+        $("queryFields").innerHTML = params
+          .map((p) => {
+            const schema = resolveSchema(p.schema);
+            const value = schema.default ?? schema.enum?.[0] ?? "";
+            const label = `<label for="q-${esc(p.name)}">${esc(p.name)}${p.required ? " *" : ""}</label>`;
+            const attrs = `id="q-${esc(p.name)}" data-query="${esc(p.name)}" class="control"`;
+            if (schema.enum) {
+              return (
+                label +
+                `<select ${attrs}>` +
+                schema.enum
+                  .map(
+                    (v) =>
+                      `<option value="${esc(v)}"${v === value ? " selected" : ""}>${esc(v)}</option>`,
+                  )
+                  .join("") +
+                "</select>"
+              );
+            }
+            return (
+              label +
+              `<input ${attrs} value="${esc(value)}"${p.required ? " required" : ""}>`
+            );
+          })
+          .join("");
       }
       function selectEndpoint(path, method, op, button, index) {
         state.path = path;
@@ -1427,8 +1763,8 @@ PLAYGROUND_HTML = r"""<!doctype html>
         $("title").textContent =
           op.summary || `${method.toUpperCase()} ${path}`;
         const sectionSplit = new RegExp(
-          "\\n\\s*(?:#{1,6}\\s*)?(?:(?:Request body|Query)\\s+)?"
-            + "(?:Parameters|Args|Arguments|Returns|Raises|Responses)\\s*:?\\s*\\n",
+          "\\n\\s*(?:#{1,6}\\s*)?(?:(?:Request body|Query)\\s+)?" +
+            "(?:Parameters|Args|Arguments|Returns|Raises|Responses)\\s*:?\\s*\\n",
           "i",
         );
         const desc = (op.description || "")
@@ -1438,32 +1774,29 @@ PLAYGROUND_HTML = r"""<!doctype html>
         $("description").innerHTML = desc
           ? renderMarkdown(desc)
           : "<p>No description supplied.</p>";
-        $("description").querySelectorAll("p").forEach((paragraph) => {
-          if (paragraph.textContent.startsWith("The credentials are checked"))
-            paragraph.classList.add("credential-note");
-        });
+        $("description")
+          .querySelectorAll("p")
+          .forEach((paragraph) => {
+            if (paragraph.textContent.startsWith("The credentials are checked"))
+              paragraph.classList.add("credential-note");
+          });
         $("methodPill").textContent = method.toUpperCase();
         $("methodPill").className = `method-pill ${method}`;
         $("pathTitle").textContent = path;
         renderFields(op);
         renderResponses(op);
-        $("explanation").innerHTML = renderMarkdown(
-          markdownFor(path, method, op),
-        );
-        const example = requestExample(op);
-        $("body").value =
-          example === null ? "" : JSON.stringify(example, null, 2);
-        $("body").hidden = !requestSchema(op);
-        document.querySelector('label[for="body"]').hidden = !requestSchema(op);
+        renderBody(op);
         renderQuery(op);
+        $("authWrap").hidden = !hasBearerSecurity(op);
+        $("token").value = "";
+        $("status").hidden = true;
+        state.responseBody = "";
+        $("sendBtn").disabled = false;
         styleDropdowns();
         $("output").className = "output";
         $("output").textContent = "Ready to send.";
       }
-      async function load(showToast = false) {
-        const reload = $("reloadBtn");
-        reload.disabled = true;
-        reload.classList.add("is-loading");
+      async function load() {
         try {
           const r = await fetch("/openapi.json", { cache: "no-store" });
           if (!r.ok) throw new Error("Specification unavailable");
@@ -1496,18 +1829,23 @@ PLAYGROUND_HTML = r"""<!doctype html>
             if (i === Math.min(state.selectedIndex, endpoints.length - 1))
               b.click();
           });
-          if (showToast) toast("API reloaded");
         } catch (e) {
           $("endpoints").innerHTML =
             '<div class="empty">Could not load the API specification.</div>';
-          toast("Reload failed");
-        } finally {
-          reload.disabled = false;
-          reload.classList.remove("is-loading");
+          toast("Could not load the API specification");
         }
       }
-      $("reloadBtn").onclick = () => load(true);
-      $("sendBtn").onclick = async () => {
+      $("copyRequestBtn").onclick = async () => {
+        if (!state.path || !$("requestForm").reportValidity()) return;
+        try {
+          await navigator.clipboard.writeText(currentCurl());
+          toast("Request copied");
+        } catch {
+          toast("Copy unavailable");
+        }
+      };
+      $("requestForm").onsubmit = async (event) => {
+        event.preventDefault();
         if (!state.path) return;
         const btn = $("sendBtn"),
           out = $("output");
@@ -1516,20 +1854,9 @@ PLAYGROUND_HTML = r"""<!doctype html>
         out.className = "output";
         out.textContent = "Waiting for response...";
         try {
-          const url = new URL(state.path, location.origin);
-          document.querySelectorAll("[data-query]").forEach((el) => {
-            if (el.value) url.searchParams.set(el.dataset.query, el.value);
-          });
-          const headers = {};
-          const opts = { method: state.method.toUpperCase(), headers };
-          if (
-            !["GET", "HEAD"].includes(opts.method) &&
-            $("body").value.trim()
-          ) {
-            headers["Content-Type"] = "application/json";
-            JSON.parse($("body").value);
-            opts.body = $("body").value;
-          }
+          const { url, opts } = buildRequest();
+          $("status").hidden = true;
+          state.responseBody = "";
           const started = performance.now();
           if (state.path === "/readme") {
             window.open(url.href, "_blank", "noopener,noreferrer");
@@ -1538,8 +1865,20 @@ PLAYGROUND_HTML = r"""<!doctype html>
           }
           const r = await fetch(url, opts);
           const text = await r.text();
-          const shown = formatResponse(text, r.headers.get("Content-Type") || "");
-          out.textContent = `${r.status} ${r.statusText} · ${Math.round(performance.now() - started)}ms\n\n${shown}`;
+          const shown = formatResponse(
+            text,
+            r.headers.get("Content-Type") || "",
+          );
+          state.responseBody = shown;
+          out.innerHTML = responseHtml(
+            shown,
+            r.headers.get("Content-Type") || "",
+          );
+          $("status").textContent =
+            `${r.status} ${r.statusText} · ${Math.round(performance.now() - started)}ms`;
+          $("status").className =
+            `status-chip ${r.status < 300 ? "success" : r.status < 500 ? "warning" : "error"}`;
+          $("status").hidden = false;
         } catch (e) {
           out.className = "output error";
           out.textContent =
@@ -1553,7 +1892,7 @@ PLAYGROUND_HTML = r"""<!doctype html>
       };
       $("copyBtn").onclick = async () => {
         try {
-          await navigator.clipboard.writeText($("output").textContent);
+          await navigator.clipboard.writeText(state.responseBody);
           toast("Response copied");
         } catch {
           toast("Copy unavailable. Select the response to copy it.");
@@ -1652,4 +1991,4 @@ PLAYGROUND_HTML = r"""<!doctype html>
       load();
     </script>
   </body>
-</html>"""
+</html>
