@@ -276,7 +276,7 @@
       }
       .method {
         font:
-          700 9px "SFMono-Regular",
+          700 11px "SFMono-Regular",
           Consolas,
           monospace;
       }
@@ -288,7 +288,7 @@
       }
       .path {
         font:
-          11px "SFMono-Regular",
+          13px "SFMono-Regular",
           Consolas,
           monospace;
         white-space: nowrap;
@@ -497,6 +497,12 @@
         font-size: 11px;
         color: var(--muted);
         margin: 8px 0;
+      }
+      #body-fields:disabled .choices {
+        opacity: 0.45;
+      }
+      #body-fields:disabled .choice {
+        cursor: not-allowed;
       }
       .field-row span {
         color: var(--muted);
@@ -904,7 +910,7 @@
           padding-right: 18px;
         }
         .endpoint {
-          min-width: 175px;
+          min-width: 195px;
         }
         .sidebar-links {
           display: none;
@@ -968,6 +974,7 @@
               class="theme-option"
               data-theme-value="system"
               role="radio"
+              aria-checked="true"
               aria-label="Use system theme"
               title="System theme"
             >
@@ -985,6 +992,7 @@
               class="theme-option"
               data-theme-value="light"
               role="radio"
+              aria-checked="false"
               aria-label="Use light theme"
               title="Light theme"
             >
@@ -1005,6 +1013,7 @@
               class="theme-option"
               data-theme-value="dark"
               role="radio"
+              aria-checked="false"
               aria-label="Use dark theme"
               title="Dark theme"
             >
@@ -1056,14 +1065,18 @@
             <div id="queryFields"></div>
             <div id="bodyFields"></div>
             <div id="authWrap" hidden>
-              <label for="token">Bearer token</label>
+              <label for="token">Bearer token (optional)</label>
               <input
                 id="token"
                 class="control"
                 type="password"
                 autocomplete="off"
                 spellcheck="false"
+                aria-describedby="tokenNote"
               />
+              <p id="tokenNote" class="form-note">
+                Only needed when the server sets METRICS_TOKEN. Sent in the Authorization header.
+              </p>
             </div>
             <button id="copyRequestBtn" class="copy request-copy" type="button">
               Copy request
@@ -1165,6 +1178,14 @@
           .filter(Boolean)
           .join(" ");
       }
+      function parameterDescription(parameter) {
+        if (state.path === "/metrics" && parameter.name === "fmt")
+          return "Response format: prometheus (default) or json.";
+        return fieldDescription(
+          parameter.schema,
+          parameter.description || `${parameter.in} parameter.`,
+        );
+      }
       function resolveSchema(s = {}, depth = 0) {
         while (s && s.$ref && depth < 10) {
           const name = s.$ref.split("/").pop();
@@ -1241,23 +1262,17 @@
             name: p.name,
             type: schemaType(p.schema),
             required: p.required,
-            description: fieldDescription(
-              p.schema,
-              p.description ||
-                [
-                  `${p.in} parameter.`,
-                  resolveSchema(p.schema).enum
-                    ? `Allowed values: ${resolveSchema(p.schema).enum.join(", ")}.`
-                    : "",
-                  resolveSchema(p.schema).default !== undefined
-                    ? `Default: ${resolveSchema(p.schema).default}.`
-                    : "",
-                ]
-                  .filter(Boolean)
-                  .join(" "),
-            ),
+            description: parameterDescription(p),
           }),
         );
+        if (hasBearerSecurity(op))
+          rows.push({
+            name: "Authorization",
+            type: "header",
+            required: false,
+            description:
+              "Bearer <token>. Only required when the server sets METRICS_TOKEN.",
+          });
         const schema = requestSchema(op);
         const bodySchema = schema ? resolveSchema(schema) : null;
         for (const [name, s] of Object.entries(bodySchema?.properties || {}))
@@ -1327,7 +1342,7 @@
                   .map(
                     (value) =>
                       `<label class="choice"><input type="checkbox" data-body="${esc(name)}"` +
-                      ` value="${esc(value)}">${esc(value)}</label>`,
+                      ` value="${esc(value)}"${name === "fields" ? " checked" : ""}>${esc(value)}</label>`,
                   )
                   .join("") +
                 "</div></fieldset>"
@@ -1343,18 +1358,27 @@
             );
           })
           .join("");
-        const syncFields = () => {
-          const fields = $("body-fields");
-          if (fields)
-            fields.disabled =
-              document.querySelector('[data-body="profile"]:checked')?.value !==
-              "true";
-        };
-        document
-          .querySelectorAll('[data-body="profile"]')
-          .forEach((el) => el.addEventListener("change", syncFields));
-        syncFields();
+        updateProfileFields();
       }
+      function updateProfileFields() {
+        const fieldset = $("body-fields");
+        if (!fieldset) return;
+        const enabled =
+          document.querySelector('[data-body="profile"]:checked')?.value ===
+          "true";
+        fieldset.disabled = !enabled;
+        const checkboxes = Array.from(
+          fieldset.querySelectorAll('input[type="checkbox"]'),
+        );
+        const first = checkboxes[0];
+        if (first)
+          first.setCustomValidity(
+            enabled && !checkboxes.some((checkbox) => checkbox.checked)
+              ? "Select at least one profile field, or set profile to false."
+              : "",
+          );
+      }
+      $("bodyFields").addEventListener("change", updateProfileFields);
       function buildRequest() {
         const url = new URL(state.path, location.origin);
         document.querySelectorAll("[data-query]").forEach((el) => {
@@ -1364,6 +1388,9 @@
         if (hasBearerSecurity(state.operation) && $("token").value.trim())
           headers.Authorization = `Bearer ${$("token").value.trim()}`;
         const opts = { method: state.method.toUpperCase(), headers };
+        const profileRequested =
+          document.querySelector('[data-body="profile"]:checked')?.value ===
+          "true";
         if (
           requestSchema(state.operation) &&
           !["GET", "HEAD"].includes(opts.method)
@@ -1381,7 +1408,12 @@
               const selected = controls
                 .filter((el) => el.checked && !el.matches(":disabled"))
                 .map((el) => el.value);
-              if (selected.length) body[name] = selected;
+              if (name === "fields" && profileRequested && !selected.length)
+                throw new Error(
+                  "Select at least one profile field, or set profile to false.",
+                );
+              if (name === "fields" ? profileRequested : selected.length)
+                body[name] = selected;
             } else if (controls[0]) body[name] = controls[0].value;
           }
           headers["Content-Type"] = "application/json";
@@ -1804,6 +1836,7 @@
               "/readme",
               "/health",
               "/metrics",
+              "/docs",
             ].indexOf(p);
             return i < 0 ? 99 : i;
           };
@@ -1812,6 +1845,32 @@
             for (const [method, op] of Object.entries(methods))
               if (["get", "post", "put", "patch", "delete"].includes(method))
                 endpoints.push({ path, method, op });
+          const swaggerVersion = await fetch("/docs", { cache: "no-store" })
+            .then((response) => response.text())
+            .then((html) => (html.match(/swagger-ui-dist@([^/]+)\//) || [])[1])
+            .catch(() => null);
+          endpoints.push({
+            path: "/docs",
+            method: "get",
+            op: {
+              tags: ["Documentation"],
+              summary: "Swagger UI",
+              description:
+                `FastAPI's built-in interactive documentation, rendered by Swagger UI ` +
+                `${swaggerVersion ? `v${swaggerVersion}` : ""} from \`/openapi.json\`. Open it in a browser with GET /docs.`,
+              responses: {
+                "200": {
+                  description: "The interactive Swagger UI page.",
+                  content: {
+                    "text/html": {
+                      example:
+                        "<!doctype html>\n<html>\n  <!-- Swagger UI, driven by /openapi.json -->\n</html>",
+                    },
+                  },
+                },
+              },
+            },
+          });
           endpoints.sort((a, b) => orderOf(a.path) - orderOf(b.path));
           $("endpoints").innerHTML = "";
           endpoints.forEach((e, i) => {
@@ -1855,9 +1914,12 @@
           $("status").hidden = true;
           state.responseBody = "";
           const started = performance.now();
-          if (state.path === "/readme") {
+          if (state.path === "/readme" || state.path === "/docs") {
             window.open(url.href, "_blank", "noopener,noreferrer");
-            out.textContent = "Opened the README in a new tab.";
+            out.textContent =
+              state.path === "/readme"
+                ? "Opened the README in a new tab."
+                : "Opened Swagger UI in a new tab.";
             return;
           }
           const r = await fetch(url, opts);
