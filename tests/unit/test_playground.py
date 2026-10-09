@@ -64,7 +64,11 @@ def test_metrics_documents_optional_header_and_concise_format():
     """Metrics uses an optional Authorization header, not a query token."""
     assert "Bearer token (optional)" in PLAYGROUND_HTML
     assert "Bearer &lt;token&gt;" not in PLAYGROUND_HTML
-    assert "Bearer <token>. Only required when the server sets METRICS_TOKEN." in PLAYGROUND_HTML
+    assert "Bearer token. Only required when the server sets `METRICS_TOKEN`." in PLAYGROUND_HTML
+    assert (
+        "Only needed when the server sets <code>METRICS_TOKEN</code>. "
+        "Sent in the <code>Authorization</code> header." in PLAYGROUND_HTML
+    )
     assert "Response format: prometheus (default) or json." in PLAYGROUND_HTML
 
 

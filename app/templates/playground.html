@@ -240,8 +240,7 @@
         padding: 28px 24px;
         background: var(--surface);
       }
-      .section-title,
-      .eyebrow {
+      .section-title {
         font:
           10px "SFMono-Regular",
           Consolas,
@@ -251,8 +250,12 @@
       }
       .endpoint-list {
         display: grid;
+        gap: 24px;
+      }
+      .endpoint-group-items {
+        display: grid;
         gap: 6px;
-        margin-top: 16px;
+        margin-top: 12px;
       }
       .endpoint {
         width: 100%;
@@ -313,17 +316,13 @@
       .sidebar-links a:hover {
         color: var(--text);
       }
-      .eyebrow {
-        display: flex;
-        align-items: center;
-      }
       h1 {
         font:
           44px/1.04 Georgia,
           "Times New Roman",
           serif;
         font-weight: 400;
-        margin: 16px 0 12px;
+        margin: 0 0 12px;
       }
       p {
         color: var(--soft);
@@ -798,10 +797,10 @@
         padding-top: 18px;
       }
       .copy {
-        border: 1px solid var(--line);
+        border: 1px solid var(--line-strong);
         border-radius: 5px;
         background: transparent;
-        color: var(--muted);
+        color: var(--text);
         padding: 6px 8px;
         cursor: pointer;
         font:
@@ -809,10 +808,6 @@
           Consolas,
           monospace;
         text-transform: uppercase;
-      }
-      .copy:hover {
-        color: var(--text);
-        border-color: var(--line-strong);
       }
       .output {
         min-height: 130px;
@@ -904,13 +899,18 @@
           padding: 16px 18px;
         }
         .endpoint-list {
-          display: flex;
-          overflow: auto;
-          margin-right: -18px;
-          padding-right: 18px;
+          gap: 18px;
+        }
+        .endpoint-group-items {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
         }
         .endpoint {
-          min-width: 195px;
+          min-width: 0;
+        }
+        .endpoint-group-items > .endpoint:only-child {
+          grid-column: 1 / -1;
         }
         .sidebar-links {
           display: none;
@@ -1031,13 +1031,11 @@
       </header>
       <div class="workspace">
         <aside class="sidebar">
-          <div class="section-title">Endpoints</div>
           <div id="endpoints" class="endpoint-list">
             <div class="empty">Loading...</div>
           </div>
         </aside>
         <main class="main">
-          <div class="eyebrow" id="tag">API reference</div>
           <h1 id="title">Choose an endpoint</h1>
           <div id="description" class="intro">
             Select an endpoint to inspect and test it.
@@ -1075,7 +1073,7 @@
                 aria-describedby="tokenNote"
               />
               <p id="tokenNote" class="form-note">
-                Only needed when the server sets METRICS_TOKEN. Sent in the Authorization header.
+                Only needed when the server sets <code>METRICS_TOKEN</code>. Sent in the <code>Authorization</code> header.
               </p>
             </div>
             <button id="copyRequestBtn" class="copy request-copy" type="button">
@@ -1271,7 +1269,7 @@
             type: "header",
             required: false,
             description:
-              "Bearer <token>. Only required when the server sets METRICS_TOKEN.",
+              "Bearer token. Only required when the server sets `METRICS_TOKEN`.",
           });
         const schema = requestSchema(op);
         const bodySchema = schema ? resolveSchema(schema) : null;
@@ -1294,7 +1292,7 @@
                   `<div class="field-row"><div class="field-name"><code>${esc(r.name)}</code>` +
                   `${r.required ? '<small class="required-label">required</small>' : ""}</div>` +
                   `<code class="field-type">${esc(r.type)}</code>` +
-                  `<p>${esc(r.description)}</p></div>`,
+                  `<p>${inline(r.description)}</p></div>`,
               )
               .join("")
           : '<p class="empty">No input parameters.</p>';
@@ -1788,7 +1786,6 @@
           .querySelectorAll(".endpoint")
           .forEach((x) => x.classList.remove("active"));
         button.classList.add("active");
-        $("tag").textContent = (op.tags || ["API reference"])[0];
         $("title").textContent =
           op.summary || `${method.toUpperCase()} ${path}`;
         const sectionSplit = new RegExp(
@@ -1873,6 +1870,26 @@
           });
           endpoints.sort((a, b) => orderOf(a.path) - orderOf(b.path));
           $("endpoints").innerHTML = "";
+          const groups = [
+            { title: "Authentication", paths: ["/authenticate"] },
+            { title: "Documentation", paths: ["/readme", "/docs"] },
+            { title: "Monitoring", paths: ["/health", "/metrics"] },
+          ];
+          const groupLists = new Map();
+          groups.forEach(({ title, paths }, index) => {
+            if (!endpoints.some((e) => paths.includes(e.path))) return;
+            const section = document.createElement("section");
+            const heading = document.createElement("div");
+            heading.className = "section-title";
+            heading.id = `endpoint-group-${index}`;
+            heading.textContent = title;
+            section.setAttribute("aria-labelledby", heading.id);
+            const list = document.createElement("div");
+            list.className = "endpoint-group-items";
+            section.append(heading, list);
+            $("endpoints").appendChild(section);
+            paths.forEach((path) => groupLists.set(path, list));
+          });
           endpoints.forEach((e, i) => {
             const b = document.createElement("button");
             b.type = "button";
@@ -1881,7 +1898,7 @@
               `<span class="method ${e.method}">${e.method.toUpperCase()}</span>` +
               `<span class="path">${esc(e.path)}</span>`;
             b.onclick = () => selectEndpoint(e.path, e.method, e.op, b, i);
-            $("endpoints").appendChild(b);
+            (groupLists.get(e.path) || $("endpoints")).appendChild(b);
             if (i === Math.min(state.selectedIndex, endpoints.length - 1))
               b.click();
           });
