@@ -1,6 +1,6 @@
 [project]
 name = "pesu-auth"
-version = "5.0.2"
+version = "5.0.3"
 description = "A simple API to authenticate PESU credentials using PESU Academy."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -13,6 +13,7 @@ dependencies = [
     "uvicorn>=0.52.4",
     "httpx2>=2.12.0",
     "pydantic>=2.13.5",
+    "pandas-stubs~=3.0.5",
 ]
 
 [dependency-groups]
@@ -95,6 +96,3 @@ exclude = [
 [tool.ruff.format]
 quote-style = "double"
 docstring-code-format = true
-
-
-
