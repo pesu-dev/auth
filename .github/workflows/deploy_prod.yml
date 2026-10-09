@@ -10,6 +10,8 @@
 #   7. sync_main           fast-forwards main to the released commit, only after everything above worked
 #
 # If release or sync_main fails, production already runs the new commit: fix the cause and use "Re-run failed jobs".
+# Cancelling the run while deploy_prod waits does not stop the Render deploy or roll it back, so production may still
+# switch to the new commit with nothing released: roll back from the Render dashboard, or start a new run to release it.
 name: Deploy to Production
 
 on:
@@ -182,7 +184,8 @@ jobs:
       timeout_seconds: 1800
     secrets: inherit
 
-  # main has not moved, so a rollback only needs to redeploy the recorded commit.
+  # main has not moved, so a rollback only needs to redeploy the recorded commit. It runs on failure only, not when the
+  # run is cancelled (see the note at the top).
   rollback_prod:
     name: Redeploy the previous production commit
     needs: [deploy_prod, record_production]
@@ -284,6 +287,7 @@ jobs:
             --tag "${DOCKERHUB_IMAGE}:prod" \
             "${IMAGE}:${TARGET_SHA}"
 
+      # sync_main moves main only after this step, so it must leave both the tag and a published Release in place.
       - name: Create git tag and GitHub Release if needed
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -293,12 +297,18 @@ jobs:
 
           if git rev-parse -q --verify "refs/tags/${TAG}"; then
             TAGGED_SHA="$(git rev-list -n 1 "${TAG}")"
-            if [ "${TAGGED_SHA}" = "${TARGET_SHA}" ]; then
-              echo "Git tag ${TAG} already points at ${TARGET_SHA}; skipping release create."
+            if [ "${TAGGED_SHA}" != "${TARGET_SHA}" ]; then
+              echo "::error::Git tag ${TAG} already exists on ${TAGGED_SHA}, not ${TARGET_SHA}."
+              exit 1
+            fi
+            if [ "$(gh release view "${TAG}" --json isDraft --jq .isDraft 2>/dev/null)" = "false" ]; then
+              echo "Git tag ${TAG} and its Release already exist on ${TARGET_SHA}; nothing to create."
               exit 0
             fi
-            echo "Git tag ${TAG} already exists on ${TAGGED_SHA}, not ${TARGET_SHA}."
-            exit 1
+            # A re-run, a hand-pushed tag or a deleted Release can leave the tag without a published Release.
+            echo "Git tag ${TAG} points at ${TARGET_SHA} but has no published Release; creating it from the tag."
+            gh release create "${TAG}" --verify-tag --generate-notes --title "${TAG}"
+            exit 0
           fi
 
           gh release create "${TAG}" --generate-notes --target "${TARGET_SHA}" --title "${TAG}"
