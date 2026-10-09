@@ -118,9 +118,14 @@ def test_validate_username_strips_whitespace():
     assert model.username == "testuser"
 
 
-def test_validate_password_strips_whitespace():
+def test_validate_password_preserves_surrounding_whitespace():
     model = RequestModel(username="testuser", password="  testpass  ")
-    assert model.password == "testpass"
+    assert model.password == "  testpass  "
+
+
+def test_validate_password_preserves_inner_whitespace():
+    model = RequestModel(username="testuser", password="test pass")
+    assert model.password == "test pass"
 
 
 def test_validate_deprecated_know_your_class_and_section_key_rejected():

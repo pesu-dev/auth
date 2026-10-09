@@ -80,8 +80,7 @@ class RequestModel(BaseModel):
     @classmethod
     def validate_password(cls, v: str) -> str:
         """Validate that password is valid and not empty after stripping whitespace."""
-        v = v.strip()
-        if not v:
+        if not v.strip():
             raise ValueError("Password cannot be empty.")
         _require_valid_text(v, "Password")
         return v

@@ -192,6 +192,48 @@ def test_integration_authenticate_password_wrong_type(client):
     assert "body.password: Input should be a valid string" in data["message"]
 
 
+def test_integration_authenticate_empty_password(client):
+    payload = {
+        "username": "username",
+        "password": "",
+        "profile": True,
+    }
+
+    response = client.post("/authenticate", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] is False
+    assert "body.password: Value error, Password cannot be empty." in data["message"]
+
+
+def test_integration_authenticate_whitespace_only_password(client):
+    payload = {
+        "username": "username",
+        "password": "   ",
+        "profile": True,
+    }
+
+    response = client.post("/authenticate", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] is False
+    assert "body.password: Value error, Password cannot be empty." in data["message"]
+
+
+def test_integration_authenticate_password_with_surrounding_whitespace(client):
+    payload = {
+        "username": "username",
+        "password": "   password   ",
+        "profile": True,
+    }
+
+    response = client.post("/authenticate", json=payload)
+    assert response.status_code != 400
+    data = response.json()
+    assert data["status"] is False
+    assert "Could not validate request data" not in data.get("message", "")
+
+
 def test_integration_authenticate_profile_wrong_type(client):
     payload = {
         "username": "username",
