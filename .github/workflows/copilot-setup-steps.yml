@@ -31,7 +31,10 @@ jobs:
         with:
           python-version: "3.14"
 
+      - name: Set up UV
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
       - name: Install dependencies
-        run: |
-          pip install uv
-          uv sync --all-groups
+        run: uv sync --all-groups
