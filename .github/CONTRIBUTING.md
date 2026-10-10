@@ -276,8 +276,8 @@ sequential run.
 
 ```bash
 cd scripts/benchmark
-uv run python benchmark_requests.py --num-requests 100 --parallel --tag baseline
-uv run python analyze_benchmark.py -f ../../benchmark/results/benchmark_requests_*.csv
+uv run --group benchmark python benchmark_requests.py --num-requests 100 --parallel --tag baseline
+uv run --group benchmark python analyze_benchmark.py -f ../../benchmark/results/benchmark_requests_*.csv
 ```
 
 `benchmark_requests.py` signs in with `TEST_PRN` and `TEST_PASSWORD` from your `.env`, so every request

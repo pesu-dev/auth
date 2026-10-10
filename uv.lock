@@ -570,7 +570,7 @@ wheels = [
 
 [[package]]
 name = "pesu-auth"
-version = "5.0.2"
+version = "5.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
@@ -580,18 +580,20 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-dev = [
+benchmark = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
+    { name = "seaborn" },
+    { name = "tqdm" },
+]
+dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "python-dotenv" },
     { name = "ruff" },
-    { name = "seaborn" },
-    { name = "tqdm" },
 ]
 
 [package.metadata]
@@ -603,18 +605,20 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
+benchmark = [
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "numpy", specifier = ">=2.5.3" },
     { name = "pandas", specifier = ">=3.0.5" },
+    { name = "seaborn", specifier = ">=0.13.2" },
+    { name = "tqdm", specifier = ">=4.70.1" },
+]
+dev = [
     { name = "pre-commit", specifier = ">=4.6.2" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
     { name = "ruff", specifier = ">=0.16.7" },
-    { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "tqdm", specifier = ">=4.70.1" },
 ]
 
 [[package]]

@@ -12,11 +12,11 @@ WORKDIR /pesu-auth
 
 COPY pyproject.toml uv.lock README.md ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+    uv sync --locked --no-dev --no-install-project
 
 COPY app/ ./app/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev && \
+    uv sync --locked --no-dev && \
     python -m compileall -q app/
 
 FROM python:3.14-slim-bookworm
