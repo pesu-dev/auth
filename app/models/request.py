@@ -59,9 +59,9 @@ class RequestModel(BaseModel):
         None,
         title="Profile Fields",
         description=(
-            "Which profile fields to return, from those listed in ProfileModel. Every field is returned when "
-            "this is omitted. Only used when profile is true. Fields come back in ProfileModel's order, whatever "
-            "order they are asked for in, and a name that is not in ProfileModel is rejected."
+            "Which profile fields to return, from those listed in `ProfileModel`. Every field is returned when "
+            "this is omitted. Only used when profile is `true`. Fields come back in `ProfileModel`'s order, "
+            "whatever order they are asked for in, and a name that is not in `ProfileModel` is rejected."
         ),
         json_schema_extra={"example": ["name", "email", "campus", "branch", "semester", "firstName", "mobile"]},
     )
