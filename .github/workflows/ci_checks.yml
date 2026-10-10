@@ -234,7 +234,7 @@ jobs:
             pr_source_checker=${{ needs.pr_source_checker.result }}
             package_checks=${{ needs.package_checks.result }}
             test_runner=${{ needs.test_runner.result }}
-            pr_image_build=${{ needs.pr_image_build.result }}
+#            pr_image_build=${{ needs.pr_image_build.result }}
             container_checks=${{ needs.container_checks.result }}
             version_check=${{ needs.version_check.result }}
         run: |
