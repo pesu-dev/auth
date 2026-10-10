@@ -570,7 +570,7 @@ wheels = [
 
 [[package]]
 name = "pesu-auth"
-version = "5.1.1"
+version = "5.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
