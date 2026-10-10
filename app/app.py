@@ -319,8 +319,7 @@ async def readme() -> RedirectResponse:
 async def authenticate(payload: RequestModel) -> JSONResponse:
     """Authenticate a user with their PESU credentials, and optionally return their profile.
 
-    The credentials are checked by signing in to PESU Academy. They are sent only there, and the
-    password is never stored or logged.
+    The credentials are checked by signing in to PESU Academy. They are never stored or logged.
 
     Request body parameters:
     - username (str): The user's SRN, PRN, email address, or phone number.

@@ -512,6 +512,17 @@
         font-size: 12px;
         line-height: 1.5;
       }
+      .field-row .allowed-label {
+        margin-top: 10px;
+        color: var(--muted);
+      }
+      .allowed-values {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        columns: 2;
+        column-gap: 24px;
+        line-height: 1.7;
+      }
       .schema {
         margin: 10px 0 0;
         padding: 14px;
@@ -829,6 +840,12 @@
       .output.error {
         color: var(--danger);
       }
+      /* Idle text in the response box reads like an input's placeholder, not like a response. */
+      .output.placeholder,
+      .control::placeholder {
+        color: var(--muted);
+        opacity: 1;
+      }
       .empty {
         color: var(--muted);
         font-size: 12px;
@@ -930,7 +947,7 @@
         .field-row {
           grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         }
-        .field-row p {
+        .field-description {
           grid-column: 1 / -1;
           overflow-wrap: anywhere;
         }
@@ -947,7 +964,7 @@
     <canvas id="dotGrid" aria-hidden="true"></canvas>
     <div class="shell">
       <header class="topbar">
-        <div class="brand">PESU<small>AUTH / API</small></div>
+        <div class="brand">PESUAuth<small>/ API</small></div>
         <nav class="topnav">
           <a
             href="https://github.com/pesu-dev/auth"
@@ -1089,7 +1106,7 @@
               ><button id="copyBtn" class="copy" type="button">Copy</button>
             </div>
             <span id="status" class="status-chip" role="status" hidden></span>
-            <pre id="output" class="output">No response yet.</pre>
+            <pre id="output" class="output placeholder">No response yet.</pre>
           </div>
         </aside>
       </div>
@@ -1166,15 +1183,12 @@
         if (s.type === "array") return `${schemaType(s.items || {})}[]`;
         return s.type || s.title || "object";
       }
-      function fieldDescription(schema, description = "") {
+      function allowedValues(schema) {
         const s = concreteSchema(schema);
-        const values = s.enum || concreteSchema(s.items || {}).enum;
-        return [
-          description || s.description || "",
-          values ? `Allowed values: ${values.join(", ")}.` : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
+        return s.enum || concreteSchema(s.items || {}).enum || null;
+      }
+      function fieldDescription(schema, description = "") {
+        return description || concreteSchema(schema).description || "";
       }
       function parameterDescription(parameter) {
         if (state.path === "/metrics" && parameter.name === "fmt")
@@ -1261,6 +1275,7 @@
             type: schemaType(p.schema),
             required: p.required,
             description: parameterDescription(p),
+            values: allowedValues(p.schema),
           }),
         );
         if (hasBearerSecurity(op))
@@ -1284,6 +1299,7 @@
               s,
               s.description || "Request body field",
             ),
+            values: allowedValues(s),
           });
         $("fields").innerHTML = rows.length
           ? rows
@@ -1292,7 +1308,13 @@
                   `<div class="field-row"><div class="field-name"><code>${esc(r.name)}</code>` +
                   `${r.required ? '<small class="required-label">required</small>' : ""}</div>` +
                   `<code class="field-type">${esc(r.type)}</code>` +
-                  `<p>${inline(r.description)}</p></div>`,
+                  `<div class="field-description"><p>${inline(r.description)}</p>` +
+                  (r.values
+                    ? '<p class="allowed-label">Allowed values:</p><ul class="allowed-values">' +
+                      r.values.map((v) => `<li><code>${esc(v)}</code></li>`).join("") +
+                      "</ul>"
+                    : "") +
+                  "</div></div>",
               )
               .join("")
           : '<p class="empty">No input parameters.</p>';
@@ -1819,7 +1841,7 @@
         state.responseBody = "";
         $("sendBtn").disabled = false;
         styleDropdowns();
-        $("output").className = "output";
+        $("output").className = "output placeholder";
         $("output").textContent = "Ready to send.";
       }
       async function load() {
@@ -1853,8 +1875,8 @@
               tags: ["Documentation"],
               summary: "Swagger UI",
               description:
-                `FastAPI's built-in interactive documentation, rendered by Swagger UI ` +
-                `${swaggerVersion ? `v${swaggerVersion}` : ""} from \`/openapi.json\`. Open it in a browser with GET /docs.`,
+                `FastAPI's built-in interactive documentation, rendered by Swagger UI` +
+                `${swaggerVersion ? ` v${swaggerVersion}` : ""} from \`/openapi.json\`. Opens in a browser with GET /docs.`,
               responses: {
                 "200": {
                   description: "The interactive Swagger UI page.",
@@ -1924,7 +1946,7 @@
           out = $("output");
         btn.disabled = true;
         btn.textContent = "Sending...";
-        out.className = "output";
+        out.className = "output placeholder";
         out.textContent = "Waiting for response...";
         try {
           const { url, opts } = buildRequest();
@@ -1946,6 +1968,7 @@
             r.headers.get("Content-Type") || "",
           );
           state.responseBody = shown;
+          out.className = "output";
           out.innerHTML = responseHtml(
             shown,
             r.headers.get("Content-Type") || "",
