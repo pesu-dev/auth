@@ -9,11 +9,11 @@ import os
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 import uvicorn
-from fastapi import Depends, FastAPI, Query
+from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.routing import APIRoute
@@ -265,18 +265,7 @@ async def health() -> JSONResponse:
     # every existing caller and the local Docker instructions expect.
     dependencies=[Depends(require_metrics_token)],
 )
-async def metrics_endpoint(
-    fmt: Annotated[
-        MetricsFormat,
-        Query(
-            description=(
-                "Response format. `prometheus` (the default) returns the Prometheus text "
-                "exposition format for a scraper; `json` returns the same counters as JSON "
-                "for a human or a script."
-            )
-        ),
-    ] = MetricsFormat.PROMETHEUS,
-) -> Response:
+async def metrics_endpoint(fmt: MetricsFormat = MetricsFormat.PROMETHEUS) -> Response:
     """Expose the collected metrics.
 
     Query parameters:
