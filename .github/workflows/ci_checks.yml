@@ -128,15 +128,15 @@ jobs:
       - name: Run tests with coverage
         run: uv run python scripts/run_tests.py
 
-#  pr_image_build:
-#    name: Build image on PR
-#    needs: [pr_source_checker]
-#    if: github.event_name == 'pull_request'
-#    uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
-#    with:
-#      image_name: pesu-auth
-#      image_tag: ${{ github.event.pull_request.head.sha }}
-#      push: false
+  pr_image_build:
+    name: Build image on PR
+    needs: [pr_source_checker]
+    if: github.event_name == 'pull_request'
+    uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
+    with:
+      image_name: pesu-auth
+      image_tag: ${{ github.event.pull_request.head.sha }}
+      push: false
 
   version_check:
     name: Version check
@@ -222,7 +222,7 @@ jobs:
       - pr_source_checker
       - package_checks
       - test_runner
-#      - pr_image_build
+      - pr_image_build
       - container_checks
       - version_check
     if: always()
