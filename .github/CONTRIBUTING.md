@@ -269,7 +269,7 @@ gitignored.
 
 Each row of `benchmark_requests.py`'s CSV is one request: `status` (1 for a success), `time` (its latency in seconds)
 and `start` (when it started, in seconds from the start of the run). Throughput comes from elapsed time, never from the
-sum of the latencies, which overlap in a `--parallel` run: `benchmark_requests.py` times the whole run, and
+sum of the latencies, which overlap in a `--parallel` run: `benchmark_requests.py` times the whole run, anduv
 `analyze_benchmark.py` measures from the first request's start to the last one's end. It still reads an older CSV
 without `start`, and says when it has had to fall back to adding the latencies up, which is only right for a
 sequential run.
