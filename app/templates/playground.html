@@ -135,6 +135,18 @@
         color: var(--muted);
         margin-left: 8px;
       }
+      .version {
+        margin-left: 10px;
+        padding: 2px 6px;
+        border: 1px solid var(--line);
+        border-radius: 99px;
+        font:
+          10px "SFMono-Regular",
+          Consolas,
+          monospace;
+        color: var(--muted);
+        vertical-align: middle;
+      }
       .topnav {
         display: flex;
         gap: 22px;
@@ -964,7 +976,7 @@
     <canvas id="dotGrid" aria-hidden="true"></canvas>
     <div class="shell">
       <header class="topbar">
-        <div class="brand">PESUAuth<small>/ API</small></div>
+        <div class="brand">PESUAuth<small>/ API</small><span id="version" class="version" hidden></span></div>
         <nav class="topnav">
           <a
             href="https://github.com/pesu-dev/auth"
@@ -1192,7 +1204,7 @@
       }
       function parameterDescription(parameter) {
         if (state.path === "/metrics" && parameter.name === "fmt")
-          return "Response format: prometheus (default) or json.";
+          return "Response format: Prometheus (default) or JSON.";
         return fieldDescription(
           parameter.schema,
           parameter.description || `${parameter.in} parameter.`,
@@ -1849,6 +1861,10 @@
           const r = await fetch("/openapi.json", { cache: "no-store" });
           if (!r.ok) throw new Error("Specification unavailable");
           state.spec = await r.json();
+          // Taken from the spec so the badge always shows the version of the server being explored.
+          const version = state.spec.info?.version;
+          $("version").textContent = version ? `v${version}` : "";
+          $("version").hidden = !version;
           const orderOf = (p) => {
             const i = [
               "/authenticate",
@@ -1875,8 +1891,8 @@
               tags: ["Documentation"],
               summary: "Swagger UI",
               description:
-                `FastAPI's built-in interactive documentation, rendered by Swagger UI` +
-                `${swaggerVersion ? ` v${swaggerVersion}` : ""} from \`/openapi.json\`. Opens in a browser with GET /docs.`,
+                `Open FastAPI's built-in interactive documentation, rendered by Swagger UI` +
+                `${swaggerVersion ? ` v${swaggerVersion}` : ""} from \`/openapi.json\`.`,
               responses: {
                 "200": {
                   description: "The interactive Swagger UI page.",

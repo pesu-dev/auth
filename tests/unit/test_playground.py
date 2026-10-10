@@ -69,7 +69,7 @@ def test_metrics_documents_optional_header_and_concise_format():
         "Only needed when the server sets <code>METRICS_TOKEN</code>. "
         "Sent in the <code>Authorization</code> header." in PLAYGROUND_HTML
     )
-    assert "Response format: prometheus (default) or json." in PLAYGROUND_HTML
+    assert "Response format: Prometheus (default) or JSON." in PLAYGROUND_HTML
 
 
 def test_theme_options_publish_their_state():
@@ -88,3 +88,9 @@ def test_explorer_document_is_separate_html():
     """The explorer is served from its standalone HTML template."""
     document = Path(__file__).parents[2] / "app" / "templates" / "playground.html"
     assert PLAYGROUND_HTML == document.read_text(encoding="utf-8")
+
+
+def test_the_navbar_shows_the_api_version_from_the_spec():
+    """The version badge is filled from the served OpenAPI spec, not hard-coded."""
+    assert '<span id="version" class="version" hidden></span>' in PLAYGROUND_HTML
+    assert "state.spec.info?.version" in PLAYGROUND_HTML
