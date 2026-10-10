@@ -1,0 +1,2109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content="Explore and test the PESUAuth API." />
+    <meta name="color-scheme" content="light dark" />
+    <meta property="og:title" content="PESUAuth API Explorer" />
+    <meta
+      property="og:description"
+      content="Explore and test the PESUAuth API."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <title>PESUAuth API Explorer</title>
+    <script>
+      (() => {
+        const saved = localStorage.getItem("pesuauth-theme") || "system";
+        const dark =
+          saved === "dark" ||
+          (saved === "system" &&
+            matchMedia("(prefers-color-scheme:dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        document.documentElement.dataset.preference = saved;
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f7f5;
+        --surface: #fff;
+        --surface-soft: #efefec;
+        --line: #d8d8d2;
+        --line-strong: #a9aaa4;
+        --text: #171816;
+        --muted: #6f716b;
+        --soft: #444740;
+        --button: #171816;
+        --button-text: #fff;
+        --get: #2563a8;
+        --post: #a45d13;
+        --danger: #b63e34;
+        --code: #f0f0ec;
+        --json-key: #6a4291;
+        --json-string: #286548;
+        --json-number: #965018;
+        --json-literal: #235b98;
+        --success: #286548;
+        --warning: #965018;
+        --shadow: 0 10px 35px rgba(30, 31, 28, 0.06);
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #090a09;
+        --surface: #101110;
+        --surface-soft: #191a19;
+        --line: #292b29;
+        --line-strong: #515451;
+        --text: #f1f1ed;
+        --muted: #969a94;
+        --soft: #c7cac4;
+        --button: #f1f1ed;
+        --button-text: #101110;
+        --get: #75a7e5;
+        --post: #d6a466;
+        --danger: #e48c84;
+        --code: #141514;
+        --json-key: #cbb0e5;
+        --json-string: #a9cebb;
+        --json-number: #e6bc91;
+        --json-literal: #a8c8ef;
+        --success: #a9cebb;
+        --warning: #e6bc91;
+        --shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background-color: var(--bg);
+        color: var(--text);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+      button {
+        color: inherit;
+      }
+      .shell {
+        position: relative;
+        z-index: 1;
+        min-height: 100vh;
+      }
+      #dotGrid {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .topbar {
+        height: 62px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        padding: 0 max(18px, calc((100vw - 1380px) / 2));
+        gap: 28px;
+        background: color-mix(in srgb, var(--bg) 94%, transparent);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        backdrop-filter: blur(16px);
+      }
+      .brand {
+        font:
+          22px Georgia,
+          "Times New Roman",
+          serif;
+        white-space: nowrap;
+      }
+      .brand small {
+        font:
+          10px "SFMono-Regular",
+          Consolas,
+          monospace;
+        color: var(--muted);
+        margin-left: 8px;
+      }
+      .version {
+        margin-left: 10px;
+        padding: 2px 6px;
+        border: 1px solid var(--line);
+        border-radius: 99px;
+        font:
+          10px "SFMono-Regular",
+          Consolas,
+          monospace;
+        color: var(--muted);
+        vertical-align: middle;
+      }
+      .topnav {
+        display: flex;
+        gap: 22px;
+        font:
+          10px "SFMono-Regular",
+          Consolas,
+          monospace;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .topnav a {
+        color: var(--muted);
+        display: grid;
+        place-items: center;
+        transition: color 0.15s;
+      }
+      .topnav a:hover {
+        color: var(--text);
+      }
+      .topnav a svg {
+        width: 24px;
+        height: 24px;
+        display: block;
+      }
+      .theme-wrap {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .theme-label {
+        font:
+          9px "SFMono-Regular",
+          Consolas,
+          monospace;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .theme-switcher {
+        display: flex;
+        padding: 3px;
+        border: 1px solid var(--line);
+        border-radius: 99px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+      .theme-option,
+      .icon-button {
+        border: 0;
+        background: transparent;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+      }
+      .theme-option {
+        position: relative;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        color: var(--muted);
+      }
+      .theme-option:hover {
+        color: var(--text);
+      }
+      .theme-option.active {
+        color: var(--text);
+        background: var(--surface-soft);
+        box-shadow: inset 0 0 0 1px var(--line-strong);
+      }
+      .theme-option svg,
+      .icon-button svg {
+        width: 15px;
+        height: 15px;
+      }
+      .theme-option:focus-visible,
+      .icon-button:focus-visible,
+      .endpoint:focus-visible,
+      .action:focus-visible,
+      .copy:focus-visible {
+        outline: 2px solid var(--text);
+        outline-offset: 2px;
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: 220px minmax(420px, 1fr) minmax(340px, 0.75fr);
+        max-width: 1380px;
+        margin: auto;
+        min-height: calc(100vh - 62px);
+        background: transparent;
+      }
+      .sidebar {
+        border-right: 1px solid var(--line);
+        padding: 28px 16px;
+        background: var(--surface);
+      }
+      .main {
+        padding: 38px clamp(25px, 4vw, 56px);
+        min-width: 0;
+        background: var(--bg);
+      }
+      .request-panel {
+        border-left: 1px solid var(--line);
+        padding: 28px 24px;
+        background: var(--surface);
+      }
+      .section-title {
+        font:
+          10px "SFMono-Regular",
+          Consolas,
+          monospace;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .endpoint-list {
+        display: grid;
+        gap: 24px;
+      }
+      .endpoint-group-items {
+        display: grid;
+        gap: 6px;
+        margin-top: 12px;
+      }
+      .endpoint {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        gap: 8px;
+        align-items: center;
+        border: 1px solid transparent;
+        background: transparent;
+        text-align: left;
+        padding: 10px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .endpoint:hover {
+        background: var(--surface-soft);
+      }
+      .endpoint.active {
+        background: var(--surface-soft);
+        border-color: var(--line-strong);
+      }
+      .method {
+        font:
+          700 11px "SFMono-Regular",
+          Consolas,
+          monospace;
+      }
+      .method.get {
+        color: var(--get);
+      }
+      .method.post {
+        color: var(--post);
+      }
+      .path {
+        font:
+          13px "SFMono-Regular",
+          Consolas,
+          monospace;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .sidebar-links {
+        border-top: 1px solid var(--line);
+        margin-top: 24px;
+        padding-top: 16px;
+        display: grid;
+        gap: 10px;
+      }
+      .sidebar-links a {
+        font:
+          11px "SFMono-Regular",
+          Consolas,
+          monospace;
+        color: var(--muted);
+        text-decoration: none;
+      }
+      .sidebar-links a:hover {
+        color: var(--text);
+      }
+      h1 {
+        font:
+          44px/1.04 Georgia,
+          "Times New Roman",
+          serif;
+        font-weight: 400;
+        margin: 0 0 12px;
+      }
+      p {
+        color: var(--soft);
+        line-height: 1.65;
+      }
+      .intro {
+        font-size: 14px;
+        max-width: 680px;
+        margin: 0;
+      }
+      .intro p {
+        margin: 0;
+      }
+      .intro p + p {
+        margin-top: 8px;
+      }
+      .intro .credential-note {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .endpoint-heading {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-top: 30px;
+      }
+      .method-pill {
+        font:
+          700 10px "SFMono-Regular",
+          Consolas,
+          monospace;
+        padding: 6px 8px;
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+      }
+      .method-pill.get {
+        color: var(--get);
+      }
+      .method-pill.post {
+        color: var(--post);
+      }
+      h2 {
+        font:
+          27px Georgia,
+          "Times New Roman",
+          serif;
+        font-weight: 400;
+        margin: 0;
+      }
+      .rule {
+        border: 0;
+        border-top: 1px solid var(--line);
+        margin: 26px 0;
+      }
+      .fields .field-row:last-child {
+        border-bottom: 0;
+      }
+      .fields {
+        display: grid;
+        gap: 0;
+        margin-top: 10px;
+      }
+      .field-row {
+        display: grid;
+        grid-template-columns: minmax(90px, 1fr) 75px minmax(0, 2fr);
+        gap: 15px;
+        padding: 13px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 12px;
+      }
+      .field-row code {
+        font-family: "SFMono-Regular", Consolas, monospace;
+        overflow-wrap: anywhere;
+      }
+      .field-name {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 6px;
+      }
+      .required-label {
+        font:
+          9px Arial,
+          sans-serif;
+        color: var(--muted);
+      }
+      .field-type {
+        color: var(--soft);
+      }
+      .json-key {
+        color: var(--json-key);
+      }
+      .json-string {
+        color: var(--json-string);
+      }
+      .json-number {
+        color: var(--json-number);
+      }
+      .json-literal {
+        color: var(--json-literal);
+      }
+      .status-chip {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 5px 8px;
+        border: 1px solid currentColor;
+        border-radius: 4px;
+        font:
+          10px/1.5 "SFMono-Regular",
+          Consolas,
+          monospace;
+        color: var(--muted);
+      }
+      .status-chip.success {
+        color: var(--success);
+      }
+      .status-chip.warning {
+        color: var(--warning);
+      }
+      .status-chip.error {
+        color: var(--danger);
+      }
+      .form-group {
+        border: 0;
+        padding: 0;
+        margin: 18px 0 0;
+        min-width: 0;
+      }
+      .form-group legend {
+        font:
+          11px "SFMono-Regular",
+          Consolas,
+          monospace;
+        color: var(--soft);
+      }
+      .choices {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        margin-top: 10px;
+      }
+      .field-choices {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px 12px;
+      }
+      .choice {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        margin: 0;
+        font:
+          11px/1.5 "SFMono-Regular",
+          Consolas,
+          monospace;
+        text-transform: none;
+      }
+      .choice input {
+        margin: 0;
+        accent-color: var(--button);
+      }
+      .form-group:disabled .choice {
+        opacity: 0.5;
+      }
+      .request-copy {
+        width: 100%;
+        margin-top: 20px;
+        padding: 11px;
+      }
+      .form-note {
+        font-size: 11px;
+        color: var(--muted);
+        margin: 8px 0;
+      }
+      #body-fields:disabled .choices {
+        opacity: 0.45;
+      }
+      #body-fields:disabled .choice {
+        cursor: not-allowed;
+      }
+      .field-row span {
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+      .field-row p {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .field-row .allowed-label {
+        margin-top: 10px;
+        color: var(--muted);
+      }
+      .allowed-values {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        columns: 2;
+        column-gap: 24px;
+        line-height: 1.7;
+      }
+      .schema {
+        margin: 10px 0 0;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--code);
+        font:
+          11px/1.65 "SFMono-Regular",
+          Consolas,
+          monospace;
+        white-space: pre;
+        overflow-x: auto;
+        max-height: 360px;
+      }
+      details.response-code summary {
+        cursor: pointer;
+        padding: 10px 12px;
+      }
+      details.response-code[open] summary {
+        border-bottom: 1px solid var(--line);
+      }
+      .response-code {
+        overflow: hidden;
+      }
+      .response-body {
+        padding: 14px;
+        font:
+          13px/1.6 Arial,
+          Helvetica,
+          sans-serif;
+      }
+      .response-body p {
+        margin: 0 0 10px;
+      }
+      .response-body p:last-child {
+        margin-bottom: 0;
+      }
+      .response-media + .response-media {
+        margin-top: 18px;
+      }
+      .response-media-type {
+        display: block;
+        color: var(--muted);
+        font:
+          10px/1.5 "SFMono-Regular",
+          Consolas,
+          monospace;
+      }
+      .response-body label {
+        margin-top: 10px;
+      }
+      .example-description:not(:empty) {
+        margin-top: 12px;
+        margin-bottom: 8px;
+      }
+      .example-description p {
+        margin: 0 0 8px;
+        color: var(--soft);
+      }
+      .responses {
+        display: grid;
+        gap: 7px;
+        margin-top: 13px;
+      }
+      .response-code {
+        min-width: 0;
+        max-width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 0;
+        font:
+          10px "SFMono-Regular",
+          Consolas,
+          monospace;
+        color: var(--soft);
+      }
+      .response-code p {
+        overflow-wrap: anywhere;
+      }
+      .explanation {
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--soft);
+      }
+      .explanation h3,
+      .intro h3,
+      .response-body h3 {
+        font:
+          16px Georgia,
+          "Times New Roman",
+          serif;
+        color: var(--text);
+        font-weight: 400;
+        margin: 20px 0 7px;
+      }
+      .explanation p {
+        margin: 0 0 9px;
+      }
+      .intro ul,
+      .explanation ul,
+      .response-body ul {
+        margin: 8px 0 12px;
+        padding-left: 20px;
+        line-height: 1.65;
+      }
+      .intro code,
+      .response-body :not(pre) > code {
+        font-family: "SFMono-Regular", Consolas, monospace;
+        overflow-wrap: anywhere;
+      }
+      .explanation code {
+        font:
+          11px "SFMono-Regular",
+          Consolas,
+          monospace;
+        background: var(--code);
+        border: 1px solid var(--line);
+        padding: 2px 4px;
+        border-radius: 3px;
+      }
+      .explanation pre {
+        overflow: auto;
+        background: var(--code);
+        border: 1px solid var(--line);
+        padding: 14px;
+        border-radius: 6px;
+      }
+      .explanation pre code {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        line-height: 1.6;
+      }
+      .panel-head,
+      .result-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .panel-head {
+        margin-bottom: 16px;
+      }
+      .panel-head strong {
+        font:
+          11px "SFMono-Regular",
+          Consolas,
+          monospace;
+        text-transform: uppercase;
+      }
+      .icon-button {
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        color: var(--muted);
+      }
+      .icon-button:hover {
+        color: var(--text);
+        border-color: var(--line-strong);
+      }
+      .icon-button.is-loading svg {
+        animation: spin 0.7s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      label {
+        display: block;
+        font:
+          9px "SFMono-Regular",
+          Consolas,
+          monospace;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 14px 0 7px;
+      }
+      .control,
+      textarea,
+      select {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: var(--bg);
+        color: var(--text);
+        border-radius: 5px;
+        outline: none;
+      }
+      .control,
+      select {
+        height: 40px;
+        padding: 0 11px;
+      }
+      .select-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        text-align: left;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .select-trigger::after {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-right: 1.5px solid var(--muted);
+        border-bottom: 1.5px solid var(--muted);
+        transform: rotate(45deg);
+        margin-top: -2px;
+        margin-right: 4px;
+        flex-shrink: 0;
+      }
+      .select-menu {
+        position: fixed;
+        z-index: 10000;
+        padding: 4px;
+        margin: 0;
+        max-height: 260px;
+        overflow: auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 5px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .select-option {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        border: 0;
+        border-radius: 3px;
+        background: var(--surface);
+        color: var(--text);
+        text-align: left;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .select-option:hover,
+      .select-option:focus-visible,
+      .select-option[aria-selected="true"] {
+        background: var(--surface-soft);
+        outline: none;
+      }
+      textarea {
+        min-height: 150px;
+        padding: 12px;
+        font:
+          12px/1.55 "SFMono-Regular",
+          Consolas,
+          monospace;
+        resize: vertical;
+      }
+      .control:focus,
+      textarea:focus,
+      select:focus {
+        border-color: var(--text);
+      }
+      .action {
+        width: 100%;
+        border: 1px solid var(--button);
+        border-radius: 5px;
+        background: var(--button);
+        color: var(--button-text);
+        cursor: pointer;
+        padding: 12px;
+        margin-top: 15px;
+        font:
+          700 10px "SFMono-Regular",
+          Consolas,
+          monospace;
+        text-transform: uppercase;
+      }
+      .action:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      .result {
+        margin-top: 22px;
+        border-top: 1px solid var(--line);
+        padding-top: 18px;
+      }
+      .copy {
+        border: 1px solid var(--line-strong);
+        border-radius: 5px;
+        background: transparent;
+        color: var(--text);
+        padding: 6px 8px;
+        cursor: pointer;
+        font:
+          9px "SFMono-Regular",
+          Consolas,
+          monospace;
+        text-transform: uppercase;
+      }
+      .output {
+        min-height: 130px;
+        max-height: 350px;
+        overflow: auto;
+        margin: 10px 0 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        padding: 14px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font:
+          11px/1.65 "SFMono-Regular",
+          Consolas,
+          monospace;
+        color: var(--soft);
+      }
+      .output.error {
+        color: var(--danger);
+      }
+      /* Idle text in the response box reads like an input's placeholder, not like a response. */
+      .output.placeholder,
+      .control::placeholder {
+        color: var(--muted);
+        opacity: 1;
+      }
+      .empty {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .toast {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        z-index: 11000;
+        background: var(--text);
+        color: var(--bg);
+        padding: 9px 12px;
+        border-radius: 5px;
+        font:
+          10px "SFMono-Regular",
+          Consolas,
+          monospace;
+        opacity: 0;
+        transform: translateY(8px);
+        pointer-events: none;
+        transition: 0.18s;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto !important;
+          transition: none !important;
+          animation: none !important;
+        }
+      }
+      @media (max-width: 1040px) {
+        .workspace {
+          grid-template-columns: 210px 1fr;
+        }
+        .request-panel {
+          grid-column: 1 / -1;
+          border-left: 0;
+          border-top: 1px solid var(--line);
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 24px;
+        }
+        .result {
+          margin-top: 0;
+          border-top: 0;
+          padding-top: 0;
+        }
+      }
+      @media (max-width: 700px) {
+        .topbar {
+          padding: 0 14px;
+          gap: 14px;
+        }
+        .topnav,
+        .theme-label {
+          display: none;
+        }
+        .brand {
+          font-size: 19px;
+        }
+        .workspace {
+          display: block;
+        }
+        .sidebar {
+          padding: 16px 18px;
+        }
+        .endpoint-list {
+          gap: 18px;
+        }
+        .endpoint-group-items {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+        .endpoint {
+          min-width: 0;
+        }
+        .endpoint-group-items > .endpoint:only-child {
+          grid-column: 1 / -1;
+        }
+        .sidebar-links {
+          display: none;
+        }
+        .main {
+          padding: 28px 18px;
+        }
+        .request-panel {
+          display: block;
+          padding: 24px 18px;
+        }
+        .result {
+          margin-top: 22px;
+          border-top: 1px solid var(--line);
+          padding-top: 18px;
+        }
+        .field-row {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        }
+        .field-description {
+          grid-column: 1 / -1;
+          overflow-wrap: anywhere;
+        }
+        h1 {
+          font-size: 36px;
+        }
+        .theme-wrap {
+          margin-left: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="dotGrid" aria-hidden="true"></canvas>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">PESUAuth<small>/ API</small><span id="version" class="version" hidden></span></div>
+        <nav class="topnav">
+          <a
+            href="https://github.com/pesu-dev/auth"
+            rel="noreferrer"
+            aria-label="GitHub repository"
+            title="GitHub"
+            ><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55
+                  0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7
+                  1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25
+                  3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28
+                  1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8
+                  0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0
+                  4.41-2.69 5.38-5.26 5.67.41.35.78 1.05.78 2.12 0 1.53-.01 2.76-.01 3.14 0
+                  .3.2.66.8.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"
+              /></svg
+          ></a>
+        </nav>
+        <div class="theme-wrap">
+          <span class="theme-label">Theme</span>
+          <div class="theme-switcher" role="radiogroup" aria-label="Theme">
+            <button
+              class="theme-option"
+              data-theme-value="system"
+              role="radio"
+              aria-checked="true"
+              aria-label="Use system theme"
+              title="System theme"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="4" width="18" height="12" rx="2" />
+                <path d="M8 20h8M12 16v4" />
+              </svg>
+            </button>
+            <button
+              class="theme-option"
+              data-theme-value="light"
+              role="radio"
+              aria-checked="false"
+              aria-label="Use light theme"
+              title="Light theme"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path
+                  d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93
+                    19.07l1.42-1.42M17.66 6.34l1.41-1.41"
+                />
+              </svg>
+            </button>
+            <button
+              class="theme-option"
+              data-theme-value="dark"
+              role="radio"
+              aria-checked="false"
+              aria-label="Use dark theme"
+              title="Dark theme"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+      <div class="workspace">
+        <aside class="sidebar">
+          <div id="endpoints" class="endpoint-list">
+            <div class="empty">Loading...</div>
+          </div>
+        </aside>
+        <main class="main">
+          <h1 id="title">Choose an endpoint</h1>
+          <div id="description" class="intro">
+            Select an endpoint to inspect and test it.
+          </div>
+          <div class="endpoint-heading">
+            <span id="methodPill" class="method-pill">API</span>
+            <h2 id="pathTitle">/</h2>
+          </div>
+          <hr class="rule" />
+          <section>
+            <div class="section-title">Parameters</div>
+            <div id="fields" class="fields">
+              <p class="empty">No endpoint selected.</p>
+            </div>
+          </section>
+          <hr class="rule" />
+          <section>
+            <div class="section-title">Responses</div>
+            <div id="responses" class="responses"></div>
+          </section>
+        </main>
+        <aside class="request-panel">
+          <form id="requestForm" autocomplete="off">
+            <div class="panel-head"><strong>Request</strong></div>
+            <div id="queryFields"></div>
+            <div id="bodyFields"></div>
+            <div id="authWrap" hidden>
+              <label for="token">Bearer token (optional)</label>
+              <input
+                id="token"
+                class="control"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                aria-describedby="tokenNote"
+              />
+              <p id="tokenNote" class="form-note">
+                Only needed when the server sets <code>METRICS_TOKEN</code>. Sent in the <code>Authorization</code> header.
+              </p>
+            </div>
+            <button id="copyRequestBtn" class="copy request-copy" type="button">
+              Copy request
+            </button>
+            <button id="sendBtn" class="action" type="submit" disabled>
+              Send request
+            </button>
+          </form>
+          <div class="result">
+            <div class="result-toolbar">
+              <span class="section-title">Response</span
+              ><button id="copyBtn" class="copy" type="button">Copy</button>
+            </div>
+            <span id="status" class="status-chip" role="status" hidden></span>
+            <pre id="output" class="output placeholder">No response yet.</pre>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <div id="toast" class="toast" role="status"></div>
+    <script>
+      const state = {
+        spec: null,
+        path: null,
+        method: null,
+        operation: null,
+        selectedIndex: 0,
+        responseBody: "",
+      };
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) =>
+        String(s ?? "").replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      function toast(message) {
+        $("toast").textContent = message;
+        $("toast").classList.add("show");
+        setTimeout(() => $("toast").classList.remove("show"), 1300);
+      }
+      function applyTheme(value) {
+        localStorage.setItem("pesuauth-theme", value);
+        document.documentElement.dataset.preference = value;
+        const dark =
+          value === "dark" ||
+          (value === "system" &&
+            matchMedia("(prefers-color-scheme:dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        document.querySelectorAll("[data-theme-value]").forEach((b) => {
+          const active = b.dataset.themeValue === value;
+          b.classList.toggle("active", active);
+          b.setAttribute("aria-checked", String(active));
+        });
+        if (window.grid) window.grid.draw();
+      }
+      document
+        .querySelectorAll("[data-theme-value]")
+        .forEach((b) => (b.onclick = () => applyTheme(b.dataset.themeValue)));
+      applyTheme(document.documentElement.dataset.preference || "system");
+      matchMedia("(prefers-color-scheme:dark)").addEventListener(
+        "change",
+        () => {
+          if (document.documentElement.dataset.preference === "system")
+            applyTheme("system");
+        },
+      );
+      function concreteSchema(schema = {}) {
+        const resolved = resolveSchema(schema);
+        const variants = resolved.anyOf || resolved.oneOf;
+        return variants
+          ? concreteSchema(variants.find((v) => v.type !== "null") || {})
+          : resolved;
+      }
+      function schemaType(schema = {}) {
+        const s = resolveSchema(schema);
+        const variants = s.anyOf || s.oneOf;
+        if (variants)
+          return variants
+            .filter((v) => v.type !== "null")
+            .map(schemaType)
+            .join(" | ");
+        if (s.type === "array") return `${schemaType(s.items || {})}[]`;
+        return s.type || s.title || "object";
+      }
+      function allowedValues(schema) {
+        const s = concreteSchema(schema);
+        return s.enum || concreteSchema(s.items || {}).enum || null;
+      }
+      function fieldDescription(schema, description = "") {
+        return description || concreteSchema(schema).description || "";
+      }
+      function parameterDescription(parameter) {
+        if (state.path === "/metrics" && parameter.name === "fmt")
+          return "Response format: Prometheus (default) or JSON.";
+        return fieldDescription(
+          parameter.schema,
+          parameter.description || `${parameter.in} parameter.`,
+        );
+      }
+      function resolveSchema(s = {}, depth = 0) {
+        while (s && s.$ref && depth < 10) {
+          const name = s.$ref.split("/").pop();
+          const next = state.spec?.components?.schemas?.[name];
+          if (!next) break;
+          s = { title: name, ...next };
+          depth++;
+        }
+        return s || {};
+      }
+      function schemaTree(schema, indent = "  ", depth = 0) {
+        const s = resolveSchema(schema);
+        const variants = s.anyOf || s.oneOf;
+        if (variants) {
+          const real = variants.filter((v) => v.type !== "null");
+          if (real.length === 1) return schemaTree(real[0], indent, depth);
+        }
+        if (s.type === "array")
+          return `array<${schemaTree(s.items || {}, indent, depth)}>`;
+        if (!s.properties || depth > 3)
+          return s.format || s.type || s.title || "any";
+        const req = s.required || [];
+        const pad = indent.repeat(depth + 1);
+        const lines = Object.entries(s.properties).map(
+          ([k, v]) =>
+            `${pad}${k}${req.includes(k) ? "" : "?"}: ${schemaTree(v, indent, depth + 1)}`,
+        );
+        return `{\n${lines.join("\n")}\n${indent.repeat(depth)}}`;
+      }
+      function exampleForSchema(schema = {}, depth = 0) {
+        if (depth > 8) return null;
+        schema = resolveSchema(schema);
+        if (schema.example !== undefined) return schema.example;
+        if (schema.default !== undefined) return schema.default;
+        if (schema.enum) return schema.enum[0];
+        const variant = (schema.anyOf || schema.oneOf || []).find(
+          (v) => v.type !== "null",
+        );
+        if (variant) return exampleForSchema(variant, depth + 1);
+        if (schema.type === "object" || schema.properties) {
+          const o = {};
+          for (const [k, v] of Object.entries(schema.properties || {}))
+            o[k] = exampleForSchema(v, depth + 1);
+          return o;
+        }
+        if (schema.type === "array")
+          return [exampleForSchema(schema.items || {}, depth + 1)];
+        if (schema.type === "boolean") return false;
+        if (schema.type === "integer" || schema.type === "number") return 0;
+        return `<${schema.title || schema.type || "value"}>`;
+      }
+      function requestSchema(op) {
+        return op.requestBody?.content?.["application/json"]?.schema || null;
+      }
+      function requestExample(op) {
+        const content = op.requestBody?.content?.["application/json"];
+        const examples = content?.examples;
+        if (examples) {
+          const first =
+            Object.values(examples).find(
+              (item) =>
+                typeof item.value?.username === "string" &&
+                item.value.username.includes("@"),
+            ) || Object.values(examples)[0];
+          if (first?.value) return first.value;
+        }
+        if (content?.example) return content.example;
+        return content?.schema ? exampleForSchema(content.schema) : null;
+      }
+      function renderFields(op) {
+        const rows = [];
+        (op.parameters || []).forEach((p) =>
+          rows.push({
+            name: p.name,
+            type: schemaType(p.schema),
+            required: p.required,
+            description: parameterDescription(p),
+            values: allowedValues(p.schema),
+          }),
+        );
+        if (hasBearerSecurity(op))
+          rows.push({
+            name: "Authorization",
+            type: "header",
+            required: false,
+            description:
+              "Bearer token. Only required when the server sets `METRICS_TOKEN`.",
+          });
+        const schema = requestSchema(op);
+        const bodySchema = schema ? resolveSchema(schema) : null;
+        for (const [name, s] of Object.entries(bodySchema?.properties || {}))
+          rows.push({
+            name,
+            type: schemaType(s),
+            required:
+              (bodySchema.required || []).includes(name) &&
+              !(s.anyOf || []).some((v) => v.type === "null"),
+            description: fieldDescription(
+              s,
+              s.description || "Request body field",
+            ),
+            values: allowedValues(s),
+          });
+        $("fields").innerHTML = rows.length
+          ? rows
+              .map(
+                (r) =>
+                  `<div class="field-row"><div class="field-name"><code>${esc(r.name)}</code>` +
+                  `${r.required ? '<small class="required-label">required</small>' : ""}</div>` +
+                  `<code class="field-type">${esc(r.type)}</code>` +
+                  `<div class="field-description"><p>${inline(r.description)}</p>` +
+                  (r.values
+                    ? '<p class="allowed-label">Allowed values:</p><ul class="allowed-values">' +
+                      r.values.map((v) => `<li><code>${esc(v)}</code></li>`).join("") +
+                      "</ul>"
+                    : "") +
+                  "</div></div>",
+              )
+              .join("")
+          : '<p class="empty">No input parameters.</p>';
+      }
+      function hasBearerSecurity(op) {
+        return (op.security ?? state.spec.security ?? []).some((requirement) =>
+          Object.keys(requirement).some((name) => {
+            const scheme = state.spec.components?.securitySchemes?.[name];
+            return (
+              scheme?.type === "http" &&
+              scheme.scheme?.toLowerCase() === "bearer"
+            );
+          }),
+        );
+      }
+      function renderBody(op) {
+        const schema = concreteSchema(requestSchema(op) || {});
+        const example = requestExample(op) || {};
+        $("bodyFields").innerHTML = Object.entries(schema.properties || {})
+          .map(([name, raw]) => {
+            const item = concreteSchema(raw);
+            const id = `body-${name}`;
+            const required = (schema.required || []).includes(name);
+            const label = `<label for="${esc(id)}">${esc(name)}${required ? " (required)" : ""}</label>`;
+            if (item.type === "boolean") {
+              return (
+                `<fieldset class="form-group"><legend>${esc(name)}</legend><div class="choices">` +
+                [false, true]
+                  .map(
+                    (value) =>
+                      `<label class="choice"><input type="radio"` +
+                      ` name="${esc(id)}" data-body="${esc(name)}" value="${value}"` +
+                      `${value === (item.default ?? false) ? " checked" : ""}>${value}</label>`,
+                  )
+                  .join("") +
+                "</div></fieldset>"
+              );
+            }
+            if (item.type === "array") {
+              const values = concreteSchema(item.items).enum || [];
+              return (
+                `<fieldset id="${esc(id)}" class="form-group"><legend>${esc(name)}</legend>` +
+                `<div class="choices field-choices">` +
+                values
+                  .map(
+                    (value) =>
+                      `<label class="choice"><input type="checkbox" data-body="${esc(name)}"` +
+                      ` value="${esc(value)}"${name === "fields" ? " checked" : ""}>${esc(value)}</label>`,
+                  )
+                  .join("") +
+                "</div></fieldset>"
+              );
+            }
+            const placeholder = example[name] ?? item.example ?? "";
+            const type = name === "password" ? "password" : "text";
+            return (
+              label +
+              `<input id="${esc(id)}" class="control" data-body="${esc(name)}"` +
+              ` type="${type}" placeholder="${esc(placeholder)}" autocomplete="off" spellcheck="false"` +
+              `${required ? " required" : ""}>`
+            );
+          })
+          .join("");
+        updateProfileFields();
+      }
+      function updateProfileFields() {
+        const fieldset = $("body-fields");
+        if (!fieldset) return;
+        const enabled =
+          document.querySelector('[data-body="profile"]:checked')?.value ===
+          "true";
+        fieldset.disabled = !enabled;
+        const checkboxes = Array.from(
+          fieldset.querySelectorAll('input[type="checkbox"]'),
+        );
+        const first = checkboxes[0];
+        if (first)
+          first.setCustomValidity(
+            enabled && !checkboxes.some((checkbox) => checkbox.checked)
+              ? "Select at least one profile field, or set profile to false."
+              : "",
+          );
+      }
+      $("bodyFields").addEventListener("change", updateProfileFields);
+      function buildRequest() {
+        const url = new URL(state.path, location.origin);
+        document.querySelectorAll("[data-query]").forEach((el) => {
+          if (el.value !== "") url.searchParams.set(el.dataset.query, el.value);
+        });
+        const headers = {};
+        if (hasBearerSecurity(state.operation) && $("token").value.trim())
+          headers.Authorization = `Bearer ${$("token").value.trim()}`;
+        const opts = { method: state.method.toUpperCase(), headers };
+        const profileRequested =
+          document.querySelector('[data-body="profile"]:checked')?.value ===
+          "true";
+        if (
+          requestSchema(state.operation) &&
+          !["GET", "HEAD"].includes(opts.method)
+        ) {
+          const body = {};
+          const schema = concreteSchema(requestSchema(state.operation));
+          for (const [name, raw] of Object.entries(schema.properties || {})) {
+            const item = concreteSchema(raw);
+            const controls = Array.from(
+              document.querySelectorAll("[data-body]"),
+            ).filter((el) => el.dataset.body === name);
+            if (item.type === "boolean")
+              body[name] = controls.find((el) => el.checked)?.value === "true";
+            else if (item.type === "array") {
+              const selected = controls
+                .filter((el) => el.checked && !el.matches(":disabled"))
+                .map((el) => el.value);
+              if (name === "fields" && profileRequested && !selected.length)
+                throw new Error(
+                  "Select at least one profile field, or set profile to false.",
+                );
+              if (name === "fields" ? profileRequested : selected.length)
+                body[name] = selected;
+            } else if (controls[0]) body[name] = controls[0].value;
+          }
+          headers["Content-Type"] = "application/json";
+          opts.body = JSON.stringify(body);
+        }
+        return { url, opts };
+      }
+      function shellQuote(value) {
+        return "'" + String(value).replaceAll("'", "'\"'\"'") + "'";
+      }
+      function currentCurl() {
+        const { url, opts } = buildRequest();
+        const parts = [`curl -X ${opts.method} ${shellQuote(url.href)}`];
+        Object.entries(opts.headers).forEach(([key, value]) =>
+          parts.push(`-H ${shellQuote(`${key}: ${value}`)}`),
+        );
+        if (opts.body) parts.push(`-d ${shellQuote(opts.body)}`);
+        return parts.join(" " + String.fromCharCode(92, 10) + "  ");
+      }
+      function renderMarkdown(md) {
+        let html = "",
+          inCode = false,
+          inList = false,
+          code = [],
+          paragraph = [];
+        const flushParagraph = () => {
+          if (paragraph.length) {
+            html += `<p>${inline(paragraph.join(" "))}</p>`;
+            paragraph = [];
+          }
+        };
+        const closeList = () => {
+          if (inList) html += "</ul>";
+          inList = false;
+        };
+        const flush = () => {
+          if (code.length) {
+            html += `<pre><code>${esc(code.join("\n"))}</code></pre>`;
+            code = [];
+          }
+        };
+        for (const line of md.replaceAll("—", ",").split("\n")) {
+          if (line.startsWith("```")) {
+            flushParagraph();
+            closeList();
+            if (inCode) {
+              flush();
+              inCode = false;
+            } else inCode = true;
+            continue;
+          }
+          if (inCode) {
+            code.push(line);
+            continue;
+          }
+          if (/^#{1,6} /.test(line)) {
+            flushParagraph();
+            closeList();
+            html += `<h3>${inline(line.replace(/^#{1,6} /, ""))}</h3>`;
+            continue;
+          }
+          if (/^\s*[-*] /.test(line)) {
+            flushParagraph();
+            if (!inList) html += "<ul>";
+            inList = true;
+            html += `<li>${inline(line.replace(/^\s*[-*] /, ""))}</li>`;
+            continue;
+          }
+          closeList();
+          if (line.trim()) paragraph.push(line.trim());
+          else flushParagraph();
+        }
+        flushParagraph();
+        closeList();
+        flush();
+        return html;
+      }
+      function inline(s) {
+        return esc(s)
+          .replace(/`([^`]+)`/g, "<code>$1</code>")
+          .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      }
+      function formatResponse(value, type) {
+        if (typeof value !== "string") return JSON.stringify(value, null, 2);
+        if (/\bjson\b/i.test(type)) {
+          try {
+            return JSON.stringify(JSON.parse(value), null, 2);
+          } catch {}
+        }
+        return value;
+      }
+      function highlightJson(text) {
+        const escaped = esc(text);
+        return escaped.replace(
+          /(&quot;(?:\\.|(?!&quot;)[^\\])*&quot;)(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
+          (token, string, colon, literal) => {
+            const kind = colon
+              ? "key"
+              : string
+                ? "string"
+                : literal
+                  ? "literal"
+                  : "number";
+            return `<span class="json-${kind}">${token}</span>`;
+          },
+        );
+      }
+      function responseHtml(text, type) {
+        if (/\bjson\b/i.test(type)) {
+          try {
+            JSON.parse(text);
+            return highlightJson(text);
+          } catch {}
+        }
+        return esc(text);
+      }
+      function renderResponses(op) {
+        const statusNames = {
+          200: "OK",
+          308: "Permanent redirect",
+          400: "Bad request",
+          401: "Unauthorized",
+          422: "Unprocessable entity",
+          500: "Internal server error",
+          502: "Bad gateway",
+        };
+        $("responses").innerHTML = Object.entries(op.responses || {})
+          .map(([code, r]) => {
+            const label = `${esc(code)} · ${esc(statusNames[code] || "Response")}`;
+            const blocks = Object.entries(r.content || {})
+              .map(([type, media], index) => {
+                const examples = Object.entries(media.examples || {}).filter(
+                  ([, example]) => example.value !== undefined,
+                );
+                const example = media.example ?? examples[0]?.[1]?.value;
+                const shown =
+                  example !== undefined
+                    ? formatResponse(example, type)
+                    : media.schema
+                      ? schemaTree(media.schema)
+                      : "";
+                const id = `response-${code}-${index}`;
+                const selector =
+                  examples.length > 1
+                    ? `<label for="${id}">Example</label><select id="${id}" data-response-code="${esc(code)}"` +
+                      ` data-response-type="${esc(type)}">${examples
+                        .map(
+                          ([key, item]) =>
+                            `<option value="${esc(key)}">${esc(item.summary || key)}</option>`,
+                        )
+                        .join("")}</select>`
+                    : "";
+                const note =
+                  example === media.example
+                    ? ""
+                    : examples[0]?.[1]?.description || "";
+                return (
+                  `<div class="response-media"><span class="response-media-type">${esc(type)}</span>${selector}` +
+                  `<div class="example-description">${renderMarkdown(note)}</div>` +
+                  `${shown !== "" ? `<pre class="schema">${responseHtml(shown, type)}</pre>` : ""}</div>`
+                );
+              })
+              .join("");
+            return (
+              `<details class="response-code"><summary>${label}</summary>` +
+              `<div class="response-body">${renderMarkdown(r.description || "Response")}` +
+              `${blocks}</div></details>`
+            );
+          })
+          .join("");
+        const animateResponse = (details, opening) => {
+          const start = details.getBoundingClientRect().height;
+          details._animation?.cancel();
+          details.open = true;
+          const end = opening
+            ? details.getBoundingClientRect().height
+            : details.querySelector("summary").getBoundingClientRect().height +
+              2;
+          if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            details.open = opening;
+            return;
+          }
+          details._animation = details.animate(
+            [{ height: `${start}px` }, { height: `${end}px` }],
+            { duration: 180, easing: "ease-out" },
+          );
+          details._animation.onfinish = () => {
+            details.open = opening;
+            details._animation = null;
+          };
+          details._opening = opening;
+        };
+        $("responses")
+          .querySelectorAll("details")
+          .forEach((details) => {
+            details.querySelector("summary").onclick = (event) => {
+              event.preventDefault();
+              const opening = !(details._animation
+                ? details._opening
+                : details.open);
+              if (opening) {
+                $("responses")
+                  .querySelectorAll("details")
+                  .forEach((other) => {
+                    if (other !== details && other.open)
+                      animateResponse(other, false);
+                  });
+              }
+              animateResponse(details, opening);
+            };
+          });
+        $("responses")
+          .querySelectorAll("select")
+          .forEach((select) => {
+            select.onchange = () => {
+              const media =
+                op.responses[select.dataset.responseCode].content[
+                  select.dataset.responseType
+                ];
+              const example = media.examples[select.value];
+              const container = select.closest(".response-media");
+              container.querySelector("pre").innerHTML = responseHtml(
+                formatResponse(example.value, select.dataset.responseType),
+                select.dataset.responseType,
+              );
+              container.querySelector(".example-description").innerHTML =
+                renderMarkdown(example.description || "");
+            };
+          });
+      }
+      let closeDropdown = () => {};
+      function styleDropdowns() {
+        closeDropdown();
+        document.querySelectorAll("select").forEach((select) => {
+          if (select.dataset.styled) return;
+          select.dataset.styled = "true";
+          select.hidden = true;
+          const trigger = document.createElement("button");
+          trigger.type = "button";
+          trigger.className = "control select-trigger";
+          trigger.setAttribute("aria-haspopup", "listbox");
+          trigger.setAttribute("aria-expanded", "false");
+          const label = document.querySelector(`label[for="${select.id}"]`);
+          trigger.setAttribute("aria-label", label?.textContent || "Example");
+          const sync = () => {
+            trigger.textContent =
+              select.selectedOptions[0]?.textContent || "Select";
+          };
+          sync();
+          select.addEventListener("change", sync);
+          select.after(trigger);
+          if (label) label.onclick = () => trigger.focus();
+          trigger.onclick = () => {
+            const wasOpen = trigger.getAttribute("aria-expanded") === "true";
+            closeDropdown();
+            if (wasOpen) return;
+            const menu = document.createElement("div");
+            menu.className = "select-menu";
+            menu.setAttribute("role", "listbox");
+            menu.setAttribute("aria-label", trigger.getAttribute("aria-label"));
+            document.body.appendChild(menu);
+            const rect = trigger.getBoundingClientRect();
+            menu.style.left = `${rect.left}px`;
+            menu.style.width = `${rect.width}px`;
+            Array.from(select.options).forEach((option) => {
+              const item = document.createElement("button");
+              item.type = "button";
+              item.className = "select-option";
+              item.setAttribute("role", "option");
+              item.setAttribute("aria-selected", String(option.selected));
+              item.textContent = option.textContent;
+              item.onclick = () => {
+                select.value = option.value;
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+                closeDropdown();
+                trigger.focus();
+              };
+              menu.appendChild(item);
+            });
+            const height = menu.getBoundingClientRect().height;
+            menu.style.top = `${
+              rect.bottom + height + 4 <= innerHeight
+                ? rect.bottom + 4
+                : Math.max(4, rect.top - height - 4)
+            }px`;
+            trigger.setAttribute("aria-expanded", "true");
+            const outside = (event) => {
+              if (
+                !menu.contains(event.target) &&
+                !trigger.contains(event.target)
+              )
+                closeDropdown();
+            };
+            const scroll = (event) => {
+              if (!menu.contains(event.target)) closeDropdown();
+            };
+            closeDropdown = () => {
+              menu.remove();
+              trigger.setAttribute("aria-expanded", "false");
+              document.removeEventListener("pointerdown", outside);
+              window.removeEventListener("resize", closeDropdown);
+              document.removeEventListener("scroll", scroll, true);
+              closeDropdown = () => {};
+            };
+            document.addEventListener("pointerdown", outside);
+            window.addEventListener("resize", closeDropdown);
+            document.addEventListener("scroll", scroll, true);
+            menu.onkeydown = (event) => {
+              const items = Array.from(menu.children);
+              const index = items.indexOf(document.activeElement);
+              if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+                event.preventDefault();
+                const next =
+                  event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? items.length - 1
+                      : (index +
+                          (event.key === "ArrowDown" ? 1 : -1) +
+                          items.length) %
+                        items.length;
+                items[next]?.focus();
+              } else if (event.key === "Escape" || event.key === "Tab") {
+                closeDropdown();
+                if (event.key === "Escape") trigger.focus();
+              }
+            };
+            menu.querySelector('[aria-selected="true"]')?.focus();
+          };
+          trigger.onkeydown = (event) => {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              trigger.click();
+            }
+          };
+        });
+      }
+      function renderQuery(op) {
+        const params = (op.parameters || []).filter((p) => p.in === "query");
+        $("queryFields").innerHTML = params
+          .map((p) => {
+            const schema = resolveSchema(p.schema);
+            const value = schema.default ?? schema.enum?.[0] ?? "";
+            const label = `<label for="q-${esc(p.name)}">${esc(p.name)}${p.required ? " *" : ""}</label>`;
+            const attrs = `id="q-${esc(p.name)}" data-query="${esc(p.name)}" class="control"`;
+            if (schema.enum) {
+              return (
+                label +
+                `<select ${attrs}>` +
+                schema.enum
+                  .map(
+                    (v) =>
+                      `<option value="${esc(v)}"${v === value ? " selected" : ""}>${esc(v)}</option>`,
+                  )
+                  .join("") +
+                "</select>"
+              );
+            }
+            return (
+              label +
+              `<input ${attrs} value="${esc(value)}"${p.required ? " required" : ""}>`
+            );
+          })
+          .join("");
+      }
+      function selectEndpoint(path, method, op, button, index) {
+        state.path = path;
+        state.method = method;
+        state.operation = op;
+        state.selectedIndex = index;
+        document
+          .querySelectorAll(".endpoint")
+          .forEach((x) => x.classList.remove("active"));
+        button.classList.add("active");
+        $("title").textContent =
+          op.summary || `${method.toUpperCase()} ${path}`;
+        const sectionSplit = new RegExp(
+          "\\n\\s*(?:#{1,6}\\s*)?(?:(?:Request body|Query)\\s+)?" +
+            "(?:Parameters|Args|Arguments|Returns|Raises|Responses)\\s*:?\\s*\\n",
+          "i",
+        );
+        const desc = (op.description || "")
+          .split(sectionSplit)[0]
+          .replaceAll("—", ",")
+          .trim();
+        $("description").innerHTML = desc
+          ? renderMarkdown(desc)
+          : "<p>No description supplied.</p>";
+        $("description")
+          .querySelectorAll("p")
+          .forEach((paragraph) => {
+            if (paragraph.textContent.startsWith("The credentials are checked"))
+              paragraph.classList.add("credential-note");
+          });
+        $("methodPill").textContent = method.toUpperCase();
+        $("methodPill").className = `method-pill ${method}`;
+        $("pathTitle").textContent = path;
+        renderFields(op);
+        renderResponses(op);
+        renderBody(op);
+        renderQuery(op);
+        $("authWrap").hidden = !hasBearerSecurity(op);
+        $("token").value = "";
+        $("status").hidden = true;
+        state.responseBody = "";
+        $("sendBtn").disabled = false;
+        styleDropdowns();
+        $("output").className = "output placeholder";
+        $("output").textContent = "Ready to send.";
+      }
+      async function load() {
+        try {
+          const r = await fetch("/openapi.json", { cache: "no-store" });
+          if (!r.ok) throw new Error("Specification unavailable");
+          state.spec = await r.json();
+          // Taken from the spec so the badge always shows the version of the server being explored.
+          const version = state.spec.info?.version;
+          $("version").textContent = version ? `v${version}` : "";
+          $("version").hidden = !version;
+          const orderOf = (p) => {
+            const i = [
+              "/authenticate",
+              "/readme",
+              "/health",
+              "/metrics",
+              "/docs",
+            ].indexOf(p);
+            return i < 0 ? 99 : i;
+          };
+          const endpoints = [];
+          for (const [path, methods] of Object.entries(state.spec.paths || {}))
+            for (const [method, op] of Object.entries(methods))
+              if (["get", "post", "put", "patch", "delete"].includes(method))
+                endpoints.push({ path, method, op });
+          const swaggerVersion = await fetch("/docs", { cache: "no-store" })
+            .then((response) => response.text())
+            .then((html) => (html.match(/swagger-ui-dist@([^/]+)\//) || [])[1])
+            .catch(() => null);
+          endpoints.push({
+            path: "/docs",
+            method: "get",
+            op: {
+              tags: ["Documentation"],
+              summary: "Swagger UI",
+              description:
+                `Open FastAPI's built-in interactive documentation, rendered by Swagger UI` +
+                `${swaggerVersion ? ` v${swaggerVersion}` : ""} from \`/openapi.json\`.`,
+              responses: {
+                "200": {
+                  description: "The interactive Swagger UI page.",
+                  content: {
+                    "text/html": {
+                      example:
+                        "<!doctype html>\n<html>\n  <!-- Swagger UI, driven by /openapi.json -->\n</html>",
+                    },
+                  },
+                },
+              },
+            },
+          });
+          endpoints.sort((a, b) => orderOf(a.path) - orderOf(b.path));
+          $("endpoints").innerHTML = "";
+          const groups = [
+            { title: "Authentication", paths: ["/authenticate"] },
+            { title: "Documentation", paths: ["/readme", "/docs"] },
+            { title: "Monitoring", paths: ["/health", "/metrics"] },
+          ];
+          const groupLists = new Map();
+          groups.forEach(({ title, paths }, index) => {
+            if (!endpoints.some((e) => paths.includes(e.path))) return;
+            const section = document.createElement("section");
+            const heading = document.createElement("div");
+            heading.className = "section-title";
+            heading.id = `endpoint-group-${index}`;
+            heading.textContent = title;
+            section.setAttribute("aria-labelledby", heading.id);
+            const list = document.createElement("div");
+            list.className = "endpoint-group-items";
+            section.append(heading, list);
+            $("endpoints").appendChild(section);
+            paths.forEach((path) => groupLists.set(path, list));
+          });
+          endpoints.forEach((e, i) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "endpoint";
+            b.innerHTML =
+              `<span class="method ${e.method}">${e.method.toUpperCase()}</span>` +
+              `<span class="path">${esc(e.path)}</span>`;
+            b.onclick = () => selectEndpoint(e.path, e.method, e.op, b, i);
+            (groupLists.get(e.path) || $("endpoints")).appendChild(b);
+            if (i === Math.min(state.selectedIndex, endpoints.length - 1))
+              b.click();
+          });
+        } catch (e) {
+          $("endpoints").innerHTML =
+            '<div class="empty">Could not load the API specification.</div>';
+          toast("Could not load the API specification");
+        }
+      }
+      $("copyRequestBtn").onclick = async () => {
+        if (!state.path || !$("requestForm").reportValidity()) return;
+        try {
+          await navigator.clipboard.writeText(currentCurl());
+          toast("Request copied");
+        } catch {
+          toast("Copy unavailable");
+        }
+      };
+      $("requestForm").onsubmit = async (event) => {
+        event.preventDefault();
+        if (!state.path) return;
+        const btn = $("sendBtn"),
+          out = $("output");
+        btn.disabled = true;
+        btn.textContent = "Sending...";
+        out.className = "output placeholder";
+        out.textContent = "Waiting for response...";
+        try {
+          const { url, opts } = buildRequest();
+          $("status").hidden = true;
+          state.responseBody = "";
+          const started = performance.now();
+          if (state.path === "/readme" || state.path === "/docs") {
+            window.open(url.href, "_blank", "noopener,noreferrer");
+            out.textContent =
+              state.path === "/readme"
+                ? "Opened the README in a new tab."
+                : "Opened Swagger UI in a new tab.";
+            return;
+          }
+          const r = await fetch(url, opts);
+          const text = await r.text();
+          const shown = formatResponse(
+            text,
+            r.headers.get("Content-Type") || "",
+          );
+          state.responseBody = shown;
+          out.className = "output";
+          out.innerHTML = responseHtml(
+            shown,
+            r.headers.get("Content-Type") || "",
+          );
+          $("status").textContent =
+            `${r.status} ${r.statusText} · ${Math.round(performance.now() - started)}ms`;
+          $("status").className =
+            `status-chip ${r.status < 300 ? "success" : r.status < 500 ? "warning" : "error"}`;
+          $("status").hidden = false;
+        } catch (e) {
+          out.className = "output error";
+          out.textContent =
+            e instanceof SyntaxError
+              ? "Request body is not valid JSON."
+              : String(e);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Send request";
+        }
+      };
+      $("copyBtn").onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(state.responseBody);
+          toast("Response copied");
+        } catch {
+          toast("Copy unavailable. Select the response to copy it.");
+        }
+      };
+      const grid = {
+        c: $("dotGrid"),
+        ctx: null,
+        w: 0,
+        h: 0,
+        mx: -9999,
+        my: -9999,
+        active: false,
+        frame: null,
+        colors: {
+          light: { dot: "rgba(0,0,0,0.08)", active: "rgba(0,0,0,0.16)" },
+          dark: {
+            dot: "rgba(255,255,255,0.06)",
+            active: "rgba(255,255,255,0.12)",
+          },
+        },
+        spacing: 22,
+        baseRadius: 1,
+        activeRadius: 2,
+        radius: 140,
+        minAlpha: 0.5,
+        palette() {
+          return this.colors[
+            document.documentElement.dataset.theme === "dark" ? "dark" : "light"
+          ];
+        },
+        resize() {
+          const dpr = window.devicePixelRatio || 1;
+          this.w = innerWidth;
+          this.h = innerHeight;
+          if (!this.w || !this.h) return;
+          this.c.width = this.w * dpr;
+          this.c.height = this.h * dpr;
+          this.c.style.width = this.w + "px";
+          this.c.style.height = this.h + "px";
+          this.ctx = this.c.getContext("2d");
+          if (!this.ctx) return;
+          this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          this.draw();
+        },
+        draw() {
+          if (!this.ctx) return;
+          const t = this.palette();
+          this.ctx.clearRect(0, 0, this.w, this.h);
+          const ox = (this.w % this.spacing) / 2,
+            oy = (this.h % this.spacing) / 2;
+          for (let x = ox; x <= this.w; x += this.spacing) {
+            for (let y = oy; y <= this.h; y += this.spacing) {
+              const dx = x - this.mx,
+                dy = y - this.my,
+                d = Math.sqrt(dx * dx + dy * dy);
+              let r = this.baseRadius,
+                color = t.dot,
+                alpha = 1;
+              if (this.active && d < this.radius) {
+                const f = 1 - d / this.radius;
+                r = this.baseRadius + (this.activeRadius - this.baseRadius) * f;
+                color = t.active;
+                alpha = this.minAlpha + (1 - this.minAlpha) * f;
+              }
+              this.ctx.globalAlpha = alpha;
+              this.ctx.beginPath();
+              this.ctx.arc(x, y, r, 0, Math.PI * 2);
+              this.ctx.fillStyle = color;
+              this.ctx.fill();
+            }
+          }
+          this.ctx.globalAlpha = 1;
+        },
+        queue() {
+          if (this.frame === null)
+            this.frame = requestAnimationFrame(() => {
+              this.frame = null;
+              this.draw();
+            });
+        },
+      };
+      window.grid = grid;
+      addEventListener("resize", () => grid.resize());
+      addEventListener("mousemove", (e) => {
+        grid.mx = e.clientX;
+        grid.my = e.clientY;
+        grid.active = true;
+        grid.queue();
+      });
+      document.addEventListener("mouseleave", () => {
+        grid.active = false;
+        grid.queue();
+      });
+      grid.resize();
+      load();
+    </script>
+  </body>
+</html>

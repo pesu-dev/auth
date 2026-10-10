@@ -8,13 +8,14 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from importlib.metadata import version
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.routing import APIRoute
 
 if TYPE_CHECKING:
@@ -66,7 +67,7 @@ app = FastAPI(
     title="PESUAuth API",
     description="A simple and lightweight API to authenticate PESU credentials using PESU Academy",
     version=version("pesu-auth"),
-    docs_url="/",
+    docs_url="/docs",
     lifespan=lifespan,
     openapi_tags=[
         {
@@ -147,6 +148,14 @@ def _restore_documented_examples(schema: dict[str, Any]) -> None:
 
 
 app.openapi = _openapi_without_phantom_validation_errors
+
+
+app.add_route(
+    "/",
+    lambda request: FileResponse(Path(__file__).parent / "templates" / "playground.html"),
+    methods=["GET"],
+    include_in_schema=False,
+)
 
 
 @app.middleware("http")
@@ -299,8 +308,7 @@ async def readme() -> RedirectResponse:
 async def authenticate(payload: RequestModel) -> JSONResponse:
     """Authenticate a user with their PESU credentials, and optionally return their profile.
 
-    The credentials are checked by signing in to PESU Academy. They are sent only there, and the
-    password is never stored or logged.
+    The credentials are checked by signing in to PESU Academy. They are never stored or logged.
 
     Request body parameters:
     - username (str): The user's SRN, PRN, email address, or phone number.
