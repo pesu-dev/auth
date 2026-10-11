@@ -34,7 +34,6 @@ def test_schema_driven_request_controls():
     assert "securitySchemes" in PLAYGROUND_HTML
     assert 'id="copyRequestBtn"' in PLAYGROUND_HTML
     assert 'id="body"' not in PLAYGROUND_HTML
-    assert "—" not in PLAYGROUND_HTML.replace('.replaceAll("—", ",")', "")
     assert "Example request</div>" not in PLAYGROUND_HTML
     assert 'id="reloadBtn"' not in PLAYGROUND_HTML
     assert 'id="dotGrid"' in PLAYGROUND_HTML

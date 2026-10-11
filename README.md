@@ -135,14 +135,14 @@ The API provides multiple endpoints for authentication, documentation, and monit
 
 | **Endpoint**    | **Method** | **Description**                                        |
 | --------------- | ---------- | ------------------------------------------------------ |
-| `/`             | `GET`      | Serves the interactive API Explorer.                    |
-| `/docs`         | `GET`      | Serves the standard Swagger UI documentation.           |
-| `/redoc`        | `GET`      | Serves the ReDoc API documentation.                      |
-| `/openapi.json` | `GET`      | Serves the OpenAPI specification used by both UIs.       |
-| `/authenticate` | `POST`     | Authenticates a user using their PESU credentials.       |
-| `/health`       | `GET`      | A health check endpoint to monitor the API's status.     |
-| `/metrics`      | `GET`      | Exposes traffic and error counters. See `fmt` below.     |
-| `/readme`       | `GET`      | Redirects to the project's official GitHub repository.   |
+| `/`             | `GET`      | Serves the interactive API Explorer.                   |
+| `/docs`         | `GET`      | Serves the standard Swagger UI documentation.          |
+| `/redoc`        | `GET`      | Serves the ReDoc API documentation.                    |
+| `/openapi.json` | `GET`      | Serves the OpenAPI specification used by both UIs.     |
+| `/authenticate` | `POST`     | Authenticates a user using their PESU credentials.     |
+| `/health`       | `GET`      | A health check endpoint to monitor the API's status.   |
+| `/metrics`      | `GET`      | Exposes traffic and error counters. See `fmt` below.   |
+| `/readme`       | `GET`      | Redirects to the project's official GitHub repository. |
 
 The Explorer builds request controls and response examples from `/openapi.json`. Enter the
 required credentials, choose whether to fetch a profile, and optionally select profile fields.

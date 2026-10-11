@@ -15,7 +15,10 @@
     <title>PESUAuth API Explorer</title>
     <script>
       (() => {
-        const saved = localStorage.getItem("pesuauth-theme") || "system";
+        let saved = "system";
+        try {
+          saved = localStorage.getItem("pesuauth-theme") || "system";
+        } catch {}
         const dark =
           saved === "dark" ||
           (saved === "system" &&
@@ -1152,7 +1155,9 @@
         setTimeout(() => $("toast").classList.remove("show"), 1300);
       }
       function applyTheme(value) {
-        localStorage.setItem("pesuauth-theme", value);
+        try {
+          localStorage.setItem("pesuauth-theme", value);
+        } catch {}
         document.documentElement.dataset.preference = value;
         const dark =
           value === "dark" ||
@@ -1487,7 +1492,7 @@
             code = [];
           }
         };
-        for (const line of md.replaceAll("—", ",").split("\n")) {
+        for (const line of md.split("\n")) {
           if (line.startsWith("```")) {
             flushParagraph();
             closeList();
@@ -1829,7 +1834,6 @@
         );
         const desc = (op.description || "")
           .split(sectionSplit)[0]
-          .replaceAll("—", ",")
           .trim();
         $("description").innerHTML = desc
           ? renderMarkdown(desc)
