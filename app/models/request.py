@@ -26,6 +26,10 @@ def _require_valid_text(value: str, label: str) -> None:
         raise ValueError(f"{label} contains characters that are not valid text.") from None
 
 
+MAX_USERNAME_LENGTH = 96  # 64 chars permissible before @ symbol, so 96 set to accomodate domains.
+MAX_PASSWORD_LENGTH = 128  # PESU limit is unknown for passwords, so set as 128.
+
+
 class RequestModel(BaseModel):
     """Model representing the student's authentication request."""
 
@@ -36,6 +40,7 @@ class RequestModel(BaseModel):
         title="Username",
         description="User's identifier for authentication. Can be SRN, PRN, email, or phone number.",
         json_schema_extra={"example": "PES1201800001"},
+        max_length=MAX_USERNAME_LENGTH,
     )
 
     password: str = Field(
@@ -43,6 +48,7 @@ class RequestModel(BaseModel):
         title="Password",
         description="User's password. It is sent only to PESU Academy, and never stored or logged.",
         json_schema_extra={"example": "mySecurePassword123"},
+        max_length=MAX_PASSWORD_LENGTH,
     )
 
     profile: bool = Field(

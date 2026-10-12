@@ -1,6 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
+from app.models.request import _require_valid_text
+
 from app.models.request import RequestModel
 
 
@@ -181,6 +183,36 @@ def test_validate_deprecated_campus_code_in_fields_rejected():
     assert any(e["type"] == "literal_error" for e in errors)
     assert "fields.0" in str(exc_info.value)
 
+def test_username_limits():
+    """Test that the username with max character limits are accepted and more than limit is rejected."""
+    MAX_USERNAME_LENGTH = 96  # 64 chars permissible before @ symbol, so 96 set to accomodate domains.
+    model = RequestModel(username="x"*MAX_USERNAME_LENGTH, password="testpass")
+    assert model.username == "x"*MAX_USERNAME_LENGTH
+
+    """For a username that crosses the limit"""
+    with pytest.raises(ValidationError) as exc_info:
+        RequestModel(username="x"*(MAX_USERNAME_LENGTH+1), password="testpass")
+    assert "username" in str(exc_info.value)
+
+def test_password_limits():
+    """Test that the password with max character limits are accepted and more than limit is rejected."""
+    MAX_PASSWORD_LENGTH = 128  # PESU limit is unknown for passwords, so set as 128 to be generous
+    model = RequestModel(username="testuser", password="x"*MAX_PASSWORD_LENGTH)
+    assert model.password == "x"*MAX_PASSWORD_LENGTH
+
+    """For a password that crosses the limit"""
+    with pytest.raises(ValidationError) as exc_info:
+        RequestModel(username="testuser", password="x"*(MAX_PASSWORD_LENGTH+1))
+    assert "password" in str(exc_info.value)
+
+def test_require_valid_text_unicode_error():
+    # Directly calls the helper function with an unpaired surrogate,
+    # forcing Python to hit the try/except UnicodeEncodeError block on lines 25-26.
+    with pytest.raises(ValueError, match="Username contains characters that are not valid text"):
+        _require_valid_text("\ud800", "Username")
+
+    with pytest.raises(ValueError, match="Password contains characters that are not valid text"):
+        _require_valid_text("\ud800", "Password")
 
 @pytest.mark.parametrize(
     "field",
