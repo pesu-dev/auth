@@ -5,6 +5,9 @@ from app.models.request import _require_valid_text
 
 from app.models.request import RequestModel
 
+MAX_USERNAME_LENGTH = RequestModel.MAX_USERNAME_LENGTH
+MAX_PASSWORD_LENGTH = RequestModel.MAX_PASSWORD_LENGTH
+
 
 def test_validate_username_empty_string():
     with pytest.raises(ValidationError) as exc_info:

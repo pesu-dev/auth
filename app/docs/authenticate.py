@@ -196,6 +196,26 @@ authenticate_docs = ApiDocs(
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
                             },
                         },
+                        "username_too_long": {
+                            "summary": "Username too long",
+                            "value": {
+                                "status": False,
+                                "message": (
+                                    "Could not validate request data - body.username: Input limit is 96 characters"
+                                ),
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                        "password_too_long": {
+                            "summary": "Password too long",
+                            "value": {
+                                "status": False,
+                                "message": (
+                                    "Could not validate request data - body.password: Input limit is 128 characters"
+                                ),
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
                     }
                 }
             },

@@ -306,6 +306,6 @@ def test_text_that_cannot_be_encoded_is_a_400(client, wire, caplog, field, asser
         response = client.post("/authenticate", content=raw, headers={"content-type": "application/json"})
 
     result = assert_error_body(response, 400)
-    assert "unable to parse raw data as a unicode string" in result["message"]
+    assert f"{field.capitalize()} contains characters that are not valid text" in result["message"]
     assert wire.requests == []
     assert not [r for r in caplog.records if r.levelname == "ERROR"]
