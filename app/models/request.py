@@ -1,6 +1,8 @@
 """Model representing the student's authentication request."""
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import ClassVar
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 from pydantic.alias_generators import to_camel
 
 from app.models.profile import ProfileField
