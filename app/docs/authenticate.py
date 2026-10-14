@@ -201,7 +201,8 @@ authenticate_docs = ApiDocs(
                             "value": {
                                 "status": False,
                                 "message": (
-                                    "Could not validate request data - body.username: Input limit is 96 characters"
+                                    "Could not validate request data - body.username: "
+                                    "String should have at most 96 characters"
                                 ),
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
                             },
@@ -211,7 +212,8 @@ authenticate_docs = ApiDocs(
                             "value": {
                                 "status": False,
                                 "message": (
-                                    "Could not validate request data - body.password: Input limit is 128 characters"
+                                    "Could not validate request data - body.password: "
+                                    "String should have at most 128 characters"
                                 ),
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
                             },

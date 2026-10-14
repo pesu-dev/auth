@@ -4,12 +4,12 @@ import pytest
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
+from app.app import app
+
 from app.models.request import RequestModel
 
 MAX_USERNAME_LENGTH = RequestModel.MAX_USERNAME_LENGTH
 MAX_PASSWORD_LENGTH = RequestModel.MAX_PASSWORD_LENGTH
-
-from app.app import app
 
 unhandled_router = APIRouter()
 
@@ -505,8 +505,8 @@ def test_integration_authenticate_exceeds_max_password_length(client):
 
     assert _validation_errors(client, "password") == before + 1
 
-def test_to_prevent_log_line_from_containing_value(client, caplog):
-    "Over limit inputs are caught by validation and not written to logs"
+def test_integration_authenticate_over_long_values_not_logged(client, caplog):
+    """Over limit inputs are caught by validation and not written to logs"""
     payload = {
         "username": invalid_length_username,
         "password": invalid_length_password,

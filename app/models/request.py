@@ -31,7 +31,7 @@ def _require_valid_text(value: str, label: str) -> None:
 class RequestModel(BaseModel):
     """Model representing the student's authentication request."""
 
-    MAX_USERNAME_LENGTH: ClassVar[int] = 96  # 64 chars permissible before @ symbol, so 96 set to accomodate domains.
+    MAX_USERNAME_LENGTH: ClassVar[int] = 96  # 64 chars permissible before @ symbol, so 96 set to accommodate domains.
     MAX_PASSWORD_LENGTH: ClassVar[int] = 128  # PESU limit is unknown for passwords, so set as 128.
 
     model_config = ConfigDict(strict=True, alias_generator=to_camel, extra="forbid")
@@ -48,7 +48,7 @@ class RequestModel(BaseModel):
         ...,
         title="Password",
         description=(
-            "User's password, up to 256 characters, counted exactly as typed. It is sent only to PESU Academy, "
+            "User's password, up to 128 characters, counted exactly as typed. It is sent only to PESU Academy, "
             "and never stored or logged."
         ),
         json_schema_extra={"example": "mySecurePassword123"},
