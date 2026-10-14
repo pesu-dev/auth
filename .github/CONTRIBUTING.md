@@ -78,7 +78,7 @@ The standard workflow for contributing is as follows:
 1. Create a Pull Request (PR) against the repository's `dev` branch (not `main`).
 1. Wait for review and feedback from the maintainers, address any comments or suggestions.
 1. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
-1. After all pre-commit checks pass, deployment to staging is triggered automatically.
+1. Once merged into `dev` and CI passes, deployment to staging is triggered automatically.
 1. Production deployment is performed manually by authorized maintainers after successful staging validation.
 
 > [!WARNING]
@@ -195,7 +195,9 @@ suite automatically before every commit.
 
 The following checks are enforced:
 
-- ✅ `ruff` for linting and formatting (with auto-fix)
+- ✅ `ruff` for linting and formatting (with auto-fix), running from `uv.lock` so it is the same version as CI
+- ✅ `compileall` to catch syntax errors in `tests/`, which ruff does not lint
+- ✅ `uv-lock` to check that `uv.lock` matches `pyproject.toml`
 - ✅ `mdformat` to format Markdown files (with GFM support)
 - ✅ `end-of-file-fixer`, `trailing-whitespace`, `check-yaml`, `check-toml`, `check-added-large-files` for formatting
 - ✅ `name-tests-test` to enforce test naming conventions
@@ -203,8 +205,38 @@ The following checks are enforced:
 - ✅ `sync-agents` to check that `.github/agents/` matches the roles in the agent submodule
 - ✅ A local `pytest` hook that runs the full test suite
 
+CI runs the same hooks (the `Pre-commit hooks` job), so a PR that passes `uv run pre-commit run --all-files` locally
+also passes CI. The tests run in their own `Test suite & coverage` job and are skipped by the pre-commit job.
+
 > [!WARNING]
 > You will not be able to commit code that fails these checks.
+
+### Checks that only run in CI
+
+A few checks require the PR itself or Docker and cannot be run as pre-commit hooks. Here is how to run each one
+locally:
+
+- **PR source checker:** verifies the PR comes from a fork and targets `dev`. There is nothing to run; just open the
+  PR that way.
+
+- **Version check:** verifies the version in `pyproject.toml` was bumped relative to `dev`:
+
+  ```bash
+  git fetch upstream
+  git show upstream/dev:pyproject.toml > /tmp/base_pyproject.toml
+  python3 .github/scripts/check_version_bump.py --base-pyproject /tmp/base_pyproject.toml \
+    --head-pyproject pyproject.toml --head-lock uv.lock --base-ref dev
+  ```
+
+- **Build image on PR, and Container security & smoke test:** verifies the image builds, runs as UID 10001, and
+  answers `/health`:
+
+  ```bash
+  docker build . --tag pesu-auth-test
+  docker run --rm pesu-auth-test id -u          # prints 10001
+  docker run --rm -d --name pesu-auth-smoke -p 5000:5000 pesu-auth-test
+  sleep 5 && curl --fail http://localhost:5000/health; docker stop pesu-auth-smoke
+  ```
 
 ### Linting & Formatting
 
@@ -375,10 +407,9 @@ does not reset the numbers to its right, such as `4.19.1`.
    - Link any related issues using `Closes #issue-number`
    - Add screenshots, terminal output, or examples if relevant
 
-After your PR is merged into `dev`, all `pre-commit` checks will run automatically. If they pass, deployment to staging is triggered.
 The maintainers will review your PR, provide feedback, and may request changes. Once approved, your PR will be merged
-into the `dev` branch and deployed to staging for testing. After successful validation, changes will be promoted to
-production, which is triggered manually by authorized maintainers.
+into the `dev` branch. When CI passes on `dev`, deployment to staging is triggered automatically. After successful
+validation, changes will be promoted to production, which is triggered manually by authorized maintainers.
 
 ## ❓ Need Help?
 
