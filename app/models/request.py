@@ -39,8 +39,10 @@ class RequestModel(BaseModel):
     username: str = Field(
         ...,
         title="Username",
-        description="User's identifier for authentication. Can be SRN, PRN, email, or phone number."
-        f" Upto {MAX_USERNAME_LENGTH} characters.",
+        description=(
+            "User's identifier for authentication. Can be SRN, PRN, email, or phone number, "
+            f"up to {MAX_USERNAME_LENGTH} characters."
+        ),
         json_schema_extra={"example": "PES1201800001"},
         max_length=MAX_USERNAME_LENGTH,
     )
