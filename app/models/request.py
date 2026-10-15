@@ -1,6 +1,8 @@
 """Model representing the student's authentication request."""
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import ClassVar
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 from pydantic.alias_generators import to_camel
 
 from app.models.profile import ProfileField
@@ -29,20 +31,31 @@ def _require_valid_text(value: str, label: str) -> None:
 class RequestModel(BaseModel):
     """Model representing the student's authentication request."""
 
+    MAX_USERNAME_LENGTH: ClassVar[int] = 96  # 64 chars permissible before @ symbol, so 96 set to accommodate domains.
+    MAX_PASSWORD_LENGTH: ClassVar[int] = 128  # PESU limit is unknown for passwords, so set as 128.
+
     model_config = ConfigDict(strict=True, alias_generator=to_camel, extra="forbid")
 
     username: str = Field(
         ...,
         title="Username",
-        description="User's identifier for authentication. Can be SRN, PRN, email, or phone number.",
+        description=(
+            "User's identifier for authentication. Can be SRN, PRN, email, or phone number, "
+            f"up to {MAX_USERNAME_LENGTH} characters."
+        ),
         json_schema_extra={"example": "PES1201800001"},
+        max_length=MAX_USERNAME_LENGTH,
     )
 
     password: str = Field(
         ...,
         title="Password",
-        description="User's password. It is sent only to PESU Academy, and never stored or logged.",
+        description=(
+            f"User's password, up to {MAX_PASSWORD_LENGTH} characters, counted exactly as typed. It is sent only to"
+            " PESU Academy, and never stored or logged."
+        ),
         json_schema_extra={"example": "mySecurePassword123"},
+        max_length=MAX_PASSWORD_LENGTH,
     )
 
     profile: bool = Field(
@@ -73,7 +86,6 @@ class RequestModel(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("Username cannot be empty.")
-        _require_valid_text(v, "Username")
         return v
 
     @field_validator("password")
@@ -82,7 +94,6 @@ class RequestModel(BaseModel):
         """Validate that password is valid and not empty after stripping whitespace."""
         if not v.strip():
             raise ValueError("Password cannot be empty.")
-        _require_valid_text(v, "Password")
         return v
 
     @field_validator("fields")
@@ -91,4 +102,20 @@ class RequestModel(BaseModel):
         """Validate that fields is either None or a non-empty list containing only allowed field names."""
         if v is not None and not v:
             raise ValueError("Fields must be a non-empty list or None.")
+        return v
+
+    @field_validator("username", "password", mode="before")
+    @classmethod
+    def validate_text(cls, v: object, info: ValidationInfo) -> object:
+        """Reject text that cannot be encoded, before pydantic's own string checks run.
+
+        Args:
+            v (object): The raw value; anything that is not a str is left for pydantic to reject.
+            info (ValidationInfo): Which field is being validated, for the error message.
+
+        Returns:
+            object: The value, unchanged.
+        """
+        if isinstance(v, str):
+            _require_valid_text(v, info.field_name.capitalize())
         return v

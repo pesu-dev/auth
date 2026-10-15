@@ -182,6 +182,28 @@ def test_validate_deprecated_campus_code_in_fields_rejected():
     assert "fields.0" in str(exc_info.value)
 
 
+def test_username_limits(over_long_username):
+    """Test that the username with max character limits are accepted and more than limit is rejected."""
+    model = RequestModel(username="x" * RequestModel.MAX_USERNAME_LENGTH, password="testpass")
+    assert model.username == "x" * RequestModel.MAX_USERNAME_LENGTH
+
+    # For a username that crosses the limit
+    with pytest.raises(ValidationError) as exc_info:
+        RequestModel(username=over_long_username, password="testpass")
+    assert "username" in str(exc_info.value)
+
+
+def test_password_limits(over_long_password):
+    """Test that the password with max character limits are accepted and more than limit is rejected."""
+    model = RequestModel(username="testuser", password="x" * RequestModel.MAX_PASSWORD_LENGTH)
+    assert model.password == "x" * RequestModel.MAX_PASSWORD_LENGTH
+
+    # For a password that crosses the limit
+    with pytest.raises(ValidationError) as exc_info:
+        RequestModel(username="testuser", password=over_long_password)
+    assert "password" in str(exc_info.value)
+
+
 @pytest.mark.parametrize(
     "field",
     ["first_name", "middle_name", "last_name", "branch_short_code", "date_of_birth", "campus_code"],
