@@ -86,8 +86,7 @@ target-version = "py314"
 exclude = [
     "tests/",
     # Agent instructions and skills from the pesu-dev/skills submodule, which lints them itself.
-    # The Lint workflow checks out without submodules, so these are dangling links there and ruff would
-    # fail to read them.
+    # A local `ruff check .` before the submodule is initialized would otherwise follow dangling links.
     "AGENTS.md",
     ".agents/",
 ]
