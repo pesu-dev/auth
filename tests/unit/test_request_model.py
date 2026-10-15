@@ -2,9 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.request import RequestModel
-
-MAX_USERNAME_LENGTH = RequestModel.MAX_USERNAME_LENGTH
-MAX_PASSWORD_LENGTH = RequestModel.MAX_PASSWORD_LENGTH
+from tests.conftest import over_long_password, over_long_username
 
 
 def test_validate_username_empty_string():
@@ -184,24 +182,26 @@ def test_validate_deprecated_campus_code_in_fields_rejected():
     assert any(e["type"] == "literal_error" for e in errors)
     assert "fields.0" in str(exc_info.value)
 
-def test_username_limits():
+
+def test_username_limits(over_long_username):
     """Test that the username with max character limits are accepted and more than limit is rejected."""
-    model = RequestModel(username="x"*MAX_USERNAME_LENGTH, password="testpass")
-    assert model.username == "x"*MAX_USERNAME_LENGTH
+    model = RequestModel(username="x" * RequestModel.MAX_USERNAME_LENGTH, password="testpass")
+    assert model.username == "x" * RequestModel.MAX_USERNAME_LENGTH
 
     # For a username that crosses the limit
     with pytest.raises(ValidationError) as exc_info:
-        RequestModel(username="x"*(MAX_USERNAME_LENGTH+1), password="testpass")
+        RequestModel(username=over_long_username, password="testpass")
     assert "username" in str(exc_info.value)
 
-def test_password_limits():
+
+def test_password_limits(over_long_password):
     """Test that the password with max character limits are accepted and more than limit is rejected."""
-    model = RequestModel(username="testuser", password="x"*MAX_PASSWORD_LENGTH)
-    assert model.password == "x"*MAX_PASSWORD_LENGTH
+    model = RequestModel(username="testuser", password="x" * RequestModel.MAX_PASSWORD_LENGTH)
+    assert model.password == "x" * RequestModel.MAX_PASSWORD_LENGTH
 
     # For a password that crosses the limit
     with pytest.raises(ValidationError) as exc_info:
-        RequestModel(username="testuser", password="x"*(MAX_PASSWORD_LENGTH+1))
+        RequestModel(username="testuser", password=over_long_password)
     assert "password" in str(exc_info.value)
 
 

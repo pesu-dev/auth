@@ -39,7 +39,8 @@ class RequestModel(BaseModel):
     username: str = Field(
         ...,
         title="Username",
-        description="User's identifier for authentication. Can be SRN, PRN, email, or phone number.Upto 96 characters",
+        description="User's identifier for authentication. Can be SRN, PRN, email, or phone number."
+        f" Upto {MAX_USERNAME_LENGTH} characters.",
         json_schema_extra={"example": "PES1201800001"},
         max_length=MAX_USERNAME_LENGTH,
     )
@@ -48,8 +49,8 @@ class RequestModel(BaseModel):
         ...,
         title="Password",
         description=(
-            "User's password, up to 128 characters, counted exactly as typed. It is sent only to PESU Academy, "
-            "and never stored or logged."
+            f"User's password, up to {MAX_PASSWORD_LENGTH} characters, counted exactly as typed. It is sent only to"
+            " PESU Academy, and never stored or logged."
         ),
         json_schema_extra={"example": "mySecurePassword123"},
         max_length=MAX_PASSWORD_LENGTH,
@@ -104,7 +105,15 @@ class RequestModel(BaseModel):
     @field_validator("username", "password", mode="before")
     @classmethod
     def validate_text(cls, v: object, info: ValidationInfo) -> object:
-        """Reject text that cannot be encoded, before pydantic's own string checks run."""
+        """Reject text that cannot be encoded, before pydantic's own string checks run.
+
+        Args:
+            v (object): The raw value; anything that is not a str is left for pydantic to reject.
+            info (ValidationInfo): Which field is being validated, for the error message.
+
+        Returns:
+            object: The value, unchanged.
+        """
         if isinstance(v, str):
             _require_valid_text(v, info.field_name.capitalize())
         return v

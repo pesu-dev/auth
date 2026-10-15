@@ -5,11 +5,7 @@ from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
 from app.app import app
-
-from app.models.request import RequestModel
-
-MAX_USERNAME_LENGTH = RequestModel.MAX_USERNAME_LENGTH
-MAX_PASSWORD_LENGTH = RequestModel.MAX_PASSWORD_LENGTH
+from tests.conftest import over_long_password, over_long_username
 
 unhandled_router = APIRouter()
 
@@ -462,8 +458,6 @@ def test_integration_authenticate_fields_the_api_does_not_return_rejected(client
     assert data["status"] is False
     assert "body.fields.0" in data["message"]
 
-invalid_length_username = "x" * (MAX_USERNAME_LENGTH+1)
-invalid_length_password = "x" * (MAX_PASSWORD_LENGTH+1)
 
 def _validation_errors(client, field):
     for line in client.get("/metrics").text.splitlines():
@@ -471,11 +465,12 @@ def _validation_errors(client, field):
             return float(line.split()[-1])
     return 0.0
 
-def test_integration_authenticate_exceeds_max_username_length(client):
+
+def test_integration_authenticate_exceeds_max_username_length(client, over_long_username):
     """Username exceeding max length returns 400 without leaking the value."""
     payload = {
-        "username": invalid_length_username,
-        "password": "password",
+        "username": over_long_username,
+        "password": "testpassword",
     }
 
     before = _validation_errors(client, "username")
@@ -484,15 +479,16 @@ def test_integration_authenticate_exceeds_max_username_length(client):
     data = response.json()
     assert data["status"] is False
     assert "username" in data["message"].lower()
-    assert invalid_length_username not in data["message"]
+    assert over_long_username not in data["message"]
 
     assert _validation_errors(client, "username") == before + 1
 
-def test_integration_authenticate_exceeds_max_password_length(client):
+
+def test_integration_authenticate_exceeds_max_password_length(client, over_long_password):
     """Password exceeding max length returns 400 without leaking the value."""
     payload = {
-        "username": 'testuser',
-        "password": invalid_length_password,
+        "username": "testuser",
+        "password": over_long_password,
     }
 
     before = _validation_errors(client, "password")
@@ -501,15 +497,16 @@ def test_integration_authenticate_exceeds_max_password_length(client):
     data = response.json()
     assert data["status"] is False
     assert "password" in data["message"].lower()
-    assert invalid_length_password not in data["message"]
+    assert over_long_password not in data["message"]
 
     assert _validation_errors(client, "password") == before + 1
 
-def test_integration_authenticate_over_long_values_not_logged(client, caplog):
-    """Over limit inputs are caught by validation and not written to logs"""
+
+def test_integration_authenticate_over_long_values_not_logged(client, caplog, over_long_username, over_long_password):
+    """Over limit inputs are caught by validation and not written to logs."""
     payload = {
-        "username": invalid_length_username,
-        "password": invalid_length_password,
+        "username": over_long_username,
+        "password": over_long_password,
     }
 
     response = client.post("/authenticate", json=payload)
@@ -517,5 +514,5 @@ def test_integration_authenticate_over_long_values_not_logged(client, caplog):
     data = response.json()
     assert data["status"] is False
     assert "Request data could not be validated" in caplog.text
-    assert invalid_length_password not in caplog.text
-    assert invalid_length_username not in caplog.text
+    assert over_long_password not in caplog.text
+    assert over_long_username not in caplog.text

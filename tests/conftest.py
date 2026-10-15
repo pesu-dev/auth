@@ -4,6 +4,8 @@ import re
 import pytest
 from dotenv import load_dotenv
 
+from app.models.request import RequestModel
+
 load_dotenv()
 
 PROFILE_VARIABLES = {
@@ -143,3 +145,15 @@ def check_live_profile(expected_profile, check_live_fields):
         assert ok, "prn and srn name different campuses"
 
     return check
+
+
+@pytest.fixture
+def over_long_username():
+    """A username one character longer than RequestModel allows."""
+    return "x" * (RequestModel.MAX_USERNAME_LENGTH + 1)
+
+
+@pytest.fixture
+def over_long_password():
+    """A password one character longer than RequestModel allows."""
+    return "x" * (RequestModel.MAX_PASSWORD_LENGTH + 1)
