@@ -63,37 +63,8 @@ jobs:
 
           echo "✅ PR passed origin and target branch checks."
 
-  code_checks:
-    name: Code quality hooks
-    needs: [pr_source_checker]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
-        with:
-          python-version: "3.14"
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --locked
-
-      - name: Cache pre-commit hook environments
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
-
-      - name: Run code quality hooks
-        env:
-          SKIP: pytest,sync-agents,uv-lock
-          RUFF_OUTPUT_FORMAT: github
-        run: uv run pre-commit run --all-files --show-diff-on-failure
-
-  sync_agents:
-    name: Sync agents hook
+  pre_commit:
+    name: Pre-commit hooks
     needs: [pr_source_checker]
     runs-on: ubuntu-latest
     steps:
@@ -117,25 +88,11 @@ jobs:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
-      - name: Run sync-agents hook
-        run: uv run pre-commit run sync-agents --all-files --show-diff-on-failure
-
-  uv_lock:
-    name: Lock file check
-    needs: [pr_source_checker]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
-        with:
-          python-version: "3.14"
-          enable-cache: true
-
-      - name: Check uv.lock is up to date
-        run: uv lock --check
+      - name: Run pre-commit hooks
+        env:
+          SKIP: pytest
+          RUFF_OUTPUT_FORMAT: github
+        run: uv run pre-commit run --all-files --show-diff-on-failure
 
   test_runner:
     name: Test suite & coverage
@@ -268,9 +225,7 @@ jobs:
     name: Greenlight - CI checks
     needs:
       - pr_source_checker
-      - code_checks
-      - sync_agents
-      - uv_lock
+      - pre_commit
       - test_runner
       - pr_image_build
       - container_checks
@@ -282,9 +237,7 @@ jobs:
         env:
           CHECK_RESULTS: >-
             pr_source_checker=${{ needs.pr_source_checker.result }}
-            code_checks=${{ needs.code_checks.result }}
-            sync_agents=${{ needs.sync_agents.result }}
-            uv_lock=${{ needs.uv_lock.result }}
+            pre_commit=${{ needs.pre_commit.result }}
             test_runner=${{ needs.test_runner.result }}
             pr_image_build=${{ needs.pr_image_build.result }}
             container_checks=${{ needs.container_checks.result }}

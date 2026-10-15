@@ -206,7 +206,7 @@ The following checks are enforced:
 - ✅ A local `pytest` hook that runs the full test suite
 
 CI runs the same hooks (the `Pre-commit hooks` job), so a PR that passes `uv run pre-commit run --all-files` locally
-also passes CI. The tests run in their own `Test suite & coverage` job and are skipped by the pre-commit job.
+also passes CI. The tests run in their own `Test suite & coverage` job and are skipped by the `Pre-commit hooks` job.
 
 > [!WARNING]
 > You will not be able to commit code that fails these checks.
@@ -216,8 +216,8 @@ also passes CI. The tests run in their own `Test suite & coverage` job and are s
 A few checks require the PR itself or Docker and cannot be run as pre-commit hooks. Here is how to run each one
 locally:
 
-- **PR source checker:** verifies the PR comes from a fork and targets `dev`. There is nothing to run; just open the
-  PR that way.
+- **PR source checker:** verifies the PR does not come from the `main` branch and targets `dev`. There is nothing to
+  run; just open the PR that way.
 
 - **Version check:** verifies the version in `pyproject.toml` was bumped relative to `dev`:
 
