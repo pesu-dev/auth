@@ -146,10 +146,9 @@ authenticate_docs = ApiDocs(
         },
         400: {
             "description": (
-                "Bad Request - The request body failed validation: a body that is not valid JSON, a missing, empty,"
-                " over-long or invalid username or password, a value of the wrong type,"
-                " an unknown key, an unknown profile "
-                "field, or an empty fields list. The message names each field that failed and why."
+                "Bad Request - The request body failed validation: a body that is not valid JSON, a missing, empty, "
+                "over-long or invalid username or password, a value of the wrong type, an unknown key, an unknown "
+                "profile field, or an empty fields list. The message names each field that failed and why."
             ),
             "model": ResponseModel,
             "content": {
