@@ -200,14 +200,14 @@ The following checks are enforced:
 - ✅ `uv-lock` to check that `uv.lock` matches `pyproject.toml`
 - ✅ `mdformat` to format Markdown files (with GFM support)
 - ✅ `end-of-file-fixer`, `trailing-whitespace`, `check-yaml`, `check-toml`, `check-added-large-files` for formatting
+- ✅ `check-symlinks` to catch broken links such as `AGENTS.md`; it also fails until the submodule is checked out
 - ✅ `name-tests-test` to enforce test naming conventions
 - ✅ `debug-statements` to prevent committed debugger calls, such as `pdb` or `breakpoint()`
 - ✅ `sync-agents` to check that `.github/agents/` matches the roles in the agent submodule
 - ✅ A local `pytest` hook that runs the full test suite
 
-CI runs the same hooks (the `Pre-commit hooks` job), so a PR that passes `uv run pre-commit run --all-files` locally
-also passes the `Pre-commit hooks` job. The tests run in their own `Test suite & coverage` job and are skipped by the
-`Pre-commit hooks` job.
+CI runs the same hooks in the `Pre-commit hooks` job, except `pytest`, because the tests run in the
+`Test suite & coverage` job. A PR that passes `uv run pre-commit run --all-files` locally also passes that job.
 
 > [!WARNING]
 > You will not be able to commit code that fails these checks.
