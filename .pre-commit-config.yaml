@@ -1,18 +1,13 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.7
-    hooks:
-      - id: ruff-check
-        args: [ --fix, --exit-non-zero-on-fix ]
-        types_or: [ python, pyi, jupyter ]
-      - id: ruff-format
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
+      - id: check-symlinks
       - id: trailing-whitespace
       - id: check-added-large-files
+        # Without it the hook only checks staged files, and a CI checkout has none
+        args: [ --enforce-all ]
       - id: check-yaml
       - id: check-toml
       - id: debug-statements
@@ -31,22 +26,53 @@ repos:
 
   - repo: local
     hooks:
+      # Ruff runs from uv.lock, so it is the same version CI runs. --frozen leaves a stale lock for
+      # the uv-lock hook to report instead of rewriting it, and --force-exclude applies ruff's
+      # exclude list (tests/) to the file names pre-commit passes.
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --frozen ruff check --force-exclude --fix --exit-non-zero-on-fix
+        language: system
+        types_or: [ python, pyi ]
+        require_serial: true
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --frozen ruff format --force-exclude
+        language: system
+        types_or: [ python, pyi ]
+        require_serial: true
+
+      # Catches syntax errors in tests/, which ruff does not lint
+      - id: compileall
+        name: Compile Python sources
+        entry: uv run --frozen python -m compileall -q
+        language: system
+        types: [ python ]
+
+      - id: uv-lock
+        name: Check uv.lock matches pyproject.toml
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+
       # .github/agents/ is generated from the roles in the pesu-dev/skills submodule. A submodule bump
       # changes no tracked Markdown file, so this runs on every commit rather than on matching files.
       - id: sync-agents
         name: Check Copilot custom agents match the roles
-        entry: python scripts/sync_agents.py --check
+        entry: uv run --frozen python scripts/sync_agents.py --check
         language: system
         pass_filenames: false
         always_run: true
 
       - id: pytest
         name: Run Pytest
-        entry: python scripts/run_tests.py
+        # --all-groups: tests/unit/test_benchmark.py needs the benchmark group
+        entry: uv run --frozen --all-groups python scripts/run_tests.py
         language: system
         types: [ python ]
         pass_filenames: false
-        # Print the run even when it passes. Without this pre-commit swallows the output, so the
-        # test counts, the coverage total and the "live tests skipped" warning were all invisible
-        # in CI -- a partial run looked identical to a full one.
+        # Print a passing run so local developers can see test counts, coverage and any
+        # "live tests skipped" warning; otherwise pre-commit suppresses hook output.
         verbose: true
