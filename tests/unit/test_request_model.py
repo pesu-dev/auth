@@ -2,7 +2,6 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.request import RequestModel
-from tests.conftest import over_long_password, over_long_username
 
 
 def test_validate_username_empty_string():
