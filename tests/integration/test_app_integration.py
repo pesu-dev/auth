@@ -5,7 +5,6 @@ from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
 from app.app import app
-from tests.conftest import over_long_password, over_long_username
 
 unhandled_router = APIRouter()
 
