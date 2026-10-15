@@ -223,6 +223,7 @@ locally:
 - **Version check:** verifies the version in `pyproject.toml` was bumped relative to `dev`:
 
   ```bash
+  git remote add upstream https://github.com/pesu-dev/auth.git
   git fetch upstream
   git show upstream/dev:pyproject.toml > /tmp/base_pyproject.toml
   python3 .github/scripts/check_version_bump.py --base-pyproject /tmp/base_pyproject.toml \
