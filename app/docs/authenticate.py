@@ -146,9 +146,9 @@ authenticate_docs = ApiDocs(
         },
         400: {
             "description": (
-                "Bad Request - The request body failed validation: a body that is not valid JSON, a missing, empty "
-                "or invalid username or password, a value of the wrong type, an unknown key, an unknown profile "
-                "field, or an empty fields list. The message names each field that failed and why."
+                "Bad Request - The request body failed validation: a body that is not valid JSON, a missing, empty, "
+                "over-long or invalid username or password, a value of the wrong type, an unknown key, an unknown "
+                "profile field, or an empty fields list. The message names each field that failed and why."
             ),
             "model": ResponseModel,
             "content": {
@@ -192,6 +192,28 @@ authenticate_docs = ApiDocs(
                                     "'prn', 'srn', 'program', 'branch', 'semester', 'section', 'email', 'mobile', "
                                     "'campusCode', 'campus', 'firstName', 'middleName', 'lastName', "
                                     "'branchShortCode', 'gender' or 'dateOfBirth'"
+                                ),
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                        "username_too_long": {
+                            "summary": "Username too long",
+                            "value": {
+                                "status": False,
+                                "message": (
+                                    "Could not validate request data - body.username: "
+                                    "String should have at most 96 characters"
+                                ),
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                        "password_too_long": {
+                            "summary": "Password too long",
+                            "value": {
+                                "status": False,
+                                "message": (
+                                    "Could not validate request data - body.password: "
+                                    "String should have at most 128 characters"
                                 ),
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
                             },

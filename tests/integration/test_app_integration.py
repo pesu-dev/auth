@@ -456,3 +456,62 @@ def test_integration_authenticate_fields_the_api_does_not_return_rejected(client
     data = response.json()
     assert data["status"] is False
     assert "body.fields.0" in data["message"]
+
+
+def _validation_errors(client, field):
+    for line in client.get("/metrics").text.splitlines():
+        if line.startswith(f'pesu_auth_validation_errors_total{{field="{field}"}}'):
+            return float(line.split()[-1])
+    return 0.0
+
+
+def test_integration_authenticate_exceeds_max_username_length(client, over_long_username):
+    """Username exceeding max length returns 400 without leaking the value."""
+    payload = {
+        "username": over_long_username,
+        "password": "testpassword",
+    }
+
+    before = _validation_errors(client, "username")
+    response = client.post("/authenticate", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] is False
+    assert "username" in data["message"].lower()
+    assert over_long_username not in data["message"]
+
+    assert _validation_errors(client, "username") == before + 1
+
+
+def test_integration_authenticate_exceeds_max_password_length(client, over_long_password):
+    """Password exceeding max length returns 400 without leaking the value."""
+    payload = {
+        "username": "testuser",
+        "password": over_long_password,
+    }
+
+    before = _validation_errors(client, "password")
+    response = client.post("/authenticate", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] is False
+    assert "password" in data["message"].lower()
+    assert over_long_password not in data["message"]
+
+    assert _validation_errors(client, "password") == before + 1
+
+
+def test_integration_authenticate_over_long_values_not_logged(client, caplog, over_long_username, over_long_password):
+    """Over limit inputs are caught by validation and not written to logs."""
+    payload = {
+        "username": over_long_username,
+        "password": over_long_password,
+    }
+
+    response = client.post("/authenticate", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] is False
+    assert "Request data could not be validated" in caplog.text
+    assert over_long_password not in caplog.text
+    assert over_long_username not in caplog.text
