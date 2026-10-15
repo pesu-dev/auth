@@ -3,6 +3,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
+      - id: check-symlinks
       - id: trailing-whitespace
       - id: check-added-large-files
         # Without it the hook only checks staged files, and a CI checkout has none
@@ -33,12 +34,14 @@ repos:
         entry: uv run --frozen ruff check --force-exclude --fix --exit-non-zero-on-fix
         language: system
         types_or: [ python, pyi ]
+        require_serial: true
 
       - id: ruff-format
         name: ruff format
         entry: uv run --frozen ruff format --force-exclude
         language: system
         types_or: [ python, pyi ]
+        require_serial: true
 
       # Catches syntax errors in tests/, which ruff does not lint
       - id: compileall
@@ -70,7 +73,6 @@ repos:
         language: system
         types: [ python ]
         pass_filenames: false
-        # Print the run even when it passes. Without this pre-commit swallows the output, so the
-        # test counts, the coverage total and the "live tests skipped" warning were all invisible
-        # in CI -- a partial run looked identical to a full one.
+        # Print a passing run so local developers can see test counts, coverage and any
+        # "live tests skipped" warning; otherwise pre-commit suppresses hook output.
         verbose: true

@@ -206,7 +206,8 @@ The following checks are enforced:
 - ✅ A local `pytest` hook that runs the full test suite
 
 CI runs the same hooks (the `Pre-commit hooks` job), so a PR that passes `uv run pre-commit run --all-files` locally
-also passes CI. The tests run in their own `Test suite & coverage` job and are skipped by the `Pre-commit hooks` job.
+also passes the `Pre-commit hooks` job. The tests run in their own `Test suite & coverage` job and are skipped by the
+`Pre-commit hooks` job.
 
 > [!WARNING]
 > You will not be able to commit code that fails these checks.
