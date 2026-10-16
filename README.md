@@ -169,7 +169,8 @@ object, with the user's profile information if requested.
 
 The request body is validated strictly. A missing or empty `username` or `password`, one that is not valid text, a value of the wrong type (such as
 the string `"true"` for `profile`), an unknown key, an empty `fields` list, or an unknown field name is rejected with a
-`400`.
+`400`. So is a body that cannot be read at all, such as JSON that is not valid UTF-8, with the fixed message
+`Could not parse request body.`
 
 #### Responses
 
@@ -339,11 +340,11 @@ A few definitions that are easy to assume wrongly:
 
 **Failures**
 
-| Metric                           | Meaning                                                                                                                                                                                                                                 |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `failures_total{fault}`          | Failed requests by whose fault it was: `client` for 4xx, `server` for 5xx. Alert on `server` without enumerating status codes                                                                                                           |
-| `errors_total{type}`             | Errors rendered by an exception handler, by exception class: `AuthenticationError`, `UpstreamError`, `ProfileFetchError`, `ProfileParseError`, `MetricsAuthorizationError`, `RequestValidationError`, or whatever reached the catch-all |
-| `validation_errors_total{field}` | Request validation failures by the field that failed. Unrecognised keys collapse into `other`, since the request body is caller-controlled                                                                                              |
+| Metric                           | Meaning                                                                                                                                                                                                                                                          |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `failures_total{fault}`          | Failed requests by whose fault it was: `client` for 4xx, `server` for 5xx. Alert on `server` without enumerating status codes                                                                                                                                    |
+| `errors_total{type}`             | Errors rendered by an exception handler, by exception class: `AuthenticationError`, `UpstreamError`, `ProfileFetchError`, `ProfileParseError`, `MetricsAuthorizationError`, `RequestBodyParseError`, `RequestValidationError`, or whatever reached the catch-all |
+| `validation_errors_total{field}` | Request validation failures by the field that failed. Unrecognised keys collapse into `other`, since the request body is caller-controlled                                                                                                                       |
 
 **Authentication**
 

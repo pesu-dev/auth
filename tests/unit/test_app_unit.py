@@ -248,3 +248,42 @@ def test_validation_error_never_logs_submitted_values(client, caplog):
     # The diagnostic value is kept: which field, and why
     assert "username" in caplog.text
     assert "Field required" in caplog.text
+
+
+def test_an_unreadable_body_is_a_400_in_the_standard_shape(client, monkeypatch, caplog):
+    """A JSON body that is not even UTF-8 never reaches validation; FastAPI rejects it first.
+
+    It must still answer in this API's `{status, message, timestamp}` shape, be counted, and never
+    echo the bytes it could not read: they could hold a password.
+    """
+    from app.metrics.collector import ERRORS_BY_TYPE, VALIDATION_ERRORS, MetricsCollector
+
+    collector = MetricsCollector()
+    monkeypatch.setattr("app.app.metrics", collector)
+    secret = b"hunter2-actual-secret"
+
+    with caplog.at_level("WARNING"):
+        response = client.post(
+            "/authenticate",
+            content=b'{"password": "\xff' + secret + b'"}',
+            headers={"Content-Type": "application/json"},
+        )
+
+    assert response.status_code == 400
+    data = response.json()
+    assert sorted(data) == ["message", "status", "timestamp"]
+    assert data["status"] is False
+    assert data["message"] == "Could not parse request body."
+    assert secret.decode() not in caplog.text
+    assert secret.decode() not in response.text
+    snapshot = collector.snapshot()
+    assert snapshot.value(ERRORS_BY_TYPE.name, type="RequestBodyParseError") == 1.0
+    assert list(snapshot.samples(VALIDATION_ERRORS.name)) == []
+
+
+def test_an_unknown_route_keeps_the_framework_404(client):
+    """Only the unreadable-body 400 is rewritten; other framework errors answer as before."""
+    response = client.get("/not-a-route")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found"}

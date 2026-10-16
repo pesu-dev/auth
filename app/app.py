@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 import uvicorn
 from fastapi import Depends, FastAPI
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.routing import APIRoute
@@ -26,9 +27,11 @@ if TYPE_CHECKING:
     from starlette.middleware.base import RequestResponseEndpoint
 
 from pydantic import ValidationError
+from starlette.exceptions import HTTPException
 
 from app.docs import authenticate_docs, health_docs, metrics_docs, readme_docs
 from app.exceptions.base import PESUAcademyError
+from app.exceptions.request import RequestBodyParseError
 from app.metrics.auth import require_metrics_token
 from app.metrics.collector import (
     AUTHENTICATION_REQUESTS,
@@ -217,6 +220,21 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
         },
         headers=exc.headers,
     )
+
+
+@app.exception_handler(HTTPException)
+async def http_error_handler(request: Request, exc: HTTPException) -> Response:
+    """Handler for errors the framework raises itself.
+
+    FastAPI raises a 400 HTTPException, not a RequestValidationError, when it cannot read the body
+    at all -- JSON that is not valid UTF-8, for one. Left alone that answers `{"detail": ...}`, so it
+    is rendered as a RequestBodyParseError instead, without the bytes that could not be read. No
+    route raises HTTPException, so every other one is the framework's (a 404 or 405) and keeps its
+    usual response.
+    """
+    if exc.status_code == 400:
+        return await pesu_exception_handler(request, RequestBodyParseError())
+    return await http_exception_handler(request, exc)
 
 
 @app.exception_handler(Exception)
