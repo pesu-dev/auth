@@ -48,12 +48,19 @@ def api_schema(monkeypatch, full_profile):
 schema = schemathesis.pytest.from_fixture("api_schema")
 
 
-@schema.parametrize()
+@schema.exclude(path="/authenticate").parametrize()
 @settings(database=None, deadline=None)
 def test_every_generated_request_gets_a_documented_response(case, conformance_checks):
     # Redirects are not followed: /readme's 308 is the response under test, and following it would
     # leave the machine
     case.call_and_validate(checks=[not_a_server_error, *conformance_checks], allow_redirects=False)
+
+
+# /authenticate is what callers use this service for, so it gets five times the budget of the other routes
+@schema.include(path="/authenticate").parametrize()
+@settings(max_examples=5 * settings().max_examples, database=None, deadline=None)
+def test_every_generated_authentication_request_gets_a_documented_response(case, conformance_checks):
+    case.call_and_validate(checks=[not_a_server_error, *conformance_checks])
 
 
 def test_each_authentication_failure_is_documented(api_schema, conformance_checks, authentication_failure, monkeypatch):

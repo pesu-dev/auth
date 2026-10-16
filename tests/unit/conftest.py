@@ -51,8 +51,8 @@ UNREADABLE_BODIES = {
     "form": (b"username=u", "application/x-www-form-urlencoded"),
 }
 
-# Hypothesis' default of 100 generated requests per operation keeps the contract test fast. Pass
-# --hypothesis-profile=deep for a longer local run.
+# Hypothesis' default of 100 generated requests per route, and 500 for /authenticate, keeps the contract
+# test fast. Pass --hypothesis-profile=deep for a longer local run, ten times as many.
 settings.register_profile("deep", max_examples=1000)
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).
