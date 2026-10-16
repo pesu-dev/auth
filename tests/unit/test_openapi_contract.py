@@ -17,6 +17,8 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.core.failures import FailureGroup
 from schemathesis.python.asgi import ASGIClient, shutdown_lifespans
 
+from fastapi.testclient import TestClient
+
 from app.app import app
 from app.metrics.collector import MetricsCollector
 
@@ -47,7 +49,7 @@ schema = schemathesis.pytest.from_fixture("api_schema")
 
 
 @schema.parametrize()
-@settings(max_examples=100, database=None, deadline=None)
+@settings(database=None, deadline=None)
 def test_every_generated_request_gets_a_documented_response(case, conformance_checks):
     # Redirects are not followed: /readme's 308 is the response under test, and following it would
     # leave the machine
@@ -57,10 +59,13 @@ def test_every_generated_request_gets_a_documented_response(case, conformance_ch
 def test_each_authentication_failure_is_documented(api_schema, conformance_checks, authentication_failure, monkeypatch):
     error, status = authentication_failure
     monkeypatch.setattr("app.app.pesu_academy.authenticate", AsyncMock(side_effect=error))
-    case = api_schema["/authenticate"]["POST"].Case(body={"username": "u", "password": "p"}, media_type="application/json")
+    case = api_schema["/authenticate"]["POST"].Case()
+    # A TestClient rather than case.call(): the server re-raises an unhandled exception after rendering
+    # its 500, and only a TestClient can be told to return the response instead
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post("/authenticate", json={"username": "u", "password": "p"})
 
-    response = case.call_and_validate(checks=conformance_checks)
-
+    case.validate_response(response, checks=conformance_checks)
     assert response.status_code == status
 
 

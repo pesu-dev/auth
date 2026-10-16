@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 
 import httpx2
 import pytest
+from hypothesis import settings
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,
     response_schema_conformance,
@@ -16,7 +17,6 @@ from schemathesis.specs.openapi.checks import (
 )
 
 from app.exceptions.authentication import AuthenticationError, ProfileFetchError, ProfileParseError, UpstreamError
-from app.exceptions.base import PESUAcademyError
 from app.models import MetricsModel, ResponseModel
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -35,13 +35,11 @@ AGENT_FRONTMATTER = '---\nname: reviewer\ndescription: Reviews diffs. Read-only.
 
 # What every response must agree with the OpenAPI schema on, whatever its status
 CONFORMANCE_CHECKS = (status_code_conformance, content_type_conformance, response_schema_conformance)
-# Each way /authenticate can fail after validation, and the status it must answer with. The 500 is the
-# one the route raises when its own response fails validation; an unhandled exception is not used, as
-# the server re-raises it after rendering the 500, which fails the test before the response is checked.
+# Each way /authenticate can fail after validation, and the status it must answer with
 AUTHENTICATION_FAILURES = {
     "authentication": (AuthenticationError(), 401),
     "profile_parse": (ProfileParseError(), 422),
-    "internal": (PESUAcademyError("Internal Server Error. Please try again later.", status_code=500), 500),
+    "unhandled": (RuntimeError("unexpected"), 500),
     "upstream": (UpstreamError(), 502),
     "profile_fetch": (ProfileFetchError(), 502),
 }
@@ -52,6 +50,10 @@ UNREADABLE_BODIES = {
     "plain_text": (b"invalid", "text/plain"),
     "form": (b"username=u", "application/x-www-form-urlencoded"),
 }
+
+# Hypothesis' default of 100 generated requests per operation keeps the contract test fast. Pass
+# --hypothesis-profile=deep for a longer local run.
+settings.register_profile("deep", max_examples=1000)
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).
 # The personal fields this service must never keep or log -- photo, parents, address -- are
