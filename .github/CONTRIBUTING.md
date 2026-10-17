@@ -336,7 +336,7 @@ run it alongside the live tests: both wait on PESU Academy, so each skews the ot
   real `PESUAcademy`, against profile responses with generated values in every field it reads, and the
   docs pages, which the schema does not describe, get generated query strings and methods. For a response
   generation cannot reach, add an explicit case there, as it does for each way PESU Academy can fail a
-  login. Each test's number of requests is set on the test itself: 500 for each `/authenticate` test,
+  login. Each test's number of requests is set on the test itself: 1000 for each `/authenticate` test,
   125 for each `/metrics` run (open and protected) and 200 for each other route
 - Adding a profile field? Read it in the model for its block in `app/models/upstream.py`, return it from
   `PESUAcademy._build_profile`, and add it to `ProfileField` and `ProfileModel` in `app/models/profile.py`,

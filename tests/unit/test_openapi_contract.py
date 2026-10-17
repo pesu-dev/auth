@@ -93,7 +93,7 @@ def test_every_generated_request_gets_a_documented_response(case, conformance_ch
 
 # /authenticate is what callers use this service for, so it gets the most requests
 @schema.include(path="/authenticate").parametrize()
-@settings(max_examples=500, database=None, deadline=None)
+@settings(max_examples=1000, database=None, deadline=None)
 def test_every_generated_authentication_request_gets_a_documented_response(
     case, wire, multipart_fields, conformance_checks
 ):
@@ -113,7 +113,7 @@ def test_every_generated_authentication_request_gets_a_documented_response(
 
 
 @given(data=st.data())
-@settings(max_examples=500, database=None, deadline=None, **UNSEEDED)
+@settings(max_examples=1000, database=None, deadline=None, **UNSEEDED)
 def test_every_generated_profile_gets_a_documented_response(data, api_schema, wire, profile_payload, conformance_checks):
     """Generated profile responses from PESU Academy, each asked for with a generated choice of fields."""
     profile_response = _profile_response(data, profile_payload)
