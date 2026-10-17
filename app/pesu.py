@@ -378,7 +378,8 @@ class PESUAcademy:
             # Not fatal -- the campus is still returned as PESU named it -- but it means a campus, or the
             # way PESU writes its name, is new, which nothing else would surface.
             self._metrics.increment(PROFILE_PARSE_ERRORS, reason="unknown_campus_code")
-            logging.warning(f"Unknown campus name: {campus} for user={username}")
+            # Quoted, so a name holding a line break cannot add lines of its own to the log
+            logging.warning(f"Unknown campus name: {campus!r} for user={username}")
         return campus_code
 
     def _build_profile(self, student: Student, username: str) -> dict[str, Any]:

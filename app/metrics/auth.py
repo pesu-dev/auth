@@ -33,10 +33,10 @@ METRICS_TOKEN: str | None = _configured_token()
 
 # auto_error=False so this never raises by itself: every failure path -- no header, no scheme, no
 # credentials, or a scheme that is not Bearer -- returns None, and the 401 is raised below as a
-# PESUAcademyError. That is what keeps the body in this API's `{status, message, timestamp}` shape
-# and gets the failure counted in errors_total. HTTPBasic cannot be used the same way; it raises
-# HTTPException on a malformed credential regardless of auto_error, which would answer in
-# Starlette's `{"detail": ...}` shape and bypass the error metric entirely.
+# MetricsAuthorizationError. That is what gives the 401 this API's documented message and gets it
+# counted in errors_total under its own name. HTTPBasic cannot be used the same way; it raises
+# HTTPException on a malformed credential regardless of auto_error, which would answer with
+# Starlette's message and be counted as a bare PESUAcademyError instead.
 _bearer = HTTPBearer(
     auto_error=False,
     scheme_name="MetricsToken",

@@ -139,12 +139,12 @@ def test_an_unhandled_exception_records_a_500(client):
 
 
 def test_an_unknown_path_is_bucketed(client):
-    """A 404 is counted, attributed to one bucket, and runs no handler of ours."""
+    """A 404 is counted, attributed to one bucket, and named as an error like any other."""
     assert client.get("/definitely-not-a-route").status_code == 404
     body = client.get("/metrics?fmt=json").json()
     assert body["responsesByStatus"]["404"] == 1
     assert "GET <unmatched>" in body["requestsByRoute"]
-    assert body["errorsByType"] == {}
+    assert body["errorsByType"] == {"RouteNotFoundError": 1}
 
 
 def test_the_metrics_endpoint_counts_itself(client):
@@ -173,7 +173,7 @@ def test_an_unrecognised_format_is_rejected(client):
 
 @patch("app.app.pesu_academy.authenticate")
 def test_response_and_outcome_counts_agree(mock_authenticate, client):
-    """sum(responsesByStatus) == success + failed, and sum(errorsByType) <= failed."""
+    """sum(responsesByStatus) == success + failed, and every failure, a 404 included, is in errorsByType."""
     mock_authenticate.side_effect = AuthenticationError()
     client.get("/health")
     client.post("/authenticate", json={"username": "u", "password": "p"})
@@ -181,7 +181,7 @@ def test_response_and_outcome_counts_agree(mock_authenticate, client):
     body = client.get("/metrics?fmt=json").json()
     resolved = body["requests"]["success"] + body["requests"]["failed"]
     assert sum(body["responsesByStatus"].values()) == resolved
-    assert sum(body["errorsByType"].values()) < body["requests"]["failed"]
+    assert sum(body["errorsByType"].values()) == body["requests"]["failed"]
 
 
 def test_latency_is_recorded_for_a_route(client):

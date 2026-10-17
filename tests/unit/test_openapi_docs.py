@@ -132,6 +132,19 @@ def test_no_phantom_validation_error_is_documented(schema):
     assert "HTTPValidationError" not in rendered
 
 
+def test_metrics_json_documents_the_metrics_model(schema):
+    """The JSON body is a MetricsModel, so its schema says so; the Prometheus text stays a string."""
+    content = schema["paths"]["/metrics"]["get"]["responses"]["200"]["content"]
+    assert content["application/json"]["schema"] == {"$ref": "#/components/schemas/MetricsModel"}
+    assert content["text/plain"]["schema"] == {"type": "string"}
+
+
+def test_an_unreadable_body_is_documented(schema):
+    content = schema["paths"]["/authenticate"]["post"]["responses"]["400"]["content"]["application/json"]
+    messages = [example["value"]["message"] for example in content["examples"].values()]
+    assert "Could not parse request body." in messages
+
+
 def test_the_profile_parse_422_is_kept(schema):
     """/authenticate really can return a 422, and it uses this API's own response shape."""
     response = schema["paths"]["/authenticate"]["post"]["responses"]["422"]

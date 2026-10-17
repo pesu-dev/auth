@@ -85,6 +85,12 @@ def test_the_json_format_is_protected_too(protected):
     assert protected.get("/metrics?fmt=json").status_code == 401
 
 
+def test_head_is_protected_too(protected, metrics_token):
+    """HEAD carries no body, but its headers would still say whether the metrics had changed."""
+    assert protected.head("/metrics").status_code == 401
+    assert protected.head("/metrics", headers={"Authorization": f"Bearer {metrics_token}"}).status_code == 200
+
+
 def test_a_rejection_is_counted_as_an_error_and_a_client_fault(protected, metrics_token):
     """The middleware/handler split from the metrics work still holds for this new error."""
     protected.get("/metrics")

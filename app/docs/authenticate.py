@@ -148,7 +148,8 @@ authenticate_docs = ApiDocs(
             "description": (
                 "Bad Request - The request body failed validation: a body that is not valid JSON, a missing, empty, "
                 "over-long or invalid username or password, a value of the wrong type, an unknown key, an unknown "
-                "profile field, or an empty fields list. The message names each field that failed and why."
+                "profile field, or an empty fields list. The message names each field that failed and why. A body "
+                "that cannot be read at all, such as JSON that is not valid UTF-8, gets a fixed message instead."
             ),
             "model": ResponseModel,
             "content": {
@@ -162,6 +163,14 @@ authenticate_docs = ApiDocs(
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
                             },
                         },
+                        "unreadable_body": {
+                            "summary": "Body that cannot be read",
+                            "value": {
+                                "status": False,
+                                "message": "Could not parse request body.",
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
                         "empty_username": {
                             "summary": "Empty username",
                             "value": {
@@ -169,6 +178,17 @@ authenticate_docs = ApiDocs(
                                 "message": (
                                     "Could not validate request data - body.username: Value error, Username cannot "
                                     "be empty."
+                                ),
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
+                        "invisible_characters_in_username": {
+                            "summary": "Line break or other invisible character in the username",
+                            "value": {
+                                "status": False,
+                                "message": (
+                                    "Could not validate request data - body.username: Value error, Username can "
+                                    "only contain visible characters."
                                 ),
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
                             },

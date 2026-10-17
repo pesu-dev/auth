@@ -9,8 +9,14 @@ from unittest.mock import AsyncMock, patch
 
 import httpx2
 import pytest
+from schemathesis.specs.openapi.checks import (
+    content_type_conformance,
+    response_schema_conformance,
+    status_code_conformance,
+)
 
 from app.models import MetricsModel, ResponseModel
+from app.pesu import DISPATCHER_URL, LOGIN_URL
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK_DIR = REPOSITORY_ROOT / "scripts" / "benchmark"
@@ -25,6 +31,49 @@ DOCUMENTED_MODELS = {"ResponseModel": ResponseModel, "MetricsModel": MetricsMode
 # Login responses' accessToken values that give no token: None stands for the key being absent
 UNUSABLE_TOKENS = {"missing": None, "object": {"token": "x"}, "list": ["x"]}
 AGENT_FRONTMATTER = '---\nname: reviewer\ndescription: Reviews diffs. Read-only.\ntools: ["read"]\n---\n'
+
+# What every response must agree with the OpenAPI schema on, whatever its status
+CONFORMANCE_CHECKS = (status_code_conformance, content_type_conformance, response_schema_conformance)
+# Each way a login that asks for a profile can fail -- PESU Academy's answer to the login or the profile
+# request, or our own code failing while it waits -- and the status /authenticate must answer with
+AUTHENTICATION_FAILURES = {
+    "wrong_credentials": (
+        LOGIN_URL,
+        lambda request: httpx2.Response(401, json={"statusCode": 401, "statusDescription": "Invalid Login Credentials"}),
+        401,
+    ),
+    "login_unavailable": (LOGIN_URL, lambda request: httpx2.Response(503), 502),
+    "login_unreachable": (LOGIN_URL, lambda request: httpx2.ConnectError("refused", request=request), 502),
+    "login_not_json": (LOGIN_URL, lambda request: httpx2.Response(200, content=b"<html></html>"), 502),
+    "profile_unavailable": (DISPATCHER_URL, lambda request: httpx2.Response(500), 502),
+    "profile_without_student": (
+        DISPATCHER_URL,
+        lambda request: httpx2.Response(200, json={"MESSAGE": "SUCCESS_Record found Successfully"}),
+        422,
+    ),
+    "unhandled": (LOGIN_URL, lambda request: RuntimeError("unexpected"), 500),
+}
+# Usernames with a character no SRN, PRN, email or phone number has: each could break or forge a log line
+UNPRINTABLE_USERNAMES = {
+    "line_feed": "PES1UG20CS001\n2026-10-17 07:00:00,000 - ERROR - Login successful for user=admin",
+    "carriage_return": "PES1UG20CS001\rforged",
+    "null": "PES1UG20CS001\x00",
+    "terminal_escape": "PES1UG20CS001\x1b[31m",
+    "line_separator": "PES1UG20CS001\u2028forged",
+    "zero_width_space": "PES1UG20CS\u200b001",
+    "no_break_space": "PES1UG20CS\u00a0001",
+}
+# Request bodies FastAPI cannot read or validate, with the Content-Type they are sent as
+UNREADABLE_BODIES = {
+    "truncated_json": (b"{", "application/json"),
+    "not_utf8": (b"\xff", "application/json"),
+    "plain_text": (b"invalid", "text/plain"),
+    "form": (b"username=u", "application/x-www-form-urlencoded"),
+}
+
+# Every route that takes no input, with the status a GET of it answers: the docs pages, which are not in
+# the OpenAPI schema, and the two that are
+PAGES = {"/": 200, "/docs": 200, "/docs/oauth2-redirect": 200, "/redoc": 200, "/openapi.json": 200, "/health": 200, "/readme": 308}
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).
 # The personal fields this service must never keep or log -- photo, parents, address -- are
@@ -174,6 +223,35 @@ def full_profile():
 
 
 @pytest.fixture
+def conformance_checks():
+    return list(CONFORMANCE_CHECKS)
+
+
+@pytest.fixture(params=list(AUTHENTICATION_FAILURES.values()), ids=list(AUTHENTICATION_FAILURES))
+def authentication_failure(request):
+    """Each way PESU Academy can fail a login, as the URL, its answer and the status to expect, one per test."""
+    return request.param
+
+
+@pytest.fixture(params=list(PAGES.items()), ids=list(PAGES))
+def page(request):
+    """Each route that takes no input, with the status a GET of it answers, one per test."""
+    return request.param
+
+
+@pytest.fixture(params=list(UNPRINTABLE_USERNAMES.values()), ids=list(UNPRINTABLE_USERNAMES))
+def unprintable_username(request):
+    """Each username with a line break or another invisible character, one per test."""
+    return request.param
+
+
+@pytest.fixture(params=list(UNREADABLE_BODIES.values()), ids=list(UNREADABLE_BODIES))
+def unreadable_body(request):
+    """Each body that never gets past FastAPI's parsing or validation, with its Content-Type, one per test."""
+    return request.param
+
+
+@pytest.fixture
 def ist_offset():
     return IST_OFFSET
 
@@ -292,6 +370,24 @@ def upstream():
     """
     with patch("app.pesu.httpx2.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         yield mock_post
+
+
+@pytest.fixture
+def multipart_fields():
+    """Decode a multipart request body into {field name: value}, each value exactly as sent."""
+
+    def _decode(request):
+        boundary = request.headers["content-type"].split("boundary=")[1].encode()
+        fields = {}
+        # Each part sits between a boundary line and the CRLF before the next one, so cutting exactly
+        # those bytes keeps a value that itself starts or ends with a line break whole
+        for part in request.content.split(b"--" + boundary)[1:-1]:
+            head, _, value = part.removeprefix(b"\r\n").partition(b"\r\n\r\n")
+            name = head.split(b'name="')[1].split(b'"')[0].decode()
+            fields[name] = value.removesuffix(b"\r\n").decode()
+        return fields
+
+    return _decode
 
 
 class Wire:

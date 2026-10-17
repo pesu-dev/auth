@@ -296,6 +296,17 @@ def test_blood_group_cannot_be_requested(client, pesu_up, assert_error_body):
     assert pesu_up.requests == []
 
 
+def test_a_username_that_could_forge_a_log_line_is_a_400(client, wire, caplog, unprintable_username, assert_error_body):
+    with caplog.at_level("INFO"):
+        response = client.post("/authenticate", json={"username": unprintable_username, "password": "pass"})
+
+    result = assert_error_body(response, 400)
+    assert "Username can only contain visible characters" in result["message"]
+    assert wire.requests == []
+    # Turned away before anything logs the username
+    assert not [r for r in caplog.records if unprintable_username.strip() in r.getMessage()]
+
+
 @pytest.mark.parametrize("field", ["username", "password"])
 def test_text_that_cannot_be_encoded_is_a_400(client, wire, caplog, field, assert_error_body):
     """An unpaired surrogate decodes from JSON but cannot be sent on; it is the caller's error, not a 500."""

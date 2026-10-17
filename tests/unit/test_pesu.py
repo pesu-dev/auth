@@ -525,7 +525,20 @@ async def test_an_unknown_campus_name_is_returned_and_counted(
     assert profile["campus"] == "PES University (Hanumanthanagar)"
     assert profile["campusCode"] is None
     assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="unknown_campus_code") == 1.0
-    assert "Unknown campus name: PES University (Hanumanthanagar)" in caplog.text
+    assert "Unknown campus name: 'PES University (Hanumanthanagar)'" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_campus_name_cannot_add_lines_to_the_log(
+    pesu, upstream, make_response, login_payload, profile_payload, caplog
+):
+    profile_payload["STUDENT_PHOTO"]["instituteName"] = "New Campus\nERROR - forged line"
+
+    with caplog.at_level("WARNING"):
+        await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert "New Campus\\nERROR - forged line" in caplog.text
+    assert not [line for line in caplog.text.splitlines() if line.startswith("ERROR - forged line")]
 
 
 @pytest.mark.asyncio
@@ -749,21 +762,8 @@ def _route_logins(wire, make_response, login_payload, profile_payload):
     wire.routes[DISPATCHER_URL] = lambda request: make_response(json=profile_payload)
 
 
-def _multipart_fields(request):
-    """Decode a multipart request body into {field name: value}."""
-    boundary = request.headers["content-type"].split("boundary=")[1].encode()
-    fields = {}
-    for part in request.content.split(b"--" + boundary):
-        if b'name="' not in part:
-            continue
-        head, _, value = part.partition(b"\r\n\r\n")
-        name = head.split(b'name="')[1].split(b'"')[0].decode()
-        fields[name] = value.rstrip(b"\r\n").decode()
-    return fields
-
-
 @pytest.mark.asyncio
-async def test_the_login_request_on_the_wire(pesu, wire, make_response, login_payload, profile_payload):
+async def test_the_login_request_on_the_wire(pesu, wire, make_response, login_payload, profile_payload, multipart_fields):
     _route_logins(wire, make_response, login_payload, profile_payload)
 
     await pesu.authenticate("PES2UG25CS001", "hunter2")
@@ -775,7 +775,7 @@ async def test_the_login_request_on_the_wire(pesu, wire, make_response, login_pa
     assert login.headers["content-type"].startswith("multipart/form-data; boundary=")
     # Nothing to authenticate with yet, and nothing from another login
     assert "authorization" not in login.headers
-    assert _multipart_fields(login) == {
+    assert multipart_fields(login) == {
         "userName": "PES2UG25CS001",
         "password": "hunter2",
         "j_appId": "YES",
@@ -784,7 +784,7 @@ async def test_the_login_request_on_the_wire(pesu, wire, make_response, login_pa
 
 
 @pytest.mark.asyncio
-async def test_the_profile_request_on_the_wire(pesu, wire, make_response, login_payload, profile_payload):
+async def test_the_profile_request_on_the_wire(pesu, wire, make_response, login_payload, profile_payload, multipart_fields):
     _route_logins(wire, make_response, login_payload, profile_payload)
 
     await pesu.authenticate("user", "hunter2", profile=True)
@@ -793,7 +793,7 @@ async def test_the_profile_request_on_the_wire(pesu, wire, make_response, login_
     assert str(dispatcher.url) == DISPATCHER_URL
     assert dispatcher.headers["authorization"] == "Bearer ACCESS-TOKEN-SECRET"
     assert dispatcher.headers["x-client-type"] == "MOBILE"
-    assert _multipart_fields(dispatcher) == {"action": "27", "mode": "1", "menuId": "11172"}
+    assert multipart_fields(dispatcher) == {"action": "27", "mode": "1", "menuId": "11172"}
     # The password goes to the login and nowhere else
     assert b"hunter2" in login.content
     assert b"hunter2" not in dispatcher.content
