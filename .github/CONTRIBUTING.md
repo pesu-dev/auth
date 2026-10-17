@@ -330,14 +330,6 @@ run it alongside the live tests: both wait on PESU Academy, so each skews the ot
   (`tests/unit/test_authenticate_flow.py`)
 - Put assertions about an exception after its `with pytest.raises(...)` block, not inside it, where
   they never run
-- `tests/unit/test_openapi_contract.py` sends requests generated from the OpenAPI schema to every route,
-  through the app with PESU Academy faked on the wire, and fails on any response the schema does not
-  document: a new status, Content-Type or body shape needs its docs in `app/docs/` first. Logins run the
-  real `PESUAcademy`, against profile responses with generated values in every field it reads, and the
-  docs pages, which the schema does not describe, get generated query strings and methods. For a response
-  generation cannot reach, add an explicit case there, as it does for each way PESU Academy can fail a
-  login. Each test's number of requests is set on the test itself: 1000 for each `/authenticate` test,
-  125 for each `/metrics` run (open and protected) and 200 for each other route
 - Adding a profile field? Read it in the model for its block in `app/models/upstream.py`, return it from
   `PESUAcademy._build_profile`, and add it to `ProfileField` and `ProfileModel` in `app/models/profile.py`,
   whose descriptions become the Swagger docs. Add it to both full-profile examples in `app/docs/authenticate.py`

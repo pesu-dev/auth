@@ -50,8 +50,7 @@ IST = ZoneInfo("Asia/Kolkata")
 # Validation failures are labelled by field, so the label set has to be closed against a caller who
 # can put anything in the request body
 KNOWN_REQUEST_FIELDS = frozenset({"username", "password", "profile", "fields", "fmt", "body"})
-# Enforced only when METRICS_TOKEN is set in the environment; open otherwise, which is what every
-# existing caller and the local Docker instructions expect.
+# Enforced only when METRICS_TOKEN is set in the environment
 METRICS_DEPENDENCIES = [Depends(require_metrics_token)]
 
 
@@ -282,10 +281,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-# FastAPI's GET routes answer GET only, where HTTP expects HEAD too: uptime monitors often check with
-# HEAD. Each GET route below has a HEAD route beside it, kept out of the schema since it answers the same,
-# and the server sends its status and headers without the body. Separate routes, because one route
-# with both methods would put two operations with the same ID in the schema.
+# FastAPI's GET routes do not answer HEAD, which uptime monitors often use. A separate HEAD route, kept out
+# of the schema: one route with both methods would document every operation twice.
 @app.head("/health", include_in_schema=False)
 @app.get(
     "/health",
