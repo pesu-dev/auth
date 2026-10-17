@@ -66,8 +66,9 @@ UNREADABLE_BODIES = {
 # the OpenAPI schema, and the two that are
 PAGES = {"/": 200, "/docs": 200, "/docs/oauth2-redirect": 200, "/redoc": 200, "/openapi.json": 200, "/health": 200, "/readme": 308}
 
-# The contract tests send 200 generated requests to each route without input, 250 to /metrics and 500
-# to /authenticate, which keeps them fast. Pass --hypothesis-profile=deep for a longer local run, ten times as many.
+# The contract tests send 200 generated requests to each route without input, 250 to /metrics (125 open,
+# 125 protected) and 500 to /authenticate, which keeps them fast. Pass --hypothesis-profile=deep for a
+# longer local run, ten times as many.
 settings.register_profile("deep", max_examples=1000)
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).

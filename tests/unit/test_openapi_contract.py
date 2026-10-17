@@ -43,9 +43,10 @@ PROFILE_BLOCKS = {
 }
 METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
 # Generated requests per route, as multiples of Hypothesis' default of 100: 200 for each route without
-# input, 250 for /metrics, and 500 for /authenticate, which is what callers use this service for
+# input, 250 for /metrics, split between its open and protected runs, and 500 for /authenticate, which is
+# what callers use this service for
 ROUTE_BUDGET = settings(max_examples=2 * settings().max_examples, database=None, deadline=None)
-METRICS_BUDGET = settings(max_examples=5 * settings().max_examples // 2, database=None, deadline=None)
+METRICS_BUDGET = settings(max_examples=5 * settings().max_examples // 4, database=None, deadline=None)
 AUTHENTICATION_BUDGET = settings(max_examples=5 * settings().max_examples, database=None, deadline=None)
 # For the tests Schemathesis does not seed: derandomized, so they too send the same data on every run.
 # Their fixtures are set up once for all their examples, which is safe because each example sets
