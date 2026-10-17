@@ -106,9 +106,11 @@ def test_every_generated_authentication_request_gets_a_documented_response(
         # A request the API turns away never reaches PESU Academy
         assert not wire.requests
     elif response.status_code == 200:
-        # The credentials reach PESU Academy as they were sent, whatever characters they hold
+        # The credentials reach PESU Academy as they were sent, whatever characters they hold, and only a
+        # username of visible characters, which cannot break the log lines that name it, gets that far
         fields = multipart_fields(wire.requests[0])
         assert fields["userName"] == case.body["username"].strip()
+        assert fields["userName"].isprintable()
         assert fields["password"] == case.body["password"]
 
 

@@ -182,6 +182,17 @@ authenticate_docs = ApiDocs(
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
                             },
                         },
+                        "invisible_characters_in_username": {
+                            "summary": "Line break or other invisible character in the username",
+                            "value": {
+                                "status": False,
+                                "message": (
+                                    "Could not validate request data - body.username: Value error, Username can "
+                                    "only contain visible characters."
+                                ),
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
+                            },
+                        },
                         "unknown_key": {
                             "summary": "Unknown key in the request body",
                             "value": {

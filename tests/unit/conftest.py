@@ -53,6 +53,16 @@ AUTHENTICATION_FAILURES = {
     ),
     "unhandled": (LOGIN_URL, lambda request: RuntimeError("unexpected"), 500),
 }
+# Usernames with a character no SRN, PRN, email or phone number has: each could break or forge a log line
+UNPRINTABLE_USERNAMES = {
+    "line_feed": "PES1UG20CS001\n2026-10-17 07:00:00,000 - ERROR - Login successful for user=admin",
+    "carriage_return": "PES1UG20CS001\rforged",
+    "null": "PES1UG20CS001\x00",
+    "terminal_escape": "PES1UG20CS001\x1b[31m",
+    "line_separator": "PES1UG20CS001\u2028forged",
+    "zero_width_space": "PES1UG20CS\u200b001",
+    "no_break_space": "PES1UG20CS\u00a0001",
+}
 # Request bodies FastAPI cannot read or validate, with the Content-Type they are sent as
 UNREADABLE_BODIES = {
     "truncated_json": (b"{", "application/json"),
@@ -226,6 +236,12 @@ def authentication_failure(request):
 @pytest.fixture(params=list(PAGES.items()), ids=list(PAGES))
 def page(request):
     """Each route that takes no input, with the status a GET of it answers, one per test."""
+    return request.param
+
+
+@pytest.fixture(params=list(UNPRINTABLE_USERNAMES.values()), ids=list(UNPRINTABLE_USERNAMES))
+def unprintable_username(request):
+    """Each username with a line break or another invisible character, one per test."""
     return request.param
 
 

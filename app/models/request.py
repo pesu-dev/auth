@@ -41,7 +41,7 @@ class RequestModel(BaseModel):
         title="Username",
         description=(
             "User's identifier for authentication. Can be SRN, PRN, email, or phone number, "
-            f"up to {MAX_USERNAME_LENGTH} characters."
+            f"up to {MAX_USERNAME_LENGTH} visible characters."
         ),
         json_schema_extra={"example": "PES1201800001"},
         max_length=MAX_USERNAME_LENGTH,
@@ -86,6 +86,10 @@ class RequestModel(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("Username cannot be empty.")
+        # Line breaks and other control or invisible characters. No SRN, PRN, email or phone number has
+        # them, and the username is logged, so one with a line break would write lines of its own into the logs.
+        if not v.isprintable():
+            raise ValueError("Username can only contain visible characters.")
         return v
 
     @field_validator("password")

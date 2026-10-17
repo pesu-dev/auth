@@ -162,12 +162,13 @@ object, with the user's profile information if requested.
 
 | **Parameter** | **Optional** | **Type**    | **Default** | **Description**                                                                                                                                                                                                     |
 | ------------- | ------------ | ----------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `username`    | No           | `str`       |             | The user's SRN, PRN, email address, or phone number. Maximum length is **96 characters**.                                                                                                                           |
+| `username`    | No           | `str`       |             | The user's SRN, PRN, email address, or phone number. Maximum length is **96 characters**, all visible.                                                                                                              |
 | `password`    | No           | `str`       |             | The user's password, up to **128 characters**, counted exactly as typed. It is sent only to PESU Academy, and never stored or logged.                                                                               |
 | `profile`     | Yes          | `boolean`   | `False`     | Whether to fetch profile information. This makes a second call to PESU Academy, so it takes longer                                                                                                                  |
 | `fields`      | Yes          | `list[str]` | `None`      | Which [`ProfileObject`](#profileobject) fields to return. Only used when `profile` is `true`. If not provided, all fields are returned. Fields come back in the table's order, whatever order they are asked for in |
 
-The request body is validated strictly. A missing or empty `username` or `password`, one that is not valid text, a value of the wrong type (such as
+The request body is validated strictly. A missing or empty `username` or `password`, one that is not valid text, a `username` with a
+line break or another invisible character, a value of the wrong type (such as
 the string `"true"` for `profile`), an unknown key, an empty `fields` list, or an unknown field name is rejected with a
 `400`. So is a body that cannot be read at all, such as JSON that is not valid UTF-8, with the fixed message
 `Could not parse request body.`

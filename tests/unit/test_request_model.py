@@ -18,6 +18,18 @@ def test_validate_username_whitespace_only():
     assert "Username cannot be empty" in str(exc_info.value)
 
 
+def test_validate_username_with_an_invisible_character(unprintable_username):
+    with pytest.raises(ValidationError) as exc_info:
+        RequestModel(username=unprintable_username, password="testpass")
+
+    assert "Username can only contain visible characters" in str(exc_info.value)
+
+
+def test_validate_username_with_inner_spaces_and_non_ascii():
+    model = RequestModel(username="Jöhn Dœ@example.com", password="testpass")
+    assert model.username == "Jöhn Dœ@example.com"
+
+
 def test_validate_username_invalid_type():
     with pytest.raises(ValidationError) as exc_info:
         RequestModel(username=123, password="testpass")
