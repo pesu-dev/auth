@@ -336,8 +336,9 @@ run it alongside the live tests: both wait on PESU Academy, so each skews the ot
   real `PESUAcademy`, against profile responses with generated values in every field it reads, and the
   docs pages, which the schema does not describe, get generated query strings and methods. For a response
   generation cannot reach, add an explicit case there, as it does for each way PESU Academy can fail a
-  login. Each `/authenticate` test sends 500 requests and each other test 100 by default; for a longer
-  local run, ten times as many, use `uv run pytest tests/unit/test_openapi_contract.py --hypothesis-profile=deep`
+  login. By default each `/authenticate` test sends 500 requests, each `/metrics` test 250, and every other
+  route gets 200; for a longer local run, ten times as many, use
+  `uv run pytest tests/unit/test_openapi_contract.py --hypothesis-profile=deep`
 - Adding a profile field? Read it in the model for its block in `app/models/upstream.py`, return it from
   `PESUAcademy._build_profile`, and add it to `ProfileField` and `ProfileModel` in `app/models/profile.py`,
   whose descriptions become the Swagger docs. Add it to both full-profile examples in `app/docs/authenticate.py`

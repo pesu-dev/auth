@@ -66,8 +66,8 @@ UNREADABLE_BODIES = {
 # the OpenAPI schema, and the two that are
 PAGES = {"/": 200, "/docs": 200, "/docs/oauth2-redirect": 200, "/redoc": 200, "/openapi.json": 200, "/health": 200, "/readme": 308}
 
-# Hypothesis' default of 100 generated examples per contract test, and 500 for each /authenticate one,
-# keeps them fast. Pass --hypothesis-profile=deep for a longer local run, ten times as many.
+# The contract tests send 200 generated requests to each route without input, 250 to /metrics and 500
+# to /authenticate, which keeps them fast. Pass --hypothesis-profile=deep for a longer local run, ten times as many.
 settings.register_profile("deep", max_examples=1000)
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).
@@ -228,9 +228,10 @@ def authentication_failure(request):
     return request.param
 
 
-@pytest.fixture
-def pages():
-    return PAGES
+@pytest.fixture(params=list(PAGES.items()), ids=list(PAGES))
+def page(request):
+    """Each route that takes no input, with the status a GET of it answers, one per test."""
+    return request.param
 
 
 @pytest.fixture(params=list(UNREADABLE_BODIES.values()), ids=list(UNREADABLE_BODIES))

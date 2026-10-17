@@ -42,7 +42,10 @@ PROFILE_BLOCKS = {
     for model in (StudentInfo, StudentPhoto)
 }
 METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-# /authenticate is what callers use this service for, so its tests get five times the budget of the others
+# Generated requests per route, as multiples of Hypothesis' default of 100: 200 for each route without
+# input, 250 for /metrics, and 500 for /authenticate, which is what callers use this service for
+ROUTE_BUDGET = settings(max_examples=2 * settings().max_examples, database=None, deadline=None)
+METRICS_BUDGET = settings(max_examples=5 * settings().max_examples // 2, database=None, deadline=None)
 AUTHENTICATION_BUDGET = settings(max_examples=5 * settings().max_examples, database=None, deadline=None)
 # For the tests Schemathesis does not seed: derandomized, so they too send the same data on every run.
 # Their fixtures are set up once for all their examples, which is safe because each example sets
@@ -86,7 +89,7 @@ def _profile_response(data, profile_payload):
 
 
 @schema.include(path=["/health", "/readme"]).parametrize()
-@settings(database=None, deadline=None)
+@ROUTE_BUDGET
 def test_every_generated_request_gets_a_documented_response(case, conformance_checks):
     # Redirects are not followed: /readme's 308 is the response under test, and following it would
     # leave the machine
@@ -133,7 +136,7 @@ def test_every_generated_profile_gets_a_documented_response(data, api_schema, wi
 
 
 @schema.include(path="/metrics").parametrize()
-@settings(database=None, deadline=None)
+@METRICS_BUDGET
 def test_every_generated_metrics_request_gets_a_documented_response(case, monkeypatch, conformance_checks):
     monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", None)
 
@@ -141,7 +144,7 @@ def test_every_generated_metrics_request_gets_a_documented_response(case, monkey
 
 
 @schema.include(path="/metrics").parametrize()
-@settings(database=None, deadline=None)
+@METRICS_BUDGET
 def test_every_generated_request_for_protected_metrics_gets_a_documented_response(
     case, monkeypatch, metrics_token, conformance_checks
 ):
@@ -154,20 +157,26 @@ def test_every_generated_request_for_protected_metrics_gets_a_documented_respons
         assert response.status_code == 401
 
 
+@pytest.fixture
+def page_client():
+    with TestClient(app, follow_redirects=False) as client:
+        yield client
+
+
 @given(data=st.data())
-@settings(database=None, deadline=None, **UNSEEDED)
-def test_a_page_answers_any_query_and_method_as_documented(data, api_schema, pages, conformance_checks):
+@settings(ROUTE_BUDGET, **UNSEEDED)
+def test_a_page_answers_any_query_and_method_as_documented(data, page, page_client, api_schema, conformance_checks):
     """The routes that take no input, sent input anyway: any query string, under any method."""
-    path = data.draw(st.sampled_from(sorted(pages)), label="path")
+    path, status = page
     method = data.draw(st.sampled_from(METHODS), label="method")
     query = data.draw(st.dictionaries(st.text(), st.text(), max_size=3), label="query")
     # getattr: other tests mount routers of their own on the app, and those have no path
     (route,) = [route for route in app.routes if getattr(route, "path", None) == path]
 
-    response = TestClient(app, follow_redirects=False).request(method, path, params=query)
+    response = page_client.request(method, path, params=query)
 
     if method in route.methods:
-        assert response.status_code == pages[path]
+        assert response.status_code == status
         if route.include_in_schema:
             api_schema[path]["GET"].Case().validate_response(response, checks=conformance_checks)
     else:
