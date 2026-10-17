@@ -9,11 +9,12 @@ responses generation cannot reach, and the pages the schema does not describe.
 """
 
 import json
+from urllib.parse import quote
 
 import httpx2
 import pytest
 import schemathesis
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 from schemathesis.checks import not_a_server_error
 from schemathesis.core.failures import FailureGroup
@@ -168,18 +169,50 @@ def test_a_page_answers_any_query_and_method_as_documented(data, page, page_clie
     path, status = page
     method = data.draw(st.sampled_from(METHODS), label="method")
     query = data.draw(st.dictionaries(st.text(), st.text(), max_size=3), label="query")
-    # getattr: other tests mount routers of their own on the app, and those have no path
-    (route,) = [route for route in app.routes if getattr(route, "path", None) == path]
+    # GET and HEAD are separate routes. getattr: other tests mount routers of their own, which have no path.
+    allowed = set().union(*[route.methods for route in app.routes if getattr(route, "path", None) == path])
 
     response = page_client.request(method, path, params=query)
 
-    if method in route.methods:
+    if method == "GET":
         assert response.status_code == status
-        if route.include_in_schema:
+        if path in api_schema.raw_schema["paths"]:
             api_schema[path]["GET"].Case().validate_response(response, checks=conformance_checks)
+    elif method == "HEAD":
+        # As GET, without the body
+        assert response.status_code == status
+        assert response.content == b""
     else:
-        assert response.status_code == 405
-        assert set(response.headers["allow"].split(", ")) == route.methods
+        assert method not in allowed
+        _assert_standard_error(response, 405)
+        assert set(response.headers["allow"].split(", ")) == allowed
+
+
+@given(
+    method=st.sampled_from(METHODS),
+    # One segment, so the client cannot fold it into a known path: no "/" to add a trailing slash, which
+    # redirects to the route without one, and no "." to make a ".." it would resolve
+    segment=st.text(st.characters(exclude_characters="/."), min_size=1),
+)
+@settings(max_examples=200, database=None, deadline=None, **UNSEEDED)
+def test_an_unknown_path_gets_the_standard_404(method, segment, page_client):
+    path = f"/{segment}"
+    assume(path not in {getattr(route, "path", None) for route in app.routes})
+
+    response = page_client.request(method, quote(path))
+
+    if method == "HEAD":
+        assert response.status_code == 404
+    else:
+        _assert_standard_error(response, 404)
+
+
+def _assert_standard_error(response, status):
+    """Check that a response is an error in this API's {status, message, timestamp} shape."""
+    assert response.status_code == status
+    body = response.json()
+    assert sorted(body) == ["message", "status", "timestamp"]
+    assert body["status"] is False
 
 
 def test_each_authentication_failure_is_documented(api_schema, wire, conformance_checks, authentication_failure):

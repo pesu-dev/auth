@@ -14,7 +14,6 @@ from zoneinfo import ZoneInfo
 
 import uvicorn
 from fastapi import Depends, FastAPI
-from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.routing import APIRoute
@@ -28,10 +27,11 @@ if TYPE_CHECKING:
 
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException
+from starlette.routing import Match
 
 from app.docs import authenticate_docs, health_docs, metrics_docs, readme_docs
 from app.exceptions.base import PESUAcademyError
-from app.exceptions.request import RequestBodyParseError
+from app.exceptions.request import MethodNotAllowedError, RequestBodyParseError, RouteNotFoundError
 from app.metrics.auth import require_metrics_token
 from app.metrics.collector import (
     AUTHENTICATION_REQUESTS,
@@ -50,6 +50,9 @@ IST = ZoneInfo("Asia/Kolkata")
 # Validation failures are labelled by field, so the label set has to be closed against a caller who
 # can put anything in the request body
 KNOWN_REQUEST_FIELDS = frozenset({"username", "password", "profile", "fields", "fmt", "body"})
+# Enforced only when METRICS_TOKEN is set in the environment; open otherwise, which is what every
+# existing caller and the local Docker instructions expect.
+METRICS_DEPENDENCIES = [Depends(require_metrics_token)]
 
 
 @asynccontextmanager
@@ -140,7 +143,8 @@ def _restore_documented_examples(schema: dict[str, Any]) -> None:
         schema (dict[str, Any]): The OpenAPI schema FastAPI built, changed in place.
     """
     for route in app.routes:
-        if not isinstance(route, APIRoute):
+        # A route kept out of the schema, such as a HEAD beside a GET, has no operation to restore
+        if not isinstance(route, APIRoute) or not route.include_in_schema:
             continue
         for method in route.methods:
             responses = schema["paths"][route.path][method.lower()]["responses"]
@@ -222,19 +226,45 @@ async def pesu_exception_handler(request: Request, exc: PESUAcademyError) -> JSO
     )
 
 
-@app.exception_handler(HTTPException)
-async def http_error_handler(request: Request, exc: HTTPException) -> Response:
-    """Handler for errors the framework raises itself.
+def _allowed_methods(request: Request) -> str:
+    """List every method the request's path is served for, for the Allow header of a 405.
 
-    FastAPI raises a 400 HTTPException, not a RequestValidationError, when it cannot read the body
-    at all -- JSON that is not valid UTF-8, for one. Left alone that answers `{"detail": ...}`, so it
-    is rendered as a RequestBodyParseError instead, without the bytes that could not be read. No
-    route raises HTTPException, so every other one is the framework's (a 404 or 405) and keeps its
-    usual response.
+    Starlette's own Allow header names the methods of the first route that matched the path only, and
+    GET and HEAD are separate routes here.
+
+    Args:
+        request (Request): The request that was answered with a 405.
+
+    Returns:
+        str: The methods, sorted and comma separated, such as "GET, HEAD".
     """
-    if exc.status_code == 400:
-        return await pesu_exception_handler(request, RequestBodyParseError())
-    return await http_exception_handler(request, exc)
+    methods: set[str] = set()
+    for route in app.routes:
+        match, _ = route.matches(request.scope)
+        if match is not Match.NONE:
+            methods |= getattr(route, "methods", None) or set()
+    return ", ".join(sorted(methods))
+
+
+@app.exception_handler(HTTPException)
+async def http_error_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """Handler for errors the framework raises itself, rendered in the same shape as every other error.
+
+    No route raises HTTPException, so each one is the framework's: a 404 for a path no route serves, a
+    405 for a method the path is not served for, and a 400 when FastAPI cannot read the body at all --
+    JSON that is not valid UTF-8, for one -- which never reaches validation. Left alone each answers
+    `{"detail": ...}`. None echoes the path or body the caller sent.
+    """
+    if exc.status_code == 404:
+        error = RouteNotFoundError()
+    elif exc.status_code == 405:
+        error = MethodNotAllowedError(allow=_allowed_methods(request))
+    elif exc.status_code == 400:
+        error = RequestBodyParseError()
+    else:
+        # Nothing raises any other status today. One that appears still gets the standard shape.
+        error = PESUAcademyError(message=str(exc.detail), status_code=exc.status_code, headers=exc.headers)
+    return await pesu_exception_handler(request, error)
 
 
 @app.exception_handler(Exception)
@@ -252,6 +282,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
+# FastAPI's GET routes answer GET only, where HTTP expects HEAD too: uptime monitors often check with
+# HEAD. Each GET route below has a HEAD route beside it, kept out of the schema since it answers the same,
+# and the server sends its status and headers without the body. Separate routes, because one route
+# with both methods would put two operations with the same ID in the schema.
+@app.head("/health", include_in_schema=False)
 @app.get(
     "/health",
     response_class=JSONResponse,
@@ -271,6 +306,8 @@ async def health() -> JSONResponse:
     )
 
 
+# The token is required for HEAD as for GET, or HEAD would tell anyone whether the metrics had changed
+@app.head("/metrics", include_in_schema=False, dependencies=METRICS_DEPENDENCIES)
 @app.get(
     "/metrics",
     summary="Metrics",
@@ -279,9 +316,7 @@ async def health() -> JSONResponse:
     response_model=None,
     responses=metrics_docs.response_examples,
     tags=["Monitoring"],
-    # Enforced only when METRICS_TOKEN is set in the environment; open otherwise, which is what
-    # every existing caller and the local Docker instructions expect.
-    dependencies=[Depends(require_metrics_token)],
+    dependencies=METRICS_DEPENDENCIES,
 )
 async def metrics_endpoint(fmt: MetricsFormat = MetricsFormat.PROMETHEUS) -> Response:
     """Expose the collected metrics.
@@ -303,6 +338,7 @@ async def metrics_endpoint(fmt: MetricsFormat = MetricsFormat.PROMETHEUS) -> Res
     )
 
 
+@app.head("/readme", include_in_schema=False)
 @app.get(
     "/readme",
     response_class=RedirectResponse,

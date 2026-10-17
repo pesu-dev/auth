@@ -318,7 +318,8 @@ def test_integration_not_found(client):
     response = client.get("/nonexistent")
     assert response.status_code == 404
     data = response.json()
-    assert data["detail"] == "Not Found"
+    assert data["status"] is False
+    assert data["message"] == "No route matches this path."
 
 
 def test_unhandled_exception_handler(client):

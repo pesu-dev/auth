@@ -133,16 +133,16 @@ dependencies.
 
 The API provides multiple endpoints for authentication, documentation, and monitoring.
 
-| **Endpoint**    | **Method** | **Description**                                        |
-| --------------- | ---------- | ------------------------------------------------------ |
-| `/`             | `GET`      | Serves the interactive API Explorer.                   |
-| `/docs`         | `GET`      | Serves the standard Swagger UI documentation.          |
-| `/redoc`        | `GET`      | Serves the ReDoc API documentation.                    |
-| `/openapi.json` | `GET`      | Serves the OpenAPI specification used by both UIs.     |
-| `/authenticate` | `POST`     | Authenticates a user using their PESU credentials.     |
-| `/health`       | `GET`      | A health check endpoint to monitor the API's status.   |
-| `/metrics`      | `GET`      | Exposes traffic and error counters. See `fmt` below.   |
-| `/readme`       | `GET`      | Redirects to the project's official GitHub repository. |
+| **Endpoint**    | **Method**    | **Description**                                        |
+| --------------- | ------------- | ------------------------------------------------------ |
+| `/`             | `GET`, `HEAD` | Serves the interactive API Explorer.                   |
+| `/docs`         | `GET`, `HEAD` | Serves the standard Swagger UI documentation.          |
+| `/redoc`        | `GET`, `HEAD` | Serves the ReDoc API documentation.                    |
+| `/openapi.json` | `GET`, `HEAD` | Serves the OpenAPI specification used by both UIs.     |
+| `/authenticate` | `POST`        | Authenticates a user using their PESU credentials.     |
+| `/health`       | `GET`, `HEAD` | A health check endpoint to monitor the API's status.   |
+| `/metrics`      | `GET`, `HEAD` | Exposes traffic and error counters. See `fmt` below.   |
+| `/readme`       | `GET`, `HEAD` | Redirects to the project's official GitHub repository. |
 
 The Explorer builds request controls and response examples from `/openapi.json`. Enter the
 required credentials, choose whether to fetch a profile, and optionally select profile fields.
@@ -184,9 +184,9 @@ the string `"true"` for `profile`), an unknown key, an empty `fields` list, or a
 | `500`    | An unexpected failure, rendered by the catch-all handler                                                                                   |
 | `502`    | PESU Academy could not be reached, timed out, or answered the login or profile request unexpectedly                                        |
 
-Every error this API renders carries the same `{status, message, timestamp}` body, with `status` set to `false`. The
-only exceptions are an unknown path or an unsupported method, which get the framework's own `404` or `405` with a
-`{"detail": ...}` body.
+Every error this API renders carries the same `{status, message, timestamp}` body, with `status` set to `false`. That
+includes a `404` for an unknown path and a `405` for an unsupported method, whose `Allow` header lists the methods
+the path is served for.
 
 #### Response Object
 
@@ -241,7 +241,8 @@ discarded and never returned, and cannot be requested in `fields`.
 Answers `200` whenever the process is serving; a `500` would come from the catch-all handler, as on any other endpoint.
 
 This endpoint can be used to check the health of the API. It's useful for monitoring and uptime checks. This endpoint
-does not take any request parameters.
+does not take any request parameters. Like every `GET` endpoint, it also answers `HEAD`, with the same status and
+headers and no body, for monitors that check that way.
 
 #### Response Object
 
@@ -309,8 +310,10 @@ A login failure's *reason* comes from `errorsByType`, which names the exception 
 `authenticationResults` carries only the outcome, so the reason is recorded in exactly one place, and
 `sum(authenticationResults) == authentication.total` modulo attempts still in flight.
 
-`sum(errorsByType)` is normally **less** than `requests.failed`: a `404` or `405` is produced by the router, so no
-exception handler of ours runs for it.
+`sum(errorsByType)` equals `requests.failed`, once no request is in flight: every failed response is rendered by an
+exception handler of ours, so each is counted under its exception class. That includes a `404` for an unknown path
+(`RouteNotFoundError`) and a `405` for an unsupported method (`MethodNotAllowedError`), which is where scanners
+probing for other software show up.
 
 A few definitions that are easy to assume wrongly:
 
@@ -341,11 +344,11 @@ A few definitions that are easy to assume wrongly:
 
 **Failures**
 
-| Metric                           | Meaning                                                                                                                                                                                                                                                          |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `failures_total{fault}`          | Failed requests by whose fault it was: `client` for 4xx, `server` for 5xx. Alert on `server` without enumerating status codes                                                                                                                                    |
-| `errors_total{type}`             | Errors rendered by an exception handler, by exception class: `AuthenticationError`, `UpstreamError`, `ProfileFetchError`, `ProfileParseError`, `MetricsAuthorizationError`, `RequestBodyParseError`, `RequestValidationError`, or whatever reached the catch-all |
-| `validation_errors_total{field}` | Request validation failures by the field that failed. Unrecognised keys collapse into `other`, since the request body is caller-controlled                                                                                                                       |
+| Metric                           | Meaning                                                                                                                                                                                                                                                                                                         |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `failures_total{fault}`          | Failed requests by whose fault it was: `client` for 4xx, `server` for 5xx. Alert on `server` without enumerating status codes                                                                                                                                                                                   |
+| `errors_total{type}`             | Errors rendered by an exception handler, by exception class: `AuthenticationError`, `UpstreamError`, `ProfileFetchError`, `ProfileParseError`, `MetricsAuthorizationError`, `RequestBodyParseError`, `RequestValidationError`, `RouteNotFoundError`, `MethodNotAllowedError`, or whatever reached the catch-all |
+| `validation_errors_total{field}` | Request validation failures by the field that failed. Unrecognised keys collapse into `other`, since the request body is caller-controlled                                                                                                                                                                      |
 
 **Authentication**
 

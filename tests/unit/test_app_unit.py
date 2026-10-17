@@ -281,9 +281,80 @@ def test_an_unreadable_body_is_a_400_in_the_standard_shape(client, monkeypatch, 
     assert list(snapshot.samples(VALIDATION_ERRORS.name)) == []
 
 
-def test_an_unknown_route_keeps_the_framework_404(client):
-    """Only the unreadable-body 400 is rewritten; other framework errors answer as before."""
-    response = client.get("/not-a-route")
+def test_an_unknown_route_is_a_404_in_the_standard_shape(client, monkeypatch, caplog):
+    from app.metrics.collector import ERRORS_BY_TYPE, MetricsCollector
+
+    collector = MetricsCollector()
+    monkeypatch.setattr("app.app.metrics", collector)
+
+    with caplog.at_level("INFO"):
+        response = client.get("/not-a-route-secret-path")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Not Found"}
+    data = response.json()
+    assert sorted(data) == ["message", "status", "timestamp"]
+    assert data["status"] is False
+    assert data["message"] == "No route matches this path."
+    # The path is the caller's, so it is neither echoed nor logged by us
+    assert "secret-path" not in response.text
+    assert not [r for r in caplog.records if r.name == "root" and "secret-path" in r.getMessage()]
+    assert collector.snapshot().value(ERRORS_BY_TYPE.name, type="RouteNotFoundError") == 1.0
+
+
+@pytest.mark.parametrize(
+    "method, path, allow",
+    [("POST", "/health", "GET, HEAD"), ("DELETE", "/metrics", "GET, HEAD"), ("GET", "/authenticate", "POST"), ("PUT", "/docs", "GET, HEAD")],
+)
+def test_an_unsupported_method_is_a_405_in_the_standard_shape(client, monkeypatch, method, path, allow):
+    from app.metrics.collector import ERRORS_BY_TYPE, MetricsCollector
+
+    collector = MetricsCollector()
+    monkeypatch.setattr("app.app.metrics", collector)
+
+    response = client.request(method, path)
+
+    assert response.status_code == 405
+    # Every method the path is served for, HEAD included, not only the first route's
+    assert response.headers["allow"] == allow
+    data = response.json()
+    assert sorted(data) == ["message", "status", "timestamp"]
+    assert data["message"] == "This method is not allowed on this path."
+    assert collector.snapshot().value(ERRORS_BY_TYPE.name, type="MethodNotAllowedError") == 1.0
+
+
+@pytest.mark.parametrize("path", ["/health", "/readme", "/metrics"])
+def test_head_answers_like_get_without_the_body(client, path):
+    get = client.get(path, follow_redirects=False)
+    head = client.head(path, follow_redirects=False)
+
+    assert head.status_code == get.status_code
+    assert head.headers.get("content-type") == get.headers.get("content-type")
+    assert head.headers.get("location") == get.headers.get("location")
+    assert head.content == b""
+
+
+def test_head_routes_stay_out_of_the_schema(client):
+    """HEAD answers as GET does, so it is not documented twice."""
+    paths = client.get("/openapi.json").json()["paths"]
+
+    assert not [path for path, operations in paths.items() if "head" in operations]
+
+
+@pytest.mark.asyncio
+async def test_any_other_framework_error_gets_the_standard_shape():
+    """Nothing raises another status today; if something starts to, it still answers in the standard shape."""
+    import json
+
+    from fastapi import Request
+    from starlette.exceptions import HTTPException
+
+    from app.app import http_error_handler
+
+    request = Request({"type": "http", "method": "GET", "path": "/", "headers": [], "query_string": b""})
+
+    response = await http_error_handler(request, HTTPException(status_code=418, detail="Teapot."))
+
+    assert response.status_code == 418
+    data = json.loads(response.body)
+    assert data["status"] is False
+    assert data["message"] == "Teapot."
