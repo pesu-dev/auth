@@ -34,8 +34,8 @@ AGENT_FRONTMATTER = '---\nname: reviewer\ndescription: Reviews diffs. Read-only.
 
 # What every response must agree with the OpenAPI schema on, whatever its status
 CONFORMANCE_CHECKS = (status_code_conformance, content_type_conformance, response_schema_conformance)
-# Each way PESU Academy can fail a login that asks for a profile -- its answer to the login or the profile
-# request -- and the status /authenticate must answer with
+# Each way a login that asks for a profile can fail -- PESU Academy's answer to the login or the profile
+# request, or our own code failing while it waits -- and the status /authenticate must answer with
 AUTHENTICATION_FAILURES = {
     "wrong_credentials": (
         LOGIN_URL,

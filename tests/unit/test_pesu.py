@@ -525,7 +525,20 @@ async def test_an_unknown_campus_name_is_returned_and_counted(
     assert profile["campus"] == "PES University (Hanumanthanagar)"
     assert profile["campusCode"] is None
     assert collector.snapshot().value(PROFILE_PARSE_ERRORS.name, reason="unknown_campus_code") == 1.0
-    assert "Unknown campus name: PES University (Hanumanthanagar)" in caplog.text
+    assert "Unknown campus name: 'PES University (Hanumanthanagar)'" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_campus_name_cannot_add_lines_to_the_log(
+    pesu, upstream, make_response, login_payload, profile_payload, caplog
+):
+    profile_payload["STUDENT_PHOTO"]["instituteName"] = "New Campus\nERROR - forged line"
+
+    with caplog.at_level("WARNING"):
+        await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
+
+    assert "New Campus\\nERROR - forged line" in caplog.text
+    assert not [line for line in caplog.text.splitlines() if line.startswith("ERROR - forged line")]
 
 
 @pytest.mark.asyncio

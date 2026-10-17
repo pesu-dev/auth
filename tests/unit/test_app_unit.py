@@ -341,7 +341,7 @@ def test_head_routes_stay_out_of_the_schema(client):
 
 
 @pytest.mark.asyncio
-async def test_any_other_framework_error_gets_the_standard_shape():
+async def test_any_other_framework_error_gets_the_standard_shape(monkeypatch):
     """Nothing raises another status today; if something starts to, it still answers in the standard shape."""
     import json
 
@@ -349,7 +349,10 @@ async def test_any_other_framework_error_gets_the_standard_shape():
     from starlette.exceptions import HTTPException
 
     from app.app import http_error_handler
+    from app.metrics.collector import MetricsCollector
 
+    # The handler counts the error, so into a collector of this test's own
+    monkeypatch.setattr("app.app.metrics", MetricsCollector())
     request = Request({"type": "http", "method": "GET", "path": "/", "headers": [], "query_string": b""})
 
     response = await http_error_handler(request, HTTPException(status_code=418, detail="Teapot."))
