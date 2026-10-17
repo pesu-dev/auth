@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, patch
 
 import httpx2
 import pytest
-from hypothesis import settings
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,
     response_schema_conformance,
@@ -65,11 +64,6 @@ UNREADABLE_BODIES = {
 # Every route that takes no input, with the status a GET of it answers: the docs pages, which are not in
 # the OpenAPI schema, and the two that are
 PAGES = {"/": 200, "/docs": 200, "/docs/oauth2-redirect": 200, "/redoc": 200, "/openapi.json": 200, "/health": 200, "/readme": 308}
-
-# The contract tests send 200 generated requests to each route without input, 250 to /metrics (125 open,
-# 125 protected) and 500 to /authenticate, which keeps them fast. Pass --hypothesis-profile=deep for a
-# longer local run, ten times as many.
-settings.register_profile("deep", max_examples=1000)
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).
 # The personal fields this service must never keep or log -- photo, parents, address -- are

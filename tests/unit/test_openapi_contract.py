@@ -42,12 +42,6 @@ PROFILE_BLOCKS = {
     for model in (StudentInfo, StudentPhoto)
 }
 METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-# Generated requests per route, as multiples of Hypothesis' default of 100: 200 for each route without
-# input, 250 for /metrics, split between its open and protected runs, and 500 for /authenticate, which is
-# what callers use this service for
-ROUTE_BUDGET = settings(max_examples=2 * settings().max_examples, database=None, deadline=None)
-METRICS_BUDGET = settings(max_examples=5 * settings().max_examples // 4, database=None, deadline=None)
-AUTHENTICATION_BUDGET = settings(max_examples=5 * settings().max_examples, database=None, deadline=None)
 # For the tests Schemathesis does not seed: derandomized, so they too send the same data on every run.
 # Their fixtures are set up once for all their examples, which is safe because each example sets
 # whatever fixture state it relies on before it sends anything.
@@ -90,15 +84,16 @@ def _profile_response(data, profile_payload):
 
 
 @schema.include(path=["/health", "/readme"]).parametrize()
-@ROUTE_BUDGET
+@settings(max_examples=200, database=None, deadline=None)
 def test_every_generated_request_gets_a_documented_response(case, conformance_checks):
     # Redirects are not followed: /readme's 308 is the response under test, and following it would
     # leave the machine
     case.call_and_validate(checks=[not_a_server_error, *conformance_checks], allow_redirects=False)
 
 
+# /authenticate is what callers use this service for, so it gets the most requests
 @schema.include(path="/authenticate").parametrize()
-@AUTHENTICATION_BUDGET
+@settings(max_examples=500, database=None, deadline=None)
 def test_every_generated_authentication_request_gets_a_documented_response(
     case, wire, multipart_fields, conformance_checks
 ):
@@ -118,7 +113,7 @@ def test_every_generated_authentication_request_gets_a_documented_response(
 
 
 @given(data=st.data())
-@settings(AUTHENTICATION_BUDGET, **UNSEEDED)
+@settings(max_examples=500, database=None, deadline=None, **UNSEEDED)
 def test_every_generated_profile_gets_a_documented_response(data, api_schema, wire, profile_payload, conformance_checks):
     """Generated profile responses from PESU Academy, each asked for with a generated choice of fields."""
     profile_response = _profile_response(data, profile_payload)
@@ -137,7 +132,7 @@ def test_every_generated_profile_gets_a_documented_response(data, api_schema, wi
 
 
 @schema.include(path="/metrics").parametrize()
-@METRICS_BUDGET
+@settings(max_examples=125, database=None, deadline=None)
 def test_every_generated_metrics_request_gets_a_documented_response(case, monkeypatch, conformance_checks):
     monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", None)
 
@@ -145,7 +140,7 @@ def test_every_generated_metrics_request_gets_a_documented_response(case, monkey
 
 
 @schema.include(path="/metrics").parametrize()
-@METRICS_BUDGET
+@settings(max_examples=125, database=None, deadline=None)
 def test_every_generated_request_for_protected_metrics_gets_a_documented_response(
     case, monkeypatch, metrics_token, conformance_checks
 ):
@@ -165,7 +160,7 @@ def page_client():
 
 
 @given(data=st.data())
-@settings(ROUTE_BUDGET, **UNSEEDED)
+@settings(max_examples=200, database=None, deadline=None, **UNSEEDED)
 def test_a_page_answers_any_query_and_method_as_documented(data, page, page_client, api_schema, conformance_checks):
     """The routes that take no input, sent input anyway: any query string, under any method."""
     path, status = page
