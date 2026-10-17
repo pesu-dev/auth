@@ -16,8 +16,8 @@ from schemathesis.specs.openapi.checks import (
     status_code_conformance,
 )
 
-from app.exceptions.authentication import AuthenticationError, ProfileFetchError, ProfileParseError, UpstreamError
 from app.models import MetricsModel, ResponseModel
+from app.pesu import DISPATCHER_URL, LOGIN_URL
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK_DIR = REPOSITORY_ROOT / "scripts" / "benchmark"
@@ -35,13 +35,24 @@ AGENT_FRONTMATTER = '---\nname: reviewer\ndescription: Reviews diffs. Read-only.
 
 # What every response must agree with the OpenAPI schema on, whatever its status
 CONFORMANCE_CHECKS = (status_code_conformance, content_type_conformance, response_schema_conformance)
-# Each way /authenticate can fail after validation, and the status it must answer with
+# Each way PESU Academy can fail a login that asks for a profile -- its answer to the login or the profile
+# request -- and the status /authenticate must answer with
 AUTHENTICATION_FAILURES = {
-    "authentication": (AuthenticationError(), 401),
-    "profile_parse": (ProfileParseError(), 422),
-    "unhandled": (RuntimeError("unexpected"), 500),
-    "upstream": (UpstreamError(), 502),
-    "profile_fetch": (ProfileFetchError(), 502),
+    "wrong_credentials": (
+        LOGIN_URL,
+        lambda request: httpx2.Response(401, json={"statusCode": 401, "statusDescription": "Invalid Login Credentials"}),
+        401,
+    ),
+    "login_unavailable": (LOGIN_URL, lambda request: httpx2.Response(503), 502),
+    "login_unreachable": (LOGIN_URL, lambda request: httpx2.ConnectError("refused", request=request), 502),
+    "login_not_json": (LOGIN_URL, lambda request: httpx2.Response(200, content=b"<html></html>"), 502),
+    "profile_unavailable": (DISPATCHER_URL, lambda request: httpx2.Response(500), 502),
+    "profile_without_student": (
+        DISPATCHER_URL,
+        lambda request: httpx2.Response(200, json={"MESSAGE": "SUCCESS_Record found Successfully"}),
+        422,
+    ),
+    "unhandled": (LOGIN_URL, lambda request: RuntimeError("unexpected"), 500),
 }
 # Request bodies FastAPI cannot read or validate, with the Content-Type they are sent as
 UNREADABLE_BODIES = {
@@ -51,8 +62,12 @@ UNREADABLE_BODIES = {
     "form": (b"username=u", "application/x-www-form-urlencoded"),
 }
 
-# Hypothesis' default of 100 generated requests per route, and 500 for /authenticate, keeps the contract
-# test fast. Pass --hypothesis-profile=deep for a longer local run, ten times as many.
+# Every route that takes no input, with the status a GET of it answers: the docs pages, which are not in
+# the OpenAPI schema, and the two that are
+PAGES = {"/": 200, "/docs": 200, "/docs/oauth2-redirect": 200, "/redoc": 200, "/openapi.json": 200, "/health": 200, "/readme": 308}
+
+# Hypothesis' default of 100 generated examples per contract test, and 500 for each /authenticate one,
+# keeps them fast. Pass --hypothesis-profile=deep for a longer local run, ten times as many.
 settings.register_profile("deep", max_examples=1000)
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).
@@ -209,8 +224,13 @@ def conformance_checks():
 
 @pytest.fixture(params=list(AUTHENTICATION_FAILURES.values()), ids=list(AUTHENTICATION_FAILURES))
 def authentication_failure(request):
-    """Each exception /authenticate can raise after validation and its status, one per test."""
+    """Each way PESU Academy can fail a login, as the URL, its answer and the status to expect, one per test."""
     return request.param
+
+
+@pytest.fixture
+def pages():
+    return PAGES
 
 
 @pytest.fixture(params=list(UNREADABLE_BODIES.values()), ids=list(UNREADABLE_BODIES))
@@ -338,6 +358,24 @@ def upstream():
     """
     with patch("app.pesu.httpx2.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         yield mock_post
+
+
+@pytest.fixture
+def multipart_fields():
+    """Decode a multipart request body into {field name: value}, each value exactly as sent."""
+
+    def _decode(request):
+        boundary = request.headers["content-type"].split("boundary=")[1].encode()
+        fields = {}
+        # Each part sits between a boundary line and the CRLF before the next one, so cutting exactly
+        # those bytes keeps a value that itself starts or ends with a line break whole
+        for part in request.content.split(b"--" + boundary)[1:-1]:
+            head, _, value = part.removeprefix(b"\r\n").partition(b"\r\n\r\n")
+            name = head.split(b'name="')[1].split(b'"')[0].decode()
+            fields[name] = value.removesuffix(b"\r\n").decode()
+        return fields
+
+    return _decode
 
 
 class Wire:
