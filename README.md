@@ -236,6 +236,18 @@ only the fields not asked for in `fields` are, and fields come back in the order
 Everything else in PESU Academy's profile information, such as the photo, blood group, addresses, parents' details and marks, is
 discarded and never returned, and cannot be requested in `fields`.
 
+### Response headers
+
+Every response includes the following baseline security headers:
+
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: no-referrer`
+- `X-Frame-Options: DENY`
+
+Responses to `/authenticate` also include:
+
+- `Cache-Control: no-store`
+
 ### `/health`
 
 Answers `200` whenever the process is serving; a `500` would come from the catch-all handler, as on any other endpoint.

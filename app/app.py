@@ -53,6 +53,12 @@ KNOWN_REQUEST_FIELDS = frozenset({"username", "password", "profile", "fields", "
 # Enforced only when METRICS_TOKEN is set in the environment
 METRICS_DEPENDENCIES = [Depends(require_metrics_token)]
 
+SECURITY_HEADERS: dict[str, str] = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "X-Frame-Options": "DENY",
+}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -170,6 +176,21 @@ async def metrics_middleware(request: Request, call_next: RequestResponseEndpoin
     # Looks the collector up on the module at call time rather than capturing it, so a test can
     # swap in a fresh one with monkeypatch.setattr("app.app.metrics", ...).
     return await record_request_metrics(metrics, request, call_next)
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    """Add security headers to all responses and prevent caching for /authenticate.
+
+    Handled responses (like 400, 401, 502 ...) pass through the middleware as they become normal responses
+    below it. But unhandled 500 exceptions are rendered above the middleware, and thus not seen by it.
+    """
+    response = await call_next(request)
+    for header, value in SECURITY_HEADERS.items():
+        response.headers[header] = value
+    if request.url.path == "/authenticate":
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.exception_handler(RequestValidationError)
