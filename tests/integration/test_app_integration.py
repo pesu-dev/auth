@@ -4,6 +4,8 @@ import pytest
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
+from unittest.mock import patch
+
 from app.app import app
 
 unhandled_router = APIRouter()
@@ -516,3 +518,18 @@ def test_integration_authenticate_over_long_values_not_logged(client, caplog, ov
     assert "Request data could not be validated" in caplog.text
     assert over_long_password not in caplog.text
     assert over_long_username not in caplog.text
+
+
+def test_integration_fields_without_profile_key(client):
+    payload = {
+        "username": "username",
+        "password": "password",
+        "fields": ["name", "email", "srn"],
+        "profile": False,
+    }
+    with patch("app.pesu.PESUAcademy.authenticate", return_value={"status": True, "message": "Login successful."}):
+        response = client.post("/authenticate", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] is True
+    assert "profile" not in data

@@ -249,3 +249,9 @@ def test_validate_removed_kycas_fields_rejected():
         errors = exc_info.value.errors()
         assert any(e["type"] == "literal_error" for e in errors)
         assert "fields.0" in str(exc_info.value)
+
+def test_validate_duplicates_are_removed():
+    """Test that the duplicates of fields are removed."""
+    fieldList = ["name", "email", "srn", "name", "email", "program"]
+    request_model = RequestModel(username="testuser", password="testpass", fields=fieldList)
+    assert request_model.fields == ["name", "email", "srn", "program"]

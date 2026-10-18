@@ -451,10 +451,12 @@ class PESUAcademy:
             ProfileFetchError: If the profile could not be fetched, or PESU Academy declined to serve it.
             ProfileParseError: If the profile response did not have the expected shape.
         """
+        if fields is not None and not profile:
+            logging.debug(f"Fields provided without profile=True for user={username}; fields will be ignored.")
         # Default fields to fetch if fields is not provided
         fields = self.DEFAULT_FIELDS if fields is None else fields
         # Check if fields is not the default fields and enable field filtering
-        field_filtering = fields != self.DEFAULT_FIELDS
+        field_filtering = set(fields) != set(self.DEFAULT_FIELDS)
 
         logging.info(
             f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ...",

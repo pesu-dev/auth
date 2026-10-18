@@ -17,7 +17,7 @@ from app.metrics.collector import (
     PROFILE_PARSE_ERRORS,
     UPSTREAM_REQUESTS,
     UPSTREAM_RESPONSES,
-    MetricsCollector,
+    MetricsCollector, PROFILE_FIELD_FILTERING,
 )
 from app.models import ProfileModel
 from app.pesu import _CLOSE_TASKS, DISPATCHER_URL, LOGIN_URL, PESUAcademy, _upstream_call
@@ -1218,3 +1218,25 @@ def test_an_unset_test_variable_is_an_error(monkeypatch, request, profile_variab
 
     with pytest.raises(AssertionError, match="TEST_MIDDLE_NAME environment variable not set"):
         request.getfixturevalue("expected_profile")
+
+
+@pytest.mark.asyncio
+async def test_field_filtering_reordered(pesu, upstream, make_response, login_payload, profile_payload, collector):
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    fields = list(reversed(PESUAcademy.DEFAULT_FIELDS))
+    result = await pesu.authenticate("user", "pass", profile=True, fields=fields)
+
+    snapshot = pesu._metrics.snapshot()
+    assert snapshot.value(PROFILE_FIELD_FILTERING, enabled="false") == 0.0
+
+
+@pytest.mark.asyncio
+async def test_real_subset_records(pesu, upstream, make_response, login_payload, profile_payload, collector):
+    upstream.side_effect = [make_response(json=login_payload), make_response(json=profile_payload)]
+
+    fields = ["name", "email", "srn"]
+    result = await pesu.authenticate("user", "pass", profile=True, fields=fields)
+
+    snapshot = pesu._metrics.snapshot()
+    assert snapshot.value(PROFILE_FIELD_FILTERING, enabled="true") == 0.0
