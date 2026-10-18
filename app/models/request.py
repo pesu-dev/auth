@@ -106,6 +106,9 @@ class RequestModel(BaseModel):
         """Validate that fields is either None or a non-empty list containing only allowed field names."""
         if v is not None and not v:
             raise ValueError("Fields must be a non-empty list or None.")
+
+        if v is not None:
+            return list(dict.fromkeys(v))
         return v
 
     @field_validator("username", "password", mode="before")
