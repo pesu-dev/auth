@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
 from app.app import app
-from app.exceptions.base import PESUAcademyError
+from app.exceptions.authentication import AuthenticationError
 
 unhandled_router = APIRouter()
 
@@ -519,34 +519,28 @@ def test_integration_authenticate_over_long_values_not_logged(client, caplog, ov
     assert over_long_username not in caplog.text
 
 
+def assert_security_headers(response):
+    """Verify standard security headers are present on a response."""
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert response.headers["X-Frame-Options"] == "DENY"
+
+
 def test_integration_security_headers_on_general_endpoints(client):
     """General endpoints must carry standard security headers and not carry Cache-Control: no-store."""
     for path in ["/", "/health", "/metrics"]:
         response = client.get(path)
-        assert response.headers["X-Content-Type-Options"] == "nosniff"
-        assert response.headers["Referrer-Policy"] == "no-referrer"
-        assert response.headers["X-Frame-Options"] == "DENY"
-        # Since Cache-Control is not set on these routes, verify key absence or that it's not no-store
-        assert "Cache-Control" not in response.headers or response.headers["Cache-Control"] != "no-store"
+        assert response.status_code == 200
+        assert_security_headers(response)
+        assert response.headers.get("Cache-Control") != "no-store"
 
 
 def test_integration_authenticate_headers_on_validation_error(client):
     """The /authenticate endpoint must return security headers and Cache-Control: no-store on error."""
     response = client.post("/authenticate", json={})
     assert response.status_code == 400
-    assert response.headers["X-Content-Type-Options"] == "nosniff"
-    assert response.headers["Referrer-Policy"] == "no-referrer"
-    assert response.headers["X-Frame-Options"] == "DENY"
+    assert_security_headers(response)
     assert response.headers["Cache-Control"] == "no-store"
-
-
-def test_integration_root_playground_loads(client):
-    """The root playground endpoint loads successfully with standard security headers."""
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.headers["X-Content-Type-Options"] == "nosniff"
-    assert response.headers["Referrer-Policy"] == "no-referrer"
-    assert response.headers["X-Frame-Options"] == "DENY"
 
 
 def test_integration_authenticate_success_headers(client, monkeypatch):
@@ -563,9 +557,7 @@ def test_integration_authenticate_success_headers(client, monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.headers["X-Content-Type-Options"] == "nosniff"
-    assert response.headers["Referrer-Policy"] == "no-referrer"
-    assert response.headers["X-Frame-Options"] == "DENY"
+    assert_security_headers(response)
     assert response.headers["Cache-Control"] == "no-store"
 
 
@@ -573,7 +565,7 @@ def test_integration_authenticate_401_headers(client, monkeypatch):
     """Test 401 Unauthorized has all security headers and no-store."""
 
     async def fake_unauthorized(*args, **kwargs):
-        raise PESUAcademyError(message="Invalid credentials", status_code=401)
+        raise AuthenticationError("Invalid credentials")
 
     monkeypatch.setattr("app.app.pesu_academy.authenticate", fake_unauthorized)
 
@@ -583,7 +575,31 @@ def test_integration_authenticate_401_headers(client, monkeypatch):
     )
 
     assert response.status_code == 401
-    assert response.headers["X-Content-Type-Options"] == "nosniff"
-    assert response.headers["Referrer-Policy"] == "no-referrer"
-    assert response.headers["X-Frame-Options"] == "DENY"
+    assert_security_headers(response)
+    assert response.headers["Cache-Control"] == "no-store"
+
+
+def test_unhandled_exception_headers(client):
+    """Unhandled exceptions on general endpoints return 500 with general security headers."""
+    response = client.get("/raiseUnhandled")
+    assert response.status_code == 500
+    assert_security_headers(response)
+    assert response.headers.get("Cache-Control") != "no-store"
+
+
+def test_unhandled_exception_authenticate_headers(client, monkeypatch):
+    """Unhandled exceptions on /authenticate return 500 with all security headers and no-store."""
+
+    async def fake_crash(*args, **kwargs):
+        raise RuntimeError("Unexpected failure")
+
+    monkeypatch.setattr("app.app.pesu_academy.authenticate", fake_crash)
+
+    response = client.post(
+        "/authenticate",
+        json={"username": "dummy_user", "password": "dummy_password"},
+    )
+
+    assert response.status_code == 500
+    assert_security_headers(response)
     assert response.headers["Cache-Control"] == "no-store"

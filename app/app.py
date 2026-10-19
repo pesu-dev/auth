@@ -53,11 +53,20 @@ KNOWN_REQUEST_FIELDS = frozenset({"username", "password", "profile", "fields", "
 # Enforced only when METRICS_TOKEN is set in the environment
 METRICS_DEPENDENCIES = [Depends(require_metrics_token)]
 
+# Sent on every response, as the OWASP REST Security Cheat Sheet recommends
 SECURITY_HEADERS: dict[str, str] = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
 }
+
+
+def _security_headers(request: Request) -> dict[str, str]:
+    """Build security headers for a response, preventing caching for /authenticate."""
+    headers = dict(SECURITY_HEADERS)
+    if request.url.path == "/authenticate":
+        headers["Cache-Control"] = "no-store"
+    return headers
 
 
 @asynccontextmanager
@@ -180,16 +189,15 @@ async def metrics_middleware(request: Request, call_next: RequestResponseEndpoin
 
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Add security headers to all responses and prevent caching for /authenticate.
+    """Add security headers to all handled responses and prevent caching for /authenticate.
 
     Handled responses (like 400, 401, 502 ...) pass through the middleware as they become normal responses
-    below it. But unhandled 500 exceptions are rendered above the middleware, and thus not seen by it.
+    below it. Unhandled 500 exceptions are rendered above this middleware by ServerErrorMiddleware, so
+    unhandled_exception_handler attaches these headers directly to its response.
     """
     response = await call_next(request)
-    for header, value in SECURITY_HEADERS.items():
+    for header, value in _security_headers(request).items():
         response.headers[header] = value
-    if request.url.path == "/authenticate":
-        response.headers["Cache-Control"] = "no-store"
     return response
 
 
@@ -299,6 +307,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             "message": "Internal Server Error. Please try again later.",
             "timestamp": datetime.datetime.now(IST).isoformat(),
         },
+        headers=_security_headers(request),
     )
 
 

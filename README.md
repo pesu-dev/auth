@@ -153,6 +153,18 @@ API. The response's **Copy** button copies only the body, without its status or 
 The Explorer's HTML, styles, and scripts live in `app/templates/playground.html` and are served
 directly from that file. It requires no frontend build step or third-party UI dependencies.
 
+### Response headers
+
+Every response includes the following baseline security headers:
+
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: no-referrer`
+- `X-Frame-Options: DENY`
+
+Responses to `/authenticate` also include:
+
+- `Cache-Control: no-store`
+
 ### `/authenticate`
 
 You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON
@@ -235,18 +247,6 @@ only the fields not asked for in `fields` are, and fields come back in the order
 
 Everything else in PESU Academy's profile information, such as the photo, blood group, addresses, parents' details and marks, is
 discarded and never returned, and cannot be requested in `fields`.
-
-### Response headers
-
-Every response includes the following baseline security headers:
-
-- `X-Content-Type-Options: nosniff`
-- `Referrer-Policy: no-referrer`
-- `X-Frame-Options: DENY`
-
-Responses to `/authenticate` also include:
-
-- `Cache-Control: no-store`
 
 ### `/health`
 
