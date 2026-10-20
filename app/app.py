@@ -53,6 +53,31 @@ KNOWN_REQUEST_FIELDS = frozenset({"username", "password", "profile", "fields", "
 # Enforced only when METRICS_TOKEN is set in the environment
 METRICS_DEPENDENCIES = [Depends(require_metrics_token)]
 
+# Sent on every response, as the OWASP REST Security Cheat Sheet recommends
+SECURITY_HEADERS: dict[str, str] = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "X-Frame-Options": "DENY",
+}
+
+
+def _security_headers(request: Request) -> dict[str, str]:
+    """Build the security headers for a response.
+
+    Used by both the middleware and the unhandled-exception handler, since ServerErrorMiddleware renders an
+    unhandled 500 above the middleware.
+
+    Args:
+        request (Request): The request being answered.
+
+    Returns:
+        dict[str, str]: The general security headers, plus `Cache-Control: no-store` for /authenticate.
+    """
+    headers = dict(SECURITY_HEADERS)
+    if request.url.path == "/authenticate":
+        headers["Cache-Control"] = "no-store"
+    return headers
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -172,6 +197,20 @@ async def metrics_middleware(request: Request, call_next: RequestResponseEndpoin
     return await record_request_metrics(metrics, request, call_next)
 
 
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    """Add security headers to all handled responses and prevent caching for /authenticate.
+
+    Handled responses (like 400, 401, 502 ...) pass through the middleware as they become normal responses
+    below it. Unhandled 500 exceptions are rendered above this middleware by ServerErrorMiddleware, so
+    unhandled_exception_handler attaches these headers directly to its response.
+    """
+    response = await call_next(request)
+    for header, value in _security_headers(request).items():
+        response.headers[header] = value
+    return response
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Handler for request validation errors."""
@@ -278,6 +317,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             "message": "Internal Server Error. Please try again later.",
             "timestamp": datetime.datetime.now(IST).isoformat(),
         },
+        headers=_security_headers(request),
     )
 
 

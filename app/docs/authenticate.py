@@ -3,6 +3,13 @@
 from app.docs.base import ApiDocs
 from app.models import ResponseModel
 
+CACHE_CONTROL_HEADER = {
+    "Cache-Control": {
+        "description": "Directs clients and proxies not to store any part of the response.",
+        "schema": {"type": "string", "example": "no-store"},
+    }
+}
+
 authenticate_docs = ApiDocs(
     request_examples={
         "requestBody": {
@@ -46,6 +53,7 @@ authenticate_docs = ApiDocs(
     response_examples={
         200: {
             "description": "Successful Authentication",
+            "headers": CACHE_CONTROL_HEADER,
             "model": ResponseModel,
             "content": {
                 "application/json": {
@@ -151,6 +159,7 @@ authenticate_docs = ApiDocs(
                 "profile field, or an empty fields list. The message names each field that failed and why. A body "
                 "that cannot be read at all, such as JSON that is not valid UTF-8, gets a fixed message instead."
             ),
+            "headers": CACHE_CONTROL_HEADER,
             "model": ResponseModel,
             "content": {
                 "application/json": {
@@ -246,6 +255,7 @@ authenticate_docs = ApiDocs(
             "description": (
                 "Unauthorized - PESU Academy rejected the credentials: a wrong password, or a user that does not exist."
             ),
+            "headers": CACHE_CONTROL_HEADER,
             "model": ResponseModel,
             "content": {
                 "application/json": {
@@ -262,6 +272,7 @@ authenticate_docs = ApiDocs(
                 "Unprocessable Entity - PESU Academy's profile response could not be parsed, or reported success "
                 "without any STUDENT_INFO, which means their API changed. Only when the profile was requested."
             ),
+            "headers": CACHE_CONTROL_HEADER,
             "model": ResponseModel,
             "content": {
                 "application/json": {
@@ -275,6 +286,7 @@ authenticate_docs = ApiDocs(
         },
         500: {
             "description": "Internal Server Error",
+            "headers": CACHE_CONTROL_HEADER,
             "model": ResponseModel,
             "content": {
                 "application/json": {
@@ -291,6 +303,7 @@ authenticate_docs = ApiDocs(
                 "Bad Gateway - PESU Academy could not be reached, timed out, or answered the login or profile request "
                 "unexpectedly, or declined to serve the profile."
             ),
+            "headers": CACHE_CONTROL_HEADER,
             "model": ResponseModel,
             "content": {
                 "application/json": {
