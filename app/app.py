@@ -62,7 +62,17 @@ SECURITY_HEADERS: dict[str, str] = {
 
 
 def _security_headers(request: Request) -> dict[str, str]:
-    """Build security headers for a response, preventing caching for /authenticate."""
+    """Build the security headers for a response.
+
+    Used by both the middleware and the unhandled-exception handler, since ServerErrorMiddleware renders an
+    unhandled 500 above the middleware.
+
+    Args:
+        request (Request): The request being answered.
+
+    Returns:
+        dict[str, str]: The general security headers, plus `Cache-Control: no-store` for /authenticate.
+    """
     headers = dict(SECURITY_HEADERS)
     if request.url.path == "/authenticate":
         headers["Cache-Control"] = "no-store"
