@@ -603,3 +603,24 @@ def test_unhandled_exception_authenticate_headers(client, monkeypatch):
     assert response.status_code == 500
     assert_security_headers(response)
     assert response.headers["Cache-Control"] == "no-store"
+
+
+def test_integration_profile_key_omitted(client):
+    """Profile key omitted but fields are still included."""
+    payload = {"username": "username", "password": "password", "fields": ["name", "email", "srn", "prn"]}
+
+    response = client.post("/authenticate", json=payload)
+    data = response.json()
+    assert response.status_code == 400
+    assert "profile" not in response.json()
+    assert "Fields can only be requested when profile is True" in data["message"]
+
+
+def test_integration_profile_is_false(client):
+    """Profile set to false."""
+    payload = {"username": "username", "password": "password", "profile": False, "fields": ["name", "email", "srn"]}
+
+    response = client.post("/authenticate", json=payload)
+    data = response.json()
+    assert response.status_code == 400
+    assert "Fields can only be requested when profile is True" in data["message"]

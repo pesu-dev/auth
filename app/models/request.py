@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
 from app.models.profile import ProfileField
@@ -103,10 +103,19 @@ class RequestModel(BaseModel):
     @field_validator("fields")
     @classmethod
     def validate_fields(cls, v: list[str] | None) -> list[str] | None:
-        """Validate that fields is either None or a non-empty list containing only allowed field names."""
+        """Validate that fields is either None or non-empty list containing allowed field names without duplicates."""
         if v is not None and not v:
             raise ValueError("Fields must be a non-empty list or None.")
+        if v is not None:
+            return list(dict.fromkeys(v))
         return v
+
+    @model_validator(mode="after")
+    def validate_fields_returned_only_when_profile_is_true(self) -> RequestModel:
+        """Validate that fields are only requested when profile is True."""
+        if self.profile is not True and self.fields is not None:
+            raise ValueError("Fields can only be requested when profile is True.")
+        return self
 
     @field_validator("username", "password", mode="before")
     @classmethod

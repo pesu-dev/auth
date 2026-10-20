@@ -123,10 +123,12 @@ def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payl
 
 
 def test_fields_without_profile_return_no_profile(client, pesu_up):
-    body = _authenticate(client, profile=False, fields=["name", "gender", "mobile"]).json()
-
-    assert "profile" not in body
-    assert len(pesu_up.requests) == 1
+    body = _authenticate(
+        client, profile=False, fields=["name", "gender", "mobile"]
+    )
+    assert body.status_code == 400
+    assert "Fields can only be requested when profile is True." in body.text
+    assert len(pesu_up.requests) == 0
 
 
 def test_the_username_is_sent_without_surrounding_whitespace(client, pesu_up):
