@@ -15,14 +15,15 @@ from zoneinfo import ZoneInfo
 import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.requests import Request
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.routing import APIRoute
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from fastapi.requests import Request
-    from fastapi.responses import Response
+    from fastapi.response import Response
     from starlette.middleware.base import RequestResponseEndpoint
 
 from pydantic import ValidationError
@@ -43,7 +44,7 @@ from app.metrics.collector import (
 )
 from app.metrics.middleware import record_request_metrics
 from app.metrics.prometheus import PROMETHEUS_CONTENT_TYPE, MetricsFormat, render_prometheus
-from app.models import MetricsModel, RequestModel, ResponseModel
+from app.models import HealthModel, MetricsModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -85,6 +86,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Startup
     metrics.increment(LIFESPAN_EVENTS, event="startup")
     logging.info("PESUAuth API startup")
+    if os.environ.get("PESU_AUTH_ENVIRONMENT", "development") not in ("development", "staging", "production"):
+        raise ValueError("Invaild enivronment value. Value must be development, staging or production")
+    app.state.environment = os.environ.get("PESU_AUTH_ENVIRONMENT", "development")
 
     yield
 
@@ -326,19 +330,23 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 @app.head("/health", include_in_schema=False)
 @app.get(
     "/health",
+    response_model=HealthModel,
     response_class=JSONResponse,
     responses=health_docs.response_examples,
     tags=["Monitoring"],
 )
-async def health() -> JSONResponse:
+async def health(request: Request) -> JSONResponse:
     """Health check endpoint."""
     logging.debug("Health check requested.")
     return JSONResponse(
         status_code=200,
+        headers={"Cache-Control": "no-store"},
         content={
             "status": True,
             "message": "ok",
             "timestamp": datetime.datetime.now(IST).isoformat(),
+            "version": version("pesu-auth"),
+            "environment": request.app.state.environment,
         },
     )
 
