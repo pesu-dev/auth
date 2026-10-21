@@ -261,14 +261,14 @@ def test_validate_profile_key_omitted():
     """Test that fields are rejected when profile is omitted."""
     with pytest.raises(ValidationError) as exc_info:
         RequestModel(username="testuser", password="testpass", fields=["name", "srn"])
-    assert "Fields can only be requested when profile is True" in str(exc_info.value)
+    assert "Fields can only be requested when profile is true" in str(exc_info.value)
 
 
 def test_validate_profile_is_set_as_false():
     """Test that fields are rejected when profile is false."""
     with pytest.raises(ValidationError) as exc_info:
         RequestModel(username="testuser", password="testpass", profile=False, fields=["name", "srn"])
-    assert "Fields can only be requested when profile is True" in str(exc_info.value)
+    assert "Fields can only be requested when profile is true" in str(exc_info.value)
 
 
 def test_validate_duplicates_are_removed():
@@ -282,14 +282,6 @@ def test_validate_with_no_duplicates():
     """Test that a list with no duplicates comes back unchanged."""
     field_list = ["name", "email", "srn", "program"]
     request_model = RequestModel(username="testuser", password="testpass", profile=True, fields=field_list)
-    assert request_model.fields == ["name", "email", "srn", "program"]
-
-
-def test_validate_fields_with_profile_true_accepted():
-    """Test that fields with profile=True are accepted."""
-    field_list = ["name", "email", "srn", "program"]
-    request_model = RequestModel(username="testuser", password="testpass", profile=True, fields=field_list)
-    assert request_model.profile is True
     assert request_model.fields == ["name", "email", "srn", "program"]
 
 

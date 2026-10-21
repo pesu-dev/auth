@@ -116,6 +116,10 @@ def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payl
         "mobile": "9876543210",
         "middleName": None,
         "branchShortCode": "CSE",
+        "dateOfBirth": "2005-01-01",
+    }
+
+
 def test_fields_without_profile_are_rejected(client, pesu_up):
     response = _authenticate(client, profile=False, fields=["name", "gender", "mobile"])
 

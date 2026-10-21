@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 from pydantic.alias_generators import to_camel
 
 from app.models.profile import ProfileField
@@ -73,8 +73,9 @@ class RequestModel(BaseModel):
         title="Profile Fields",
         description=(
             "Which profile fields to return, from those listed in `ProfileModel`. Every field is returned when "
-            "this is omitted. Only used when profile is `true`. Fields come back in `ProfileModel`'s order, "
-            "whatever order they are asked for in, and a name that is not in `ProfileModel` is rejected."
+            "this is omitted. Can only be given when `profile` is true (otherwise the request is rejected with a 400); "
+            "repeated names are ignored. Fields come back in `ProfileModel`'s order, whatever order they are asked for "
+            "in, and a name that is not in `ProfileModel` is rejected."
         ),
         json_schema_extra={"example": ["name", "email", "campus", "branch", "semester", "firstName", "mobile"]},
     )
@@ -99,7 +100,8 @@ class RequestModel(BaseModel):
         if not v.strip():
             raise ValueError("Password cannot be empty.")
         return v
-    @field_validator("fields")
+
+    @field_validator("fields", mode="after")
     @classmethod
     def validate_fields(cls, v: list[str] | None, info: ValidationInfo) -> list[str] | None:
         """Validate fields: a non-empty list, only with profile set to true, with duplicates removed."""
