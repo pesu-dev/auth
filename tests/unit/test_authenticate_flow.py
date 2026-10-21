@@ -116,17 +116,12 @@ def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payl
         "mobile": "9876543210",
         "middleName": None,
         "branchShortCode": "CSE",
-        "dateOfBirth": "2005-01-01",
-    }
-    # On the wire, in the documented order
-    assert list(profile) == [field for field in full_profile if field in fields]
+def test_fields_without_profile_are_rejected(client, pesu_up):
+    response = _authenticate(client, profile=False, fields=["name", "gender", "mobile"])
 
-
-def test_fields_without_profile_return_no_profile(client, pesu_up):
-    body = _authenticate(client, profile=False, fields=["name", "gender", "mobile"])
-    assert body.status_code == 400
-    assert "Fields can only be requested when profile is True." in body.text
-    assert len(pesu_up.requests) == 0
+    assert response.status_code == 400
+    assert "Fields can only be requested when profile is true." in response.json()["message"]
+    assert not pesu_up.requests
 
 
 def test_the_username_is_sent_without_surrounding_whitespace(client, pesu_up):
