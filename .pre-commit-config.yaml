@@ -28,7 +28,7 @@ repos:
     hooks:
       # Ruff runs from uv.lock, so it is the same version CI runs. --frozen leaves a stale lock for
       # the uv-lock hook to report instead of rewriting it, and --force-exclude applies ruff's
-      # exclude list (tests/) to the file names pre-commit passes.
+      # exclude list (AGENTS.md, .agents/) to the file names pre-commit passes.
       - id: ruff-check
         name: ruff check
         entry: uv run --frozen ruff check --force-exclude --fix --exit-non-zero-on-fix
@@ -42,13 +42,6 @@ repos:
         language: system
         types_or: [ python, pyi ]
         require_serial: true
-
-      # Catches syntax errors in tests/, which ruff does not lint
-      - id: compileall
-        name: Compile Python sources
-        entry: uv run --frozen python -m compileall -q
-        language: system
-        types: [ python ]
 
       - id: uv-lock
         name: Check uv.lock matches pyproject.toml

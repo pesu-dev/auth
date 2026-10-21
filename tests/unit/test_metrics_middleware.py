@@ -105,8 +105,11 @@ async def test_a_redirect_is_not_counted_as_a_failure(collector):
 
 @pytest.mark.asyncio
 async def test_a_raised_exception_is_counted_and_re_raised(collector):
-    """ServerErrorMiddleware renders the 500 above us, so we never see that response -- we must
-    record the status ourselves or requests_total stops matching the sum of responses_total."""
+    """A raised exception is recorded as a 500 and re-raised.
+
+    ServerErrorMiddleware renders the 500 above us, so we never see that response -- we must record the status
+    ourselves or requests_total stops matching the sum of responses_total.
+    """
     with pytest.raises(RuntimeError, match="boom"):
         await record_request_metrics(collector, FakeRequest(scope()), raising(RuntimeError("boom")))
     snapshot = collector.snapshot()
@@ -126,8 +129,11 @@ async def test_an_exception_does_not_record_an_error_type(collector):
 
 @pytest.mark.asyncio
 async def test_cancellation_is_not_recorded(collector):
-    """A client disconnect surfaces as cancellation. Swallowing it to record would be worse than
-    the small undercount, so it propagates untouched and total exceeds success + failed."""
+    """A client disconnect surfaces as cancellation, which is not recorded.
+
+    Swallowing it to record would be worse than the small undercount, so it propagates untouched and total
+    exceeds success + failed.
+    """
     with pytest.raises(asyncio.CancelledError):
         await record_request_metrics(collector, FakeRequest(scope()), raising(asyncio.CancelledError()))
     snapshot = collector.snapshot()

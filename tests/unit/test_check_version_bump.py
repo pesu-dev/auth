@@ -11,7 +11,9 @@ def _pyproject(tmp_path, name, version):
 
 def _lock(tmp_path, version):
     path = tmp_path / "uv.lock"
-    path.write_text(f'version = 1\n\n[[package]]\nname = "pesu-auth"\nversion = "{version}"\nsource = {{ editable = "." }}\n')
+    path.write_text(
+        f'version = 1\n\n[[package]]\nname = "pesu-auth"\nversion = "{version}"\nsource = {{ editable = "." }}\n'
+    )
     return path
 
 

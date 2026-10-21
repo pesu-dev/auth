@@ -1,12 +1,10 @@
-from pathlib import Path
-
 import pytest
 
 from scripts.sync_agents import AGENTS_PATH, REPO_ROOT, ROLES_PATH, main, read_frontmatter, sync_agents
 
 
 @pytest.fixture
-def roles_dir(tmp_path: Path, agent_frontmatter) -> Path:
+def roles_dir(tmp_path, agent_frontmatter):
     roles = tmp_path / "roles"
     roles.mkdir()
     (roles / "reviewer.md").write_text(f"{agent_frontmatter}\n# Reviewer\n\nThe full role.\n")
@@ -15,7 +13,7 @@ def roles_dir(tmp_path: Path, agent_frontmatter) -> Path:
 
 
 @pytest.fixture
-def agents_dir(tmp_path: Path) -> Path:
+def agents_dir(tmp_path):
     return tmp_path / "agents"
 
 

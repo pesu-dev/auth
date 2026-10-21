@@ -14,11 +14,11 @@ from app.exceptions.authentication import (
 )
 from app.metrics.collector import (
     HTTP_CLIENTS,
+    PROFILE_FIELD_FILTERING,
     PROFILE_PARSE_ERRORS,
     UPSTREAM_REQUESTS,
     UPSTREAM_RESPONSES,
     MetricsCollector,
-    PROFILE_FIELD_FILTERING
 )
 from app.models import ProfileModel
 from app.pesu import _CLOSE_TASKS, DISPATCHER_URL, LOGIN_URL, PESUAcademy, _upstream_call
@@ -287,8 +287,16 @@ async def test_nothing_stands_in_for_a_value_student_info_lacks(
 ):
     """The login response and STUDENT_PHOTO carry many of the same details; none fills a gap."""
     for key in (
-        "LoginId", "SRN", "NameAsInSSLC", "FirstName", "Email", "Mobile",
-        "ProgramAbbreviation", "ClassName", "SectionName", "DateOfBirth",
+        "LoginId",
+        "SRN",
+        "NameAsInSSLC",
+        "FirstName",
+        "Email",
+        "Mobile",
+        "ProgramAbbreviation",
+        "ClassName",
+        "SectionName",
+        "DateOfBirth",
     ):
         profile_payload["STUDENT_INFO"][key] = None
     # Every other source still has a value for each of them
@@ -299,8 +307,16 @@ async def test_nothing_stands_in_for_a_value_student_info_lacks(
     profile = await _profile_for(pesu, upstream, make_response, login_payload, profile_payload)
 
     for field in (
-        "prn", "srn", "name", "firstName", "email", "mobile", "program",
-        "semester", "section", "dateOfBirth",
+        "prn",
+        "srn",
+        "name",
+        "firstName",
+        "email",
+        "mobile",
+        "program",
+        "semester",
+        "section",
+        "dateOfBirth",
     ):
         assert profile[field] is None, field
     # What STUDENT_INFO still has is unaffected
@@ -764,7 +780,9 @@ def _route_logins(wire, make_response, login_payload, profile_payload):
 
 
 @pytest.mark.asyncio
-async def test_the_login_request_on_the_wire(pesu, wire, make_response, login_payload, profile_payload, multipart_fields):
+async def test_the_login_request_on_the_wire(
+    pesu, wire, make_response, login_payload, profile_payload, multipart_fields
+):
     _route_logins(wire, make_response, login_payload, profile_payload)
 
     await pesu.authenticate("PES2UG25CS001", "hunter2")
@@ -785,7 +803,9 @@ async def test_the_login_request_on_the_wire(pesu, wire, make_response, login_pa
 
 
 @pytest.mark.asyncio
-async def test_the_profile_request_on_the_wire(pesu, wire, make_response, login_payload, profile_payload, multipart_fields):
+async def test_the_profile_request_on_the_wire(
+    pesu, wire, make_response, login_payload, profile_payload, multipart_fields
+):
     _route_logins(wire, make_response, login_payload, profile_payload)
 
     await pesu.authenticate("user", "hunter2", profile=True)
@@ -1193,7 +1213,7 @@ def test_every_profile_field_has_a_test_variable(profile_variables):
 
 
 def test_each_test_variable_is_named_after_its_field(profile_variables):
-    """branchShortCode is TEST_BRANCH_SHORT_CODE, so the variable for a field never needs looking up."""
+    """The variable for branchShortCode is TEST_BRANCH_SHORT_CODE, so none ever needs looking up."""
     assert profile_variables == {field: f"TEST_{to_snake(field).upper()}" for field in profile_variables}
 
 

@@ -1,5 +1,3 @@
-from idlelib.iomenu import errors
-
 import pytest
 from pydantic import ValidationError
 
@@ -107,7 +105,9 @@ def test_validate_fields_multiple_invalid_fields():
 
 
 def test_validate_fields_valid_fields():
-    model = RequestModel(username="testuser", password="testpass", profile=True, fields=["name", "email", "mobile", "dateOfBirth"])
+    model = RequestModel(
+        username="testuser", password="testpass", profile=True, fields=["name", "email", "mobile", "dateOfBirth"]
+    )
     assert model.fields == ["name", "email", "mobile", "dateOfBirth"]
 
 
@@ -117,7 +117,9 @@ def test_validate_every_profile_field_is_accepted():
     from app.models.profile import ProfileField
 
     every_field = list(get_args(ProfileField))
-    assert RequestModel(username="testuser", password="testpass", profile=True, fields=every_field).fields == every_field
+    assert (
+        RequestModel(username="testuser", password="testpass", profile=True, fields=every_field).fields == every_field
+    )
     for field in every_field:
         assert RequestModel(username="testuser", password="testpass", profile=True, fields=[field]).fields == [field]
 
@@ -231,7 +233,9 @@ def test_validate_snake_case_fields_rejected(field):
     assert "fields.0" in str(exc_info.value)
 
 
-@pytest.mark.parametrize("field", ["bloodGroup", "photo", "profilePicture", "programShortCode", "phone", "institute", "rollNumber"])
+@pytest.mark.parametrize(
+    "field", ["bloodGroup", "photo", "profilePicture", "programShortCode", "phone", "institute", "rollNumber"]
+)
 def test_validate_fields_the_api_does_not_return_rejected(field):
     """Neither what PESU sends but this API does not return, nor a field this API no longer returns, can be requested.
 
@@ -257,14 +261,14 @@ def test_validate_profile_key_omitted():
     """Test that the profile key is omitted."""
     with pytest.raises(ValidationError) as exc_info:
         RequestModel(username="testuser", password="testpass", fields=["name", "srn"])
-    assert ("Fields can only be requested when profile is True" in str(exc_info.value))
+    assert "Fields can only be requested when profile is True" in str(exc_info.value)
 
 
 def test_validate_profile_is_set_as_false():
     """Test that the profile is set as false."""
     with pytest.raises(ValidationError) as exc_info:
         RequestModel(username="testuser", password="testpass", profile=False, fields=["name", "srn"])
-    assert ("Fields can only be requested when profile is True" in str(exc_info.value))
+    assert "Fields can only be requested when profile is True" in str(exc_info.value)
 
 
 def test_validate_duplicates_are_removed():
@@ -285,13 +289,12 @@ def test_validate_fields_with_profile_true_accepted():
     """Test that fields with profile=True are accepted."""
     field_list = ["name", "email", "srn", "program"]
     request_model = RequestModel(username="testuser", password="testpass", profile=True, fields=field_list)
-    assert request_model.profile == True
+    assert request_model.profile is True
     assert request_model.fields == ["name", "email", "srn", "program"]
 
 
 def test_validate_profile_false_without_fields():
     """Test that profile=False without fields is accepted."""
-    field_list = ["name", "email", "srn", "program"]
     request_model = RequestModel(username="testuser", password="testpass", profile=False, fields=None)
-    assert request_model.profile == False
-    assert request_model.fields == None
+    assert request_model.profile is False
+    assert request_model.fields is None

@@ -311,7 +311,7 @@ def test_integration_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == True
+    assert data["status"] is True
     assert data["message"] == "ok"
 
 
@@ -448,9 +448,11 @@ def test_integration_authenticate_snake_case_fields_rejected(client, field):
     assert "body.fields.0" in data["message"]
 
 
-@pytest.mark.parametrize("field", ["bloodGroup", "photo", "profilePicture", "programShortCode", "phone", "institute", "rollNumber"])
+@pytest.mark.parametrize(
+    "field", ["bloodGroup", "photo", "profilePicture", "programShortCode", "phone", "institute", "rollNumber"]
+)
 def test_integration_authenticate_fields_the_api_does_not_return_rejected(client, field):
-    """PESU sends some of these and this API returned the others before 5.0.0; none is returned now, so asking is a 400."""
+    """PESU sends some of these and this API returned the others before 5.0.0; asking for any of them now is a 400."""
     payload = {"username": "username", "password": "password", "profile": True, "fields": [field]}
 
     response = client.post("/authenticate", json=payload)

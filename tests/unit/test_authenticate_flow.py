@@ -123,9 +123,7 @@ def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payl
 
 
 def test_fields_without_profile_return_no_profile(client, pesu_up):
-    body = _authenticate(
-        client, profile=False, fields=["name", "gender", "mobile"]
-    )
+    body = _authenticate(client, profile=False, fields=["name", "gender", "mobile"])
     assert body.status_code == 400
     assert "Fields can only be requested when profile is True." in body.text
     assert len(pesu_up.requests) == 0

@@ -131,7 +131,7 @@ async def test_closing_a_client_is_recorded(collector):
 
 @pytest.mark.asyncio
 async def test_a_client_that_refuses_to_close_is_recorded(collector, caplog):
-    """created minus closed is the leak indicator, so a failed close cannot be counted as a close."""
+    """Created minus closed is the leak indicator, so a failed close cannot be counted as a close."""
     client = AsyncMock()
     client.aclose.side_effect = RuntimeError("refused")
 

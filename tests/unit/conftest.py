@@ -39,7 +39,9 @@ CONFORMANCE_CHECKS = (status_code_conformance, content_type_conformance, respons
 AUTHENTICATION_FAILURES = {
     "wrong_credentials": (
         LOGIN_URL,
-        lambda request: httpx2.Response(401, json={"statusCode": 401, "statusDescription": "Invalid Login Credentials"}),
+        lambda request: httpx2.Response(
+            401, json={"statusCode": 401, "statusDescription": "Invalid Login Credentials"}
+        ),
         401,
     ),
     "login_unavailable": (LOGIN_URL, lambda request: httpx2.Response(503), 502),
@@ -73,7 +75,15 @@ UNREADABLE_BODIES = {
 
 # Every route that takes no input, with the status a GET of it answers: the docs pages, which are not in
 # the OpenAPI schema, and the two that are
-PAGES = {"/": 200, "/docs": 200, "/docs/oauth2-redirect": 200, "/redoc": 200, "/openapi.json": 200, "/health": 200, "/readme": 308}
+PAGES = {
+    "/": 200,
+    "/docs": 200,
+    "/docs/oauth2-redirect": 200,
+    "/redoc": 200,
+    "/openapi.json": 200,
+    "/health": 200,
+    "/readme": 308,
+}
 
 # Shaped like the real responses (key names and types taken from the live API, values invented).
 # The personal fields this service must never keep or log -- photo, parents, address -- are
@@ -154,9 +164,24 @@ PROFILE_PAYLOAD = {
     },
     # Not read: there for realism, and to prove a profile does not depend on it
     "STUDENT_SEMESTERS": [
-        {"studentId": "00000000-0000-0000-0000-000000000000", "studentRollNo": 12, "className": "Sem-3", "batchClassOrder": 2026071499},
-        {"studentId": "00000000-0000-0000-0000-000000000000", "studentRollNo": 27, "className": "Sem-4", "batchClassOrder": 2027010199},
-        {"studentId": "00000000-0000-0000-0000-000000000000", "studentRollNo": 9, "className": "Sem-2", "batchClassOrder": 2026010199},
+        {
+            "studentId": "00000000-0000-0000-0000-000000000000",
+            "studentRollNo": 12,
+            "className": "Sem-3",
+            "batchClassOrder": 2026071499,
+        },
+        {
+            "studentId": "00000000-0000-0000-0000-000000000000",
+            "studentRollNo": 27,
+            "className": "Sem-4",
+            "batchClassOrder": 2027010199,
+        },
+        {
+            "studentId": "00000000-0000-0000-0000-000000000000",
+            "studentRollNo": 9,
+            "className": "Sem-2",
+            "batchClassOrder": 2026010199,
+        },
     ],
     "STUDENT_CGPA_DETAILS": [{"USN": "PES2UG25CS001", "CGPA": "CGPASECRET"}],
 }

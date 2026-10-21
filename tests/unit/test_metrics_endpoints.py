@@ -129,8 +129,10 @@ def test_a_validation_error_records_its_type(client):
 
 
 def test_an_unhandled_exception_records_a_500(client):
-    """ServerErrorMiddleware sits above the middleware, so this path cannot be verified by reading
-    the code -- only by driving a real unhandled exception through the whole stack."""
+    """A real unhandled exception, driven through the whole stack, is recorded as a 500.
+
+    ServerErrorMiddleware sits above the middleware, so this path cannot be verified by reading the code.
+    """
     assert client.get("/raiseUnhandledForMetrics").status_code == 500
     body = client.get("/metrics?fmt=json").json()
     assert body["responsesByStatus"]["500"] == 1
@@ -264,7 +266,7 @@ def test_failures_are_attributed_to_client_or_server(mock_authenticate, client):
 
 
 def test_in_flight_accounts_for_the_gap_in_the_totals(client):
-    """total exceeds success + failed only by what is still being served -- here, this request."""
+    """Total exceeds success + failed only by what is still being served -- here, this request."""
     body = client.get("/metrics?fmt=json").json()
     assert body["requestsInFlight"] == 1
     assert body["requests"]["total"] == body["requests"]["success"] + body["requests"]["failed"] + 1
