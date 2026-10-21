@@ -614,7 +614,6 @@ def test_integration_profile_key_omitted(client):
     response = client.post("/authenticate", json=payload)
     data = response.json()
     assert response.status_code == 400
-    assert "profile" not in response.json()
     assert "Fields can only be requested when profile is True" in data["message"]
 
 

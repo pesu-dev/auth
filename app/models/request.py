@@ -103,7 +103,7 @@ class RequestModel(BaseModel):
     @field_validator("fields")
     @classmethod
     def validate_fields(cls, v: list[str] | None) -> list[str] | None:
-        """Validate that fields is either None or non-empty list containing allowed field names without duplicates."""
+        """Validate that fields is either None or a non-empty list of allowed field names, and remove duplicates."""
         if v is not None and not v:
             raise ValueError("Fields must be a non-empty list or None.")
         if v is not None:
@@ -111,10 +111,10 @@ class RequestModel(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_fields_returned_only_when_profile_is_true(self) -> RequestModel:
-        """Validate that fields are only requested when profile is True."""
-        if self.profile is not True and self.fields is not None:
-            raise ValueError("Fields can only be requested when profile is True.")
+    def validate_fields_need_profile(self) -> RequestModel:
+        """Reject fields unless profile is true, since they would otherwise be silently ignored."""
+        if not self.profile and self.fields is not None:
+            raise ValueError("Fields can only be requested when profile is true.")
         return self
 
     @field_validator("username", "password", mode="before")
