@@ -99,23 +99,18 @@ class RequestModel(BaseModel):
         if not v.strip():
             raise ValueError("Password cannot be empty.")
         return v
-
     @field_validator("fields")
     @classmethod
-    def validate_fields(cls, v: list[str] | None) -> list[str] | None:
-        """Validate that fields is either None or a non-empty list of allowed field names, and remove duplicates."""
-        if v is not None and not v:
+    def validate_fields(cls, v: list[str] | None, info: ValidationInfo) -> list[str] | None:
+        """Validate fields: a non-empty list, only with profile set to true, with duplicates removed."""
+        if v is None:
+            return v
+        if not v:
             raise ValueError("Fields must be a non-empty list or None.")
-        if v is not None:
-            return list(dict.fromkeys(v))
-        return v
-
-    @model_validator(mode="after")
-    def validate_fields_need_profile(self) -> RequestModel:
-        """Reject fields unless profile is true, since they would otherwise be silently ignored."""
-        if not self.profile and self.fields is not None:
+        # profile is declared before fields, so it is in info.data unless it failed its own validation
+        if info.data.get("profile") is False:
             raise ValueError("Fields can only be requested when profile is true.")
-        return self
+        return list(dict.fromkeys(v))
 
     @field_validator("username", "password", mode="before")
     @classmethod
