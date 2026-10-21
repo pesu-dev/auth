@@ -230,7 +230,7 @@ authenticate_docs = ApiDocs(
                             "summary": "Fields without profile set to true",
                             "value": {
                                 "status": False,
-                                "timestamp": 1700000000,
+                                "timestamp": "2024-07-28T22:30:10.103368+05:30",
                                 "message": "Could not validate request data - body.fields: Value error, "
                                 "Fields can only be requested when profile is true.",
                             },

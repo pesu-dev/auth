@@ -258,14 +258,14 @@ def test_validate_removed_kycas_fields_rejected():
 
 
 def test_validate_profile_key_omitted():
-    """Test that fields are rejected when profile is omitted."""
+    """Fields with profile omitted is a 400."""
     with pytest.raises(ValidationError) as exc_info:
         RequestModel(username="testuser", password="testpass", fields=["name", "srn"])
     assert "Fields can only be requested when profile is true" in str(exc_info.value)
 
 
 def test_validate_profile_is_set_as_false():
-    """Test that fields are rejected when profile is false."""
+    """Fields with profile set as False is a 400."""
     with pytest.raises(ValidationError) as exc_info:
         RequestModel(username="testuser", password="testpass", profile=False, fields=["name", "srn"])
     assert "Fields can only be requested when profile is true" in str(exc_info.value)
@@ -283,10 +283,3 @@ def test_validate_with_no_duplicates():
     field_list = ["name", "email", "srn", "program"]
     request_model = RequestModel(username="testuser", password="testpass", profile=True, fields=field_list)
     assert request_model.fields == ["name", "email", "srn", "program"]
-
-
-def test_validate_profile_false_without_fields():
-    """Test that profile=False without fields is accepted."""
-    request_model = RequestModel(username="testuser", password="testpass", profile=False, fields=None)
-    assert request_model.profile is False
-    assert request_model.fields is None

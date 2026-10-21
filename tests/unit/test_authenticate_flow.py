@@ -118,6 +118,8 @@ def test_requested_fields_only_and_null_when_empty(client, pesu_up, profile_payl
         "branchShortCode": "CSE",
         "dateOfBirth": "2005-01-01",
     }
+    # Ensure fields come back in the table's order, regardless of the requested order
+    assert list(profile) == [field for field in full_profile if field in fields]
 
 
 def test_fields_without_profile_are_rejected(client, pesu_up):
