@@ -625,5 +625,3 @@ def test_integration_profile_is_false(client):
     data = response.json()
     assert response.status_code == 400
     assert "Fields can only be requested when profile is true" in data["message"]
-
-
