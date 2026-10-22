@@ -265,6 +265,12 @@ def test_failures_are_attributed_to_client_or_server(mock_authenticate, client):
     assert client.get("/metrics?fmt=json").json()["failuresByFault"] == {"client": 1, "server": 1}
 
 
+def test_fields_without_profile_are_recorded_against_fields(client):
+    """The error is about fields, so it is counted there, not against the whole body."""
+    client.post("/authenticate", json={"username": "u", "password": "p", "fields": ["name"]})
+    assert client.get("/metrics?fmt=json").json()["validationErrorsByField"] == {"fields": 1}
+
+
 def test_in_flight_accounts_for_the_gap_in_the_totals(client):
     """Total exceeds success + failed only by what is still being served -- here, this request."""
     body = client.get("/metrics?fmt=json").json()
