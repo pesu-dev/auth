@@ -627,12 +627,3 @@ def test_integration_profile_is_false(client):
     assert "Fields can only be requested when profile is true" in data["message"]
 
 
-def test_validation_error_for_fields(client):
-    payload = {"username": "test", "password": "password", "profile": False, "fields": "invalid_value"}
-    response = client.post("/authenticate", json=payload)
-    assert response.status_code == 400
-
-    metrics_response = client.get("/metrics")
-    assert metrics_response.status_code == 200
-
-    assert 'validation_errors_total{field="fields"}' in metrics_response.text

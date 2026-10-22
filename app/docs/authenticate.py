@@ -156,9 +156,9 @@ authenticate_docs = ApiDocs(
             "description": (
                 "Bad Request - The request body failed validation: a body that is not valid JSON, a missing, empty, "
                 "over-long or invalid username or password, a value of the wrong type, an unknown key, an unknown "
-                "profile field, or an empty fields list or fields without profile set to true. The message names each"
-                " field that failed and why. A body that cannot be read at all, such as JSON that is not valid UTF-8,"
-                " gets a fixed message instead."
+                "profile field, an empty fields list, or fields without profile set to true. The message names each "
+                "field that failed and why. A body that cannot be read at all, such as JSON that is not valid UTF-8, "
+                "gets a fixed message instead."
             ),
             "headers": CACHE_CONTROL_HEADER,
             "model": ResponseModel,
@@ -230,9 +230,11 @@ authenticate_docs = ApiDocs(
                             "summary": "Fields without profile set to true",
                             "value": {
                                 "status": False,
+                                "message": (
+                                    "Could not validate request data - body.fields: Value error, Fields can only be "
+                                    "requested when profile is true."
+                                ),
                                 "timestamp": "2024-07-28T22:30:10.103368+05:30",
-                                "message": "Could not validate request data - body.fields: Value error, "
-                                "Fields can only be requested when profile is true.",
                             },
                         },
                         "username_too_long": {
