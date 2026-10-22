@@ -453,8 +453,8 @@ class PESUAcademy:
         """
         # Default fields to fetch if fields is not provided
         fields = self.DEFAULT_FIELDS if fields is None else fields
-        # Check if fields is not the default fields and enable field filtering
-        field_filtering = fields != self.DEFAULT_FIELDS
+        # Field filtering is on only if the requested set differs from the default set; order and repeats don't count.
+        field_filtering = set(fields) != set(self.DEFAULT_FIELDS)
 
         logging.info(
             f"Connecting to PESU Academy with user={username}, profile={profile}, fields={fields} ...",

@@ -196,7 +196,6 @@ suite automatically before every commit.
 The following checks are enforced:
 
 - ✅ `ruff` for linting and formatting (with auto-fix), running from `uv.lock` so it is the same version as CI
-- ✅ `compileall` to catch syntax errors in `tests/`, which ruff does not lint
 - ✅ `uv-lock` to check that `uv.lock` matches `pyproject.toml`
 - ✅ `mdformat` to format Markdown files (with GFM support)
 - ✅ `end-of-file-fixer`, `trailing-whitespace`, `check-yaml`, `check-toml`, `check-added-large-files` for formatting

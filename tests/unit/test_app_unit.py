@@ -1,13 +1,11 @@
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.exceptions.authentication import AuthenticationError, UpstreamError
-
 from app.app import _build_arg_parser, app, main
-
-import logging
+from app.exceptions.authentication import AuthenticationError, UpstreamError
 
 
 @pytest.fixture
@@ -143,13 +141,15 @@ def test_main_function_debug_mode(mock_run, mock_logging, mock_parse_args):
     )
     mock_run.assert_called_once_with("app.app:app", host="127.0.0.1", port=8000, reload=True)
 
+
 def test_parser_default_port(monkeypatch):
-    monkeypatch.delenv("PORT",raising=False)
+    monkeypatch.delenv("PORT", raising=False)
 
     parser = _build_arg_parser()
     args = parser.parse_args([])
 
     assert args.port == 5000
+
 
 def test_parser_port_from_env(monkeypatch):
     monkeypatch.setenv("PORT", "8080")
@@ -159,6 +159,7 @@ def test_parser_port_from_env(monkeypatch):
 
     assert args.port == 8080
 
+
 def test_parser_cli_port_overrides_env(monkeypatch):
     monkeypatch.setenv("PORT", "8080")
 
@@ -167,6 +168,7 @@ def test_parser_cli_port_overrides_env(monkeypatch):
 
     assert args.port == 9000
 
+
 def test_parser_invalid_port(monkeypatch):
     monkeypatch.setenv("PORT", "abc")
 
@@ -174,6 +176,7 @@ def test_parser_invalid_port(monkeypatch):
 
     with pytest.raises(SystemExit):
         parser.parse_args([])
+
 
 def test_client_error_is_logged_without_a_traceback(client, caplog):
     """A 4xx is an expected outcome, so it must be logged at WARNING with no stack trace."""
@@ -303,7 +306,12 @@ def test_an_unknown_route_is_a_404_in_the_standard_shape(client, monkeypatch, ca
 
 @pytest.mark.parametrize(
     "method, path, allow",
-    [("POST", "/health", "GET, HEAD"), ("DELETE", "/metrics", "GET, HEAD"), ("GET", "/authenticate", "POST"), ("PUT", "/docs", "GET, HEAD")],
+    [
+        ("POST", "/health", "GET, HEAD"),
+        ("DELETE", "/metrics", "GET, HEAD"),
+        ("GET", "/authenticate", "POST"),
+        ("PUT", "/docs", "GET, HEAD"),
+    ],
 )
 def test_an_unsupported_method_is_a_405_in_the_standard_shape(client, monkeypatch, method, path, allow):
     from app.metrics.collector import ERRORS_BY_TYPE, MetricsCollector

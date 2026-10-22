@@ -14,13 +14,12 @@ from urllib.parse import quote
 import httpx2
 import pytest
 import schemathesis
+from fastapi.testclient import TestClient
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 from schemathesis.checks import not_a_server_error
 from schemathesis.core.failures import FailureGroup
 from schemathesis.python.asgi import ASGIClient, shutdown_lifespans
-
-from fastapi.testclient import TestClient
 
 from app.app import app
 from app.metrics.collector import MetricsCollector
@@ -29,7 +28,9 @@ from app.pesu import DISPATCHER_URL, LOGIN_URL, PESUAcademy
 
 # Anything PESU Academy could put in a profile field instead of the value expected there
 JSON_SCALARS = st.none() | st.booleans() | st.integers() | st.floats(allow_nan=False, allow_infinity=False) | st.text()
-ANY_JSON_VALUE = JSON_SCALARS | st.lists(JSON_SCALARS, max_size=2) | st.dictionaries(st.text(max_size=5), JSON_SCALARS, max_size=2)
+ANY_JSON_VALUE = (
+    JSON_SCALARS | st.lists(JSON_SCALARS, max_size=2) | st.dictionaries(st.text(max_size=5), JSON_SCALARS, max_size=2)
+)
 # Stand for a field holding the value PESU Academy usually sends, and for one it leaves out altogether
 KEEP, ABSENT = object(), object()
 # For each block the profile is built from, what each field it reads holds in a generated response
@@ -117,7 +118,9 @@ def test_every_generated_authentication_request_gets_a_documented_response(
 
 @given(data=st.data())
 @settings(max_examples=1000, database=None, deadline=None, **UNSEEDED)
-def test_every_generated_profile_gets_a_documented_response(data, api_schema, wire, profile_payload, conformance_checks):
+def test_every_generated_profile_gets_a_documented_response(
+    data, api_schema, wire, profile_payload, conformance_checks
+):
     """Generated profile responses from PESU Academy, each asked for with a generated choice of fields."""
     profile_response = _profile_response(data, profile_payload)
     wire.routes[DISPATCHER_URL] = lambda request: httpx2.Response(200, json=profile_response)
@@ -240,7 +243,9 @@ def test_an_unreadable_body_gets_a_documented_response(api_schema, conformance_c
 
 
 @pytest.mark.parametrize("header", [None, "Bearer wrong-token", "Basic dXNlcg==", "Bearer ü"])
-def test_a_rejected_metrics_token_gets_a_documented_response(api_schema, conformance_checks, metrics_token, monkeypatch, header):
+def test_a_rejected_metrics_token_gets_a_documented_response(
+    api_schema, conformance_checks, metrics_token, monkeypatch, header
+):
     monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", metrics_token)
     headers = {} if header is None else {"Authorization": header}
     case = api_schema["/metrics"]["GET"].Case(query={"fmt": "json"}, headers=headers)
@@ -251,7 +256,9 @@ def test_a_rejected_metrics_token_gets_a_documented_response(api_schema, conform
 
 
 @pytest.mark.parametrize("fmt", ["json", "prometheus"])
-def test_an_accepted_metrics_token_gets_a_documented_response(api_schema, conformance_checks, metrics_token, monkeypatch, fmt):
+def test_an_accepted_metrics_token_gets_a_documented_response(
+    api_schema, conformance_checks, metrics_token, monkeypatch, fmt
+):
     monkeypatch.setattr("app.metrics.auth.METRICS_TOKEN", metrics_token)
     case = api_schema["/metrics"]["GET"].Case(query={"fmt": fmt}, headers={"Authorization": f"Bearer {metrics_token}"})
 

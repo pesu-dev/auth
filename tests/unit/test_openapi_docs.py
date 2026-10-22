@@ -18,7 +18,7 @@ from app.exceptions.authentication import (
     ProfileParseError,
     UpstreamError,
 )
-from app.models import MetricsModel, ProfileModel, RequestModel, ResponseModel
+from app.models import ProfileModel, RequestModel, ResponseModel
 from app.pesu import PESUAcademy
 
 
