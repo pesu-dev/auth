@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.14-slim-bookworm AS builder
+FROM python:3.14-slim-trixie AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev && \
     python -m compileall -q app/
 
-FROM python:3.14-slim-bookworm
+FROM python:3.14-slim-trixie
 
 WORKDIR /pesu-auth
 
