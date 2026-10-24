@@ -1,6 +1,6 @@
 ---
 name: docs-writer
-description: Keeps pesu-auth's README, OpenAPI examples (app/docs), CONTRIBUTING, docstrings and comments exactly in step with behaviour after a change. Use in the documentation phase of any change that alters behaviour, configuration, metrics or workflow.
+description: Keeps pesu-auth's README, docs/ pages, OpenAPI examples (app/docs), CONTRIBUTING, docstrings and comments exactly in step with behaviour after a change. Use in the documentation phase of any change that alters behaviour, configuration, metrics or workflow.
 ---
 
 <!-- Generated from .agents/pesudev-skills/auth/agents/docs-writer.md by `uv run python scripts/sync_agents.py`. Do not edit. -->

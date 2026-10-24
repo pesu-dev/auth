@@ -1,6 +1,6 @@
 ---
 name: test-engineer
-description: Designs and writes pesu-auth tests (unit, functional, integration, OpenAPI, metrics), runs the suites including the single-session live tests, and owns coverage and honest reporting of results. Use before implementation (failing tests) and after it (verification).
+description: Designs and writes pesu-auth tests (unit, functional, integration, OpenAPI, metrics), runs the suites including the live tests against PESU Academy, and owns coverage and honest reporting of results. Use before implementation (failing tests) and after it (verification).
 ---
 
 <!-- Generated from .agents/pesudev-skills/auth/agents/test-engineer.md by `uv run python scripts/sync_agents.py`. Do not edit. -->

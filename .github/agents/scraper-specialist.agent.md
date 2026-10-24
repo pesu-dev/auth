@@ -1,6 +1,6 @@
 ---
 name: scraper-specialist
-description: Owns everything involving PESU Academy - the CSRF and login flow, profile page HTML, selectors, new profile fields and detecting upstream changes - in app/pesu.py. Use for scraper breakage (422s, CSRF 502s, unexpected 401s) and any profile-field work.
+description: Owns everything involving PESU Academy's API - the login and profile requests, the upstream response models, profile fields and detecting upstream changes - in app/pesu.py and app/models/upstream.py. Use for upstream breakage (422s, unexpected 502s or 401s, missing_field or unexpected_value counts) and any profile-field work.
 ---
 
 <!-- Generated from .agents/pesudev-skills/auth/agents/scraper-specialist.md by `uv run python scripts/sync_agents.py`. Do not edit. -->

@@ -1,6 +1,6 @@
 ---
 name: ci-investigator
-description: Diagnoses failing GitHub Actions checks on a pesu-auth PR or branch (pre-commit, lint, docker, source policy, version check), reproduces them locally and fixes those caused by the change. Use whenever a check is red.
+description: Diagnoses failing GitHub Actions checks on a pesu-auth PR or branch (the CI Checks jobs - PR source checker, pre-commit hooks, tests and coverage, image build and container checks, version check), reproduces them locally and fixes those caused by the change. Use whenever a check is red.
 ---
 
 <!-- Generated from .agents/pesudev-skills/auth/agents/ci-investigator.md by `uv run python scripts/sync_agents.py`. Do not edit. -->
