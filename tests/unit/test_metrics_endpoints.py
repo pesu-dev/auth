@@ -88,6 +88,15 @@ def test_every_metric_family_appears_in_both_views(client):
         assert f"# TYPE {family.name} " in prometheus, family.name
 
 
+def test_the_metrics_doc_describes_every_family(repository_root):
+    """docs/metrics.md is where operators look a metric up, so a new family needs a row there."""
+    from app.metrics.collector import FAMILIES
+
+    doc = (repository_root / "docs" / "metrics.md").read_text()
+    for family in FAMILIES:
+        assert f"| `{family.name.removeprefix('pesu_auth_')}" in doc, family.name
+
+
 def test_a_request_is_reflected_in_both_views(client):
     client.get("/health")
     assert 'pesu_auth_route_requests_total{method="GET",route="/health"} 1' in client.get("/metrics").text
