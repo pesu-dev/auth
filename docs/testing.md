@@ -80,4 +80,3 @@ run it alongside the live tests: both wait on PESU Academy, so each skews the ot
   (`tests/unit/test_authenticate_flow.py`)
 - Put assertions about an exception after its `with pytest.raises(...)` block, not inside it, where
   they never run
-- Adding a profile field? See [Adding a profile field](development.md#adding-a-profile-field)
