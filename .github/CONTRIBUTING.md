@@ -1,7 +1,7 @@
 # 🤝 Contributing to auth
 
 Thank you for your interest in contributing to auth! This document covers how to contribute, and the rules and
-policies contributions follow. How the project is developed, tested and deployed is documented in [`docs/`](../docs).
+policies contributions follow. How the service works, and how it is developed, tested and deployed, is documented in [`docs/`](../docs).
 
 <details>
 <summary>📚 Table of Contents</summary>
@@ -183,7 +183,7 @@ validation, changes will be promoted to production, which is triggered manually 
 
 If you get stuck or have questions:
 
-1. Check the [README.md](../README.md) for usage, and [`docs/`](../docs) for development, testing and deployment.
+1. Check the [README.md](../README.md) for usage, and [`docs/`](../docs) for how the service works and how to develop, test and deploy it.
 1. Review [open issues](https://github.com/pesu-dev/auth/issues)
    or [pull requests](https://github.com/pesu-dev/auth/pulls) to see if someone else encountered the same problem.
 1. Reach out to the maintainers on PESU Discord.

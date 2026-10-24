@@ -2,10 +2,32 @@
 
 We use `pytest`, and a pre-commit hook ensures tests are run automatically before every commit.
 
+## Test layout
+
+| Directory            | What it tests                                                          | Needs PESU Academy |
+| -------------------- | ---------------------------------------------------------------------- | ------------------ |
+| `tests/unit/`        | Everything, offline, with PESU Academy mocked. One file per concern    | No                 |
+| `tests/functional/`  | `PESUAcademy` on its own, against the real PESU Academy                | Yes                |
+| `tests/integration/` | The whole app through `TestClient`, with its real startup and shutdown | Yes                |
+
+They always run in that order, unit first. `tests/unit/test_openapi_contract.py` uses Schemathesis to send generated
+requests, valid and invalid, to the app and checks that every response matches the OpenAPI schema; it runs offline
+like the rest of `tests/unit/`.
+
+`METRICS_TOKEN` is turned off for every test, so a token in your shell or `.env` does not break the `/metrics` tests.
+The tests that need a token set it themselves.
+
 To run tests manually:
 
 ```bash
 uv run pytest
+```
+
+To run one directory or file, which is the quickest way to iterate:
+
+```bash
+uv run pytest tests/unit -q
+uv run pytest tests/unit/test_pesu.py -q
 ```
 
 To check coverage:

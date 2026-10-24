@@ -57,6 +57,17 @@ instructions. The container runs as an unprivileged user (`UID 10001:10001`) wit
 The API Explorer at `/` is served directly from `app/templates/playground.html`, which holds its HTML, styles and
 scripts. It needs no frontend build step or third-party UI dependencies.
 
+### Configuration
+
+| Setting         | Default   | What it does                                                                  |
+| --------------- | --------- | ----------------------------------------------------------------------------- |
+| `--host`        | `0.0.0.0` | The address to listen on                                                      |
+| `--port`        | `5000`    | The port to listen on. Also read from `PORT`; `--port` wins when both are set |
+| `--debug`       | off       | Logs at `DEBUG` instead of `INFO`, and reloads the app when a file changes    |
+| `METRICS_TOKEN` | unset     | Requires this bearer token on `/metrics` (see [metrics.md](metrics.md))       |
+
+The application reads nothing else from the environment. `.env` is only read by the tests and the benchmarks.
+
 ## Coding agents
 
 This repository is set up for coding agents (Codex, Claude Code, Copilot, Cursor, Gemini and
@@ -150,6 +161,24 @@ locally:
   docker run --rm -d --name pesu-auth-smoke -p 5000:5000 pesu-auth-test
   sleep 5 && curl --fail http://localhost:5000/health; docker stop pesu-auth-smoke
   ```
+
+## Documenting a route
+
+Every route in the OpenAPI schema needs a tag, a docstring (which becomes its description) and a module in `app/docs/`
+holding an `ApiDocs` with an example for each response it can give, including a success and a `500`. The route passes
+them in with `responses=` and, for a request body, `openapi_extra=`. `tests/unit/test_openapi_docs.py` fails if any of
+this is missing or an example does not match its model, and `tests/unit/test_openapi_contract.py` checks that the real
+responses match what is documented.
+
+The API Explorer and Swagger UI are built from `/openapi.json`, so a documented route appears in both with no other
+changes. Add the route to the endpoint table and its own section in the README too.
+
+## Adding an error type
+
+Subclass `PESUAcademyError` in `app/exceptions/`, with the status code and a fixed message as defaults, and raise it
+with the specifics in `detail=`. The existing handler renders it and counts it in `errors_total` under its class name.
+Document the response in the route's `app/docs/` module and in the README's response table, and add it to the error
+table in [architecture.md](architecture.md) and the `errors_total` row in [metrics.md](metrics.md).
 
 ## Adding a profile field
 

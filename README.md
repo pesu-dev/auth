@@ -346,5 +346,5 @@ Made with ❤️ by
 
 *Powered by [contrib.rocks](https://contrib.rocks)*
 
-If you'd like to contribute, please follow our [contribution guidelines](.github/CONTRIBUTING.md). Development, testing
-and deployment are documented in [`docs/`](docs).
+If you'd like to contribute, please follow our [contribution guidelines](.github/CONTRIBUTING.md). How the service works,
+and how to develop, test and deploy it, is documented in [`docs/`](docs).

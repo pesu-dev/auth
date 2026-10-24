@@ -3,6 +3,9 @@
 How `/metrics` collects its counters, what each one means, and how to protect and scrape the endpoint. The request
 parameters and responses are in the [README](../README.md#metrics).
 
+The counters for both hosted environments are charted on the public
+[metrics dashboard](https://loyalplateau1250.grafana.net/public-dashboards/bd1df85e9420490f88978906b0d9fbdf).
+
 ## How collection works
 
 Everything is counted **in this process, in memory**. There is no database and no external dependency, and the counters
@@ -418,3 +421,13 @@ scrape_configs:
     authorization:
       credentials: <token>   # omit when METRICS_TOKEN is unset
 ```
+
+## Adding a metric
+
+1. Define a `MetricFamily` in `app/metrics/collector.py` and add it to `FAMILIES`. Keep its labels to a fixed set of
+   values; never use a raw path, a username or anything else the caller controls.
+1. Record it in exactly one layer: the middleware for anything about HTTP requests, an exception handler for anything
+   about errors, or `app/pesu.py` for calls to PESU Academy.
+1. Add it to the JSON view in `MetricsModel` and `MetricsModel.from_snapshot` in `app/models/metrics.py`.
+1. Add it to the Prometheus and JSON examples in `app/docs/metrics.py` and in this page, and give it a row in
+   [What each metric means](#what-each-metric-means). A unit test fails until every family has a row.

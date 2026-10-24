@@ -29,3 +29,16 @@ failed jobs** to finish the release.
 
 Don't cancel a run while it is deploying: the deploy keeps going on Render without being released or rolled back. If
 that happens, roll back from the Render dashboard, or start a new run.
+
+## Docker images
+
+Each release is published as `pesudev/pesu-auth` on Docker Hub and `ghcr.io/pesu-dev/pesu-auth` on GHCR, for
+`linux/amd64` and `linux/arm64`, tagged with its version (`vX.Y.Z`). The `latest` and `prod` tags always point at the
+newest release.
+
+## Monitoring
+
+- The status pages above check both environments' docs, health and authentication regularly.
+- The [metrics dashboard](https://loyalplateau1250.grafana.net/public-dashboards/bd1df85e9420490f88978906b0d9fbdf)
+  charts the counters from `/metrics` for both environments. The counters reset when a service restarts, which on
+  Render is often.
