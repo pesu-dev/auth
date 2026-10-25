@@ -46,8 +46,8 @@ class HealthModel(BaseModel):
     )
 
     environment: Literal["development", "staging", "production"] = Field(
-        default="development",
-        title="environment",
-        description="an environment variable",
-        json_schema_extra={"example": "developement"},
+        ...,
+        title="Environment",
+        description="The deployment this instance is running as, set by `PESU_AUTH_ENVIRONMENT`.",
+        json_schema_extra={"example": "development"},
     )
