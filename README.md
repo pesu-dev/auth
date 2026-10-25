@@ -247,11 +247,20 @@ headers and no body, for monitors that check that way.
 
 #### Response Object
 
-| **Field**   | **Type**   | **Description**                                                     |
-| ----------- | ---------- | ------------------------------------------------------------------- |
-| `status`    | `boolean`  | `true` if healthy, `false` if there was an error                    |
-| `message`   | `str`      | "ok" if healthy, error message otherwise                            |
-| `timestamp` | `datetime` | A timezone offset timestamp indicating the time of the health check |
+| **Field**     | **Type**   | **Description**                                                     |
+| ------------- | ---------- | ------------------------------------------------------------------- |
+| `status`      | `boolean`  | `true` if healthy, `false` if there was an error                    |
+| `message`     | `str`      | "ok" if healthy, error message otherwise                            |
+| `timestamp`   | `datetime` | A timezone offset timestamp indicating the time of the health check |
+| `version`     | `str`      | The version of pesu-auth that is running                            |
+| `environment` | `str`      | gets its value from `PESU_AUTH_ENVIRONMENT`                         |
+
+`PESU_AUTH_ENVIRONMENT`
+An explicit environment variable. Its value is read once at startup.
+
+| **Allowed values**                       | **Default value** |
+| ---------------------------------------- | ----------------- |
+| `development`, `staging` or `production` | `development`     |
 
 ### `/metrics`
 

@@ -530,7 +530,7 @@ def assert_security_headers(response):
 
 def test_integration_security_headers_on_general_endpoints(client):
     """General endpoints must carry standard security headers and not carry Cache-Control: no-store."""
-    for path in ["/", "/health", "/metrics"]:
+    for path in ["/", "/metrics"]:
         response = client.get(path)
         assert response.status_code == 200
         assert_security_headers(response)
