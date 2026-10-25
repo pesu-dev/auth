@@ -110,6 +110,7 @@ def check_live_fields(expected_profile):
         assert list(profile) == [field for field in PROFILE_VARIABLES if field in fields], "the fields are out of order"
         mismatched = [field for field in fields if profile[field] != expected_profile[field]]
         assert not mismatched, f"these fields do not match their TEST_* values: {mismatched}"
+
     return check
 
 
