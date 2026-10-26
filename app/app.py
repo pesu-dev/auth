@@ -15,15 +15,14 @@ from zoneinfo import ZoneInfo
 import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.requests import Request
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.routing import APIRoute
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from fastapi.requests import Request
-    from fastapi.response import Response
+    from fastapi.responses import Response
     from starlette.middleware.base import RequestResponseEndpoint
 
 from pydantic import ValidationError
@@ -335,7 +334,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     responses=health_docs.response_examples,
     tags=["Monitoring"],
 )
-async def health(request: Request) -> JSONResponse:
+async def health() -> JSONResponse:
     """Health check endpoint."""
     logging.debug("Health check requested.")
     return JSONResponse(
@@ -346,7 +345,7 @@ async def health(request: Request) -> JSONResponse:
             "message": "ok",
             "timestamp": datetime.datetime.now(IST).isoformat(),
             "version": app.version,
-            "environment": request.app.state.environment,
+            "environment": app.state.environment,
         },
     )
 
