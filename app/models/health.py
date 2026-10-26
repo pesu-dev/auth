@@ -15,14 +15,14 @@ class HealthModel(BaseModel):
     status: bool = Field(
         ...,
         title="Health status",
-        description="indicates whether the service is alive",
+        description="Indicates whether the health request was successful.",
         json_schema_extra={"example": True},
     )
 
     message: str = Field(
         ...,
         title="Health message",
-        description="A string indicating the service's health",
+        description="A human-readable message providing information about the health status.",
         json_schema_extra={"example": "ok"},
     )
 
@@ -33,16 +33,16 @@ class HealthModel(BaseModel):
         # parse its own responses -- which made the published schema unusable to a client wanting
         # to validate with it, and forced the documentation tests into JSON mode to compensate.
         strict=False,
-        title="timestamp",
-        description="returns the timestamp of when /health was used",
+        title="Health Check Timestamp",
+        description="Time of the health check, in IST (UTC+05:30).",
         json_schema_extra={"example": "2024-07-28T22:30:10.103368+05:30"},
     )
 
     version: str = Field(
         ...,
-        title="version",
-        description="The version of pesu-auth that is running",
-        json_schema_extra={"example": "5.0.0"},
+        title="Version",
+        description="The version of pesu-auth that is running.",
+        json_schema_extra={"example": "5.8.0"},
     )
 
     environment: Literal["development", "staging", "production"] = Field(
