@@ -244,15 +244,15 @@ def test_a_real_response_can_be_parsed_with_the_published_model(client):
     be unable to use it.
     """
     body = client.get("/health").json()
-    assert ResponseModel.model_validate(body).status is True
-    assert ResponseModel.model_validate_json(json.dumps(body)).status is True
+    assert HealthModel.model_validate(body).status is True
+    assert HealthModel.model_validate_json(json.dumps(body)).status is True
 
 
 def test_the_model_still_rejects_a_wrong_type_elsewhere(client):
     """Relaxing `timestamp` must not have relaxed the model as a whole."""
     body = client.get("/health").json()
     with pytest.raises(Exception, match="status"):
-        ResponseModel.model_validate({**body, "status": "not-a-bool"})
+        HealthModel.model_validate({**body, "status": "not-a-bool"})
 
 
 def _authenticate_examples(schema, code):
