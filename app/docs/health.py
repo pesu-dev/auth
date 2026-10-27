@@ -15,7 +15,7 @@ health_docs = ApiDocs(
                         "status": True,
                         "message": "ok",
                         "timestamp": "2024-07-28T22:30:10.103368+05:30",
-                        "version": "5.0.0",
+                        "version": "5.8.0",
                         "environment": "development",
                     }
                 }
