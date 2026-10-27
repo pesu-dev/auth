@@ -39,7 +39,9 @@ def test_head_cache_no_store_header(client):
 @pytest.mark.parametrize("valid_cases", ("development", "production", "staging"))
 def test_valid_cases_for_pesu_auth_environment(monkeypatch, valid_cases):
     monkeypatch.setenv("PESU_AUTH_ENVIRONMENT", valid_cases)
-    assert os.environ.get("PESU_AUTH_ENVIRONMENT") == valid_cases
+    with TestClient(app) as client:
+        response = client.get("/health")
+    assert response.json()["environment"] == valid_cases
 
 
 def test_default_fallback_pesu_auth_environment():
