@@ -153,7 +153,7 @@ Every response includes the following baseline security headers:
 - `Referrer-Policy: no-referrer`
 - `X-Frame-Options: DENY`
 
-Responses to `/authenticate` also include:
+Responses to `/authenticate` and `/health` also include:
 
 - `Cache-Control: no-store`
 

@@ -71,10 +71,10 @@ def _security_headers(request: Request) -> dict[str, str]:
         request (Request): The request being answered.
 
     Returns:
-        dict[str, str]: The general security headers, plus `Cache-Control: no-store` for /authenticate.
+        dict[str, str]: The general security headers, plus `Cache-Control: no-store` for /authenticate and /health.
     """
     headers = dict(SECURITY_HEADERS)
-    if request.url.path == "/authenticate":
+    if request.url.path in ("/authenticate", "/health"):
         headers["Cache-Control"] = "no-store"
     return headers
 
@@ -202,7 +202,7 @@ async def metrics_middleware(request: Request, call_next: RequestResponseEndpoin
 
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Add security headers to all handled responses and prevent caching for /authenticate.
+    """Add security headers to all handled responses and prevent caching for /authenticate and /health.
 
     Handled responses (like 400, 401, 502 ...) pass through the middleware as they become normal responses
     below it. Unhandled 500 exceptions are rendered above this middleware by ServerErrorMiddleware, so
@@ -339,7 +339,6 @@ async def health() -> JSONResponse:
     logging.debug("Health check requested.")
     return JSONResponse(
         status_code=200,
-        headers={"Cache-Control": "no-store"},
         content={
             "status": True,
             "message": "ok",
