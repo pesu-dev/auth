@@ -44,8 +44,11 @@ def test_valid_cases_for_pesu_auth_environment(monkeypatch, valid_cases):
     assert response.json()["environment"] == valid_cases
 
 
-def test_default_fallback_pesu_auth_environment():
-    assert app.state.environment == "development"
+def test_default_fallback_pesu_auth_environment(monkeypatch):
+    monkeypatch.delenv("PESU_AUTH_ENVIRONMENT", raising=False)
+    with TestClient(app) as client:
+        response = client.get("/health")
+    assert response.json()["environment"] == "development"
 
 
 @pytest.mark.parametrize("invalid_cases", ("", "prod", "Development"))
