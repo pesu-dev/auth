@@ -16,10 +16,8 @@ def client():
 
 def test_version(client):
     response = client.get("/health")
-    if response.status_code == 200:
-        json_data = response.json()
-        actual_version = json_data["version"]
-        assert actual_version == version("pesu-auth")
+    assert response.status_code == 200
+    assert response.json()["version"] == version("pesu-auth")
 
 
 def test_head_method_for_health(client):
