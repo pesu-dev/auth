@@ -9,7 +9,7 @@ import os
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args
 from zoneinfo import ZoneInfo
 
 import uvicorn
@@ -44,6 +44,7 @@ from app.metrics.collector import (
 from app.metrics.middleware import record_request_metrics
 from app.metrics.prometheus import PROMETHEUS_CONTENT_TYPE, MetricsFormat, render_prometheus
 from app.models import HealthModel, MetricsModel, RequestModel, ResponseModel
+from app.models.health import environment_values
 from app.pesu import PESUAcademy
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -87,7 +88,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     logging.info("PESUAuth API startup")
     # Read once, so that a bad deploy fails here instead of /health reporting a wrong value
     environment = os.environ.get("PESU_AUTH_ENVIRONMENT", "development")
-    if environment not in ("development", "staging", "production"):
+    if environment not in get_args(environment_values):
         raise ValueError(f"PESU_AUTH_ENVIRONMENT must be development, staging or production, not {environment!r}")
     app.state.environment = environment
 
