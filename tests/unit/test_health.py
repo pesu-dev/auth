@@ -51,7 +51,6 @@ def test_default_fallback_pesu_auth_environment():
 @pytest.mark.parametrize("invalid_cases", ("", "prod", "Development"))
 def test_invalid_cases_for_pesu_auth_environment(monkeypatch, invalid_cases):
     monkeypatch.setenv("PESU_AUTH_ENVIRONMENT", invalid_cases)
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(ValueError, match="PESU_AUTH_ENVIRONMENT must be development, staging or production"):
         with TestClient(app):
             pass
-    assert "Invaild enivronment value. Value must be development, staging or production" in str(exc_info.value)

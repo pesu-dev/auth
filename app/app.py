@@ -85,9 +85,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Startup
     metrics.increment(LIFESPAN_EVENTS, event="startup")
     logging.info("PESUAuth API startup")
-    if os.environ.get("PESU_AUTH_ENVIRONMENT", "development") not in ("development", "staging", "production"):
-        raise ValueError("Invaild enivronment value. Value must be development, staging or production")
-    app.state.environment = os.environ.get("PESU_AUTH_ENVIRONMENT", "development")
+    # Read once, so that a bad deploy fails here instead of /health reporting a wrong value
+    environment = os.environ.get("PESU_AUTH_ENVIRONMENT", "development")
+    if environment not in ("development", "staging", "production"):
+        raise ValueError(f"PESU_AUTH_ENVIRONMENT must be development, staging or production, not {environment!r}")
+    app.state.environment = environment
 
     yield
 
