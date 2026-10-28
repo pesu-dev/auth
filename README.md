@@ -247,20 +247,17 @@ headers and no body, for monitors that check that way.
 
 #### Response Object
 
-| **Field**     | **Type**   | **Description**                                                     |
-| ------------- | ---------- | ------------------------------------------------------------------- |
-| `status`      | `boolean`  | `true` if healthy, `false` if there was an error                    |
-| `message`     | `str`      | "ok" if healthy, error message otherwise                            |
-| `timestamp`   | `datetime` | A timezone offset timestamp indicating the time of the health check |
-| `version`     | `str`      | The version of pesu-auth that is running                            |
-| `environment` | `str`      | gets its value from `PESU_AUTH_ENVIRONMENT`                         |
+| **Field**     | **Type**   | **Description**                                                                |
+| ------------- | ---------- | ------------------------------------------------------------------------------ |
+| `status`      | `boolean`  | `true` if healthy, `false` if there was an error                               |
+| `message`     | `str`      | "ok" if healthy, error message otherwise                                       |
+| `timestamp`   | `datetime` | A timezone offset timestamp indicating the time of the health check            |
+| `version`     | `str`      | The version of pesu-auth that is running                                       |
+| `environment` | `str`      | The deployment this instance runs as: `development`, `staging` or `production` |
 
-`PESU_AUTH_ENVIRONMENT`
-An explicit environment variable. Its value is read once at startup.
-
-| **Allowed values**                       | **Default value** |
-| ---------------------------------------- | ----------------- |
-| `development`, `staging` or `production` | `development`     |
+`environment` comes from the `PESU_AUTH_ENVIRONMENT` environment variable, read once at startup. It is `development`
+when the variable is unset, and any value other than `development`, `staging` or `production` stops the app from
+starting. See [Configuration](docs/development.md#configuration).
 
 ### `/metrics`
 
