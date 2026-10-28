@@ -28,11 +28,13 @@ def test_head_method_for_health(client):
 
 def test_get_cache_no_store_header(client):
     get_response = client.get("/health")
+    assert get_response.status_code == 200
     assert get_response.headers.get("Cache-Control") == "no-store"
 
 
 def test_head_cache_no_store_header(client):
     head_response = client.head("/health")
+    assert head_response.status_code == 200
     assert head_response.headers.get("Cache-Control") == "no-store"
 
 
