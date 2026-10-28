@@ -27,7 +27,7 @@ IST_OFFSET = timedelta(hours=5, minutes=30)
 CREDENTIAL_VARIABLES = ("TEST_EMAIL", "TEST_PRN", "TEST_SRN", "TEST_MOBILE", "TEST_PASSWORD")
 METRICS_TOKEN = "test-metrics-token"
 # The models the OpenAPI docs refer to by name
-DOCUMENTED_MODELS = {"HealthModel": HealthModel, "ResponseModel": ResponseModel, "MetricsModel": MetricsModel}
+DOCUMENTED_MODELS = {"HealthModel": HealthModel, "MetricsModel": MetricsModel, "ResponseModel": ResponseModel}
 # Login responses' accessToken values that give no token: None stands for the key being absent
 UNUSABLE_TOKENS = {"missing": None, "object": {"token": "x"}, "list": ["x"]}
 AGENT_FRONTMATTER = '---\nname: reviewer\ndescription: Reviews diffs. Read-only.\ntools: ["read"]\n---\n'
