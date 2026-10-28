@@ -1,6 +1,7 @@
 """Model representing response from health endpoint."""
 
 from datetime import datetime
+from importlib import metadata
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -45,7 +46,7 @@ class HealthModel(BaseModel):
         ...,
         title="Version",
         description="The version of pesu-auth that is running.",
-        json_schema_extra={"example": "5.8.0"},
+        json_schema_extra={"example": metadata.version("pesu-auth")},
     )
 
     environment: Environment = Field(
