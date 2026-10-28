@@ -6,8 +6,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-# Allowed values for PESU_AUTH_ENVIRONMENT
-environment_values = Literal["development", "staging", "production"]
+# The values PESU_AUTH_ENVIRONMENT may take; the app refuses to start with any other
+Environment = Literal["development", "staging", "production"]
 
 
 class HealthModel(BaseModel):
@@ -48,7 +48,7 @@ class HealthModel(BaseModel):
         json_schema_extra={"example": "5.8.0"},
     )
 
-    environment: environment_values = Field(
+    environment: Environment = Field(
         ...,
         title="Environment",
         description="The deployment this instance is running as, set by `PESU_AUTH_ENVIRONMENT`.",
