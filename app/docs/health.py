@@ -1,5 +1,7 @@
 """Custom docs for the /health PESUAuth endpoint."""
 
+from importlib.metadata import version
+
 from app.docs.base import ApiDocs
 from app.models import HealthModel, ResponseModel
 
@@ -15,7 +17,7 @@ health_docs = ApiDocs(
                         "status": True,
                         "message": "ok",
                         "timestamp": "2024-07-28T22:30:10.103368+05:30",
-                        "version": "5.8.0",
+                        "version": version("pesu-auth"),
                         "environment": "development",
                     }
                 }
