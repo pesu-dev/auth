@@ -12,30 +12,28 @@ Environment = Literal["development", "staging", "production"]
 
 
 class HealthModel(BaseModel):
-    """Model representing response from health endpoint."""
+    """The body of a successful /health response. An error from /health is a ResponseModel, like every other error."""
 
     model_config = ConfigDict(strict=True, alias_generator=to_camel, populate_by_name=True)
 
     status: bool = Field(
         ...,
-        title="Health status",
+        title="Health Status",
         description="Indicates whether the health request was successful.",
         json_schema_extra={"example": True},
     )
 
     message: str = Field(
         ...,
-        title="Health message",
+        title="Health Message",
         description="A human-readable message providing information about the health status.",
         json_schema_extra={"example": "ok"},
     )
 
     timestamp: datetime = Field(
         ...,
-        # Relaxed from the model-wide strict=True for this field alone. The API builds this model
-        # from a datetime but serializes an ISO string onto the wire, so a strict model could not
-        # parse its own responses -- which made the published schema unusable to a client wanting
-        # to validate with it, and forced the documentation tests into JSON mode to compensate.
+        # Not strict: /health sends an ISO string, which a strict datetime refuses outside JSON mode, so a
+        # client could not validate response.json() with this model
         strict=False,
         title="Health Check Timestamp",
         description="Time of the health check, in IST (UTC+05:30).",
