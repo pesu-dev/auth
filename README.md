@@ -143,7 +143,9 @@ The Explorer builds request controls and response examples from `/openapi.json`.
 required credentials, choose whether to fetch a profile, and optionally select profile fields.
 Unselected fields are omitted, so requesting a profile with no fields selected returns the full
 profile. **Copy request** copies a curl command for the current inputs; **Send request** calls the
-API. The response's **Copy** button copies only the body, without its status or timing.
+API. The response's **Copy** button copies only the body, without its status or timing. Next to the
+name, the Explorer shows the version from `/openapi.json` and the environment from `/health`
+(`development`, `staging` or `production`).
 
 ### Response headers
 
