@@ -9,7 +9,7 @@ import os
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args
 from zoneinfo import ZoneInfo
 
 import uvicorn
@@ -43,7 +43,8 @@ from app.metrics.collector import (
 )
 from app.metrics.middleware import record_request_metrics
 from app.metrics.prometheus import PROMETHEUS_CONTENT_TYPE, MetricsFormat, render_prometheus
-from app.models import MetricsModel, RequestModel, ResponseModel
+from app.models import HealthModel, MetricsModel, RequestModel, ResponseModel
+from app.models.health import Environment
 from app.pesu import PESUAcademy
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -71,10 +72,10 @@ def _security_headers(request: Request) -> dict[str, str]:
         request (Request): The request being answered.
 
     Returns:
-        dict[str, str]: The general security headers, plus `Cache-Control: no-store` for /authenticate.
+        dict[str, str]: The general security headers, plus `Cache-Control: no-store` for /authenticate and /health.
     """
     headers = dict(SECURITY_HEADERS)
-    if request.url.path == "/authenticate":
+    if request.url.path in ("/authenticate", "/health"):
         headers["Cache-Control"] = "no-store"
     return headers
 
@@ -85,6 +86,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Startup
     metrics.increment(LIFESPAN_EVENTS, event="startup")
     logging.info("PESUAuth API startup")
+    # Read once, so that a bad deploy fails here instead of /health reporting a wrong value
+    environment = os.environ.get("PESU_AUTH_ENVIRONMENT", "development")
+    if environment not in get_args(Environment):
+        raise ValueError(f"PESU_AUTH_ENVIRONMENT must be development, staging or production, not {environment!r}")
+    app.state.environment = environment
 
     yield
 
@@ -199,7 +205,7 @@ async def metrics_middleware(request: Request, call_next: RequestResponseEndpoin
 
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Add security headers to all handled responses and prevent caching for /authenticate.
+    """Add security headers to all handled responses and prevent caching for /authenticate and /health.
 
     Handled responses (like 400, 401, 502 ...) pass through the middleware as they become normal responses
     below it. Unhandled 500 exceptions are rendered above this middleware by ServerErrorMiddleware, so
@@ -326,6 +332,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 @app.head("/health", include_in_schema=False)
 @app.get(
     "/health",
+    response_model=HealthModel,
     response_class=JSONResponse,
     responses=health_docs.response_examples,
     tags=["Monitoring"],
@@ -339,6 +346,8 @@ async def health() -> JSONResponse:
             "status": True,
             "message": "ok",
             "timestamp": datetime.datetime.now(IST).isoformat(),
+            "version": app.version,
+            "environment": app.state.environment,
         },
     )
 

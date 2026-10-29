@@ -59,12 +59,13 @@ scripts. It needs no frontend build step or third-party UI dependencies.
 
 ### Configuration
 
-| Setting         | Default   | What it does                                                                  |
-| --------------- | --------- | ----------------------------------------------------------------------------- |
-| `--host`        | `0.0.0.0` | The address to listen on                                                      |
-| `--port`        | `5000`    | The port to listen on. Also read from `PORT`; `--port` wins when both are set |
-| `--debug`       | off       | Logs at `DEBUG` instead of `INFO`, and reloads the app when a file changes    |
-| `METRICS_TOKEN` | unset     | Requires this bearer token on `/metrics` (see [metrics.md](metrics.md))       |
+| Setting                 | Default       | What it does                                                                                               |
+| ----------------------- | ------------- | ---------------------------------------------------------------------------------------------------------- |
+| `--host`                | `0.0.0.0`     | The address to listen on                                                                                   |
+| `--port`                | `5000`        | The port to listen on. Also read from `PORT`; `--port` wins when both are set                              |
+| `--debug`               | off           | Logs at `DEBUG` instead of `INFO`, and reloads the app when a file changes                                 |
+| `METRICS_TOKEN`         | unset         | Requires this bearer token on `/metrics` (see [metrics.md](metrics.md))                                    |
+| `PESU_AUTH_ENVIRONMENT` | `development` | The environment `/health` reports: `development`, `staging` or `production`. Any other value fails startup |
 
 The application reads nothing else from the environment. `.env` is only read by the tests and the benchmarks.
 

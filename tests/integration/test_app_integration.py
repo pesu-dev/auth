@@ -528,9 +528,17 @@ def assert_security_headers(response):
     assert response.headers["X-Frame-Options"] == "DENY"
 
 
+def test_integration_health_security_headers(client):
+    """/health must carry the standard security headers and Cache-Control: no-store, on GET and HEAD."""
+    for response in (client.get("/health"), client.head("/health")):
+        assert response.status_code == 200
+        assert_security_headers(response)
+        assert response.headers["Cache-Control"] == "no-store"
+
+
 def test_integration_security_headers_on_general_endpoints(client):
     """General endpoints must carry standard security headers and not carry Cache-Control: no-store."""
-    for path in ["/", "/health", "/metrics"]:
+    for path in ["/", "/metrics"]:
         response = client.get(path)
         assert response.status_code == 200
         assert_security_headers(response)
