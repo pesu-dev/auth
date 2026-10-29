@@ -93,3 +93,36 @@ def test_the_navbar_shows_the_api_version_from_the_spec():
     """The version badge is filled from the served OpenAPI spec, not hard-coded."""
     assert '<span id="version" class="version" hidden></span>' in PLAYGROUND_HTML
     assert "state.spec.info?.version" in PLAYGROUND_HTML
+
+
+def test_the_navbar_has_a_hidden_environment_badge():
+    """The environment badge sits right after the version badge and starts hidden."""
+    assert (
+        '<span id="version" class="version" hidden></span><span id="environment" class="environment" hidden></span>'
+        in PLAYGROUND_HTML
+    )
+
+
+def test_the_environment_badge_is_filled_from_health():
+    """The environment badge is filled from /health, as text, never as HTML."""
+    assert 'fetch("/health", { cache: "no-store" })' in PLAYGROUND_HTML
+    assert "health?.environment" in PLAYGROUND_HTML
+    assert '$("environment").textContent = environment' in PLAYGROUND_HTML
+    assert "innerHTML" not in PLAYGROUND_HTML.split("function loadEnvironment()")[1].split("\n      }\n")[0]
+
+
+def test_each_environment_has_its_own_colour(environment):
+    """Each environment colours the badge with an existing theme token."""
+    token = {"production": "--success", "staging": "--warning", "development": "--get"}[environment]
+    rule = re.search(rf'\.environment\[data-env="{environment}"\] \{{([^}}]*)\}}', PLAYGROUND_HTML)
+    assert rule
+    assert f"color: var({token});" in rule.group(1)
+    assert f"border-color: var({token});" in rule.group(1)
+
+
+def test_a_failing_health_does_not_break_the_explorer():
+    """/health is fetched apart from the spec, with its own catch, so a failure only leaves the badge hidden."""
+    assert "function loadEnvironment()" in PLAYGROUND_HTML
+    assert "loadEnvironment" not in PLAYGROUND_HTML.split("async function load()")[1].split("\n      }\n")[0]
+    assert ".catch(() => {});" in PLAYGROUND_HTML.split("function loadEnvironment()")[1]
+    assert re.search(r"\n\s*load\(\);\n\s*loadEnvironment\(\);\n", PLAYGROUND_HTML)

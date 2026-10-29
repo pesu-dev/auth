@@ -138,7 +138,8 @@
         color: var(--muted);
         margin-left: 8px;
       }
-      .version {
+      .version,
+      .environment {
         margin-left: 10px;
         padding: 2px 6px;
         border: 1px solid var(--line);
@@ -149,6 +150,18 @@
           monospace;
         color: var(--muted);
         vertical-align: middle;
+      }
+      .environment[data-env="production"] {
+        color: var(--success);
+        border-color: var(--success);
+      }
+      .environment[data-env="staging"] {
+        color: var(--warning);
+        border-color: var(--warning);
+      }
+      .environment[data-env="development"] {
+        color: var(--get);
+        border-color: var(--get);
       }
       .topnav {
         display: flex;
@@ -979,7 +992,7 @@
     <canvas id="dotGrid" aria-hidden="true"></canvas>
     <div class="shell">
       <header class="topbar">
-        <div class="brand">PESUAuth<small>/ API</small><span id="version" class="version" hidden></span></div>
+        <div class="brand">PESUAuth<small>/ API</small><span id="version" class="version" hidden></span><span id="environment" class="environment" hidden></span></div>
         <nav class="topnav">
           <a
             href="https://github.com/pesu-dev/auth"
@@ -1860,6 +1873,19 @@
         $("output").className = "output placeholder";
         $("output").textContent = "Ready to send.";
       }
+      // Fetched apart from the spec so that a failing /health only leaves this badge hidden.
+      function loadEnvironment() {
+        fetch("/health", { cache: "no-store" })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((health) => {
+            const environment = health?.environment;
+            if (typeof environment !== "string" || !environment) return;
+            $("environment").textContent = environment;
+            $("environment").dataset.env = environment;
+            $("environment").hidden = false;
+          })
+          .catch(() => {});
+      }
       async function load() {
         try {
           const r = await fetch("/openapi.json", { cache: "no-store" });
@@ -2108,6 +2134,7 @@
       });
       grid.resize();
       load();
+      loadEnvironment();
     </script>
   </body>
 </html>
