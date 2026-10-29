@@ -30,6 +30,9 @@ METRICS_TOKEN = "test-metrics-token"
 DOCUMENTED_MODELS = {"HealthModel": HealthModel, "MetricsModel": MetricsModel, "ResponseModel": ResponseModel}
 # Login responses' accessToken values that give no token: None stands for the key being absent
 UNUSABLE_TOKENS = {"missing": None, "object": {"token": "x"}, "list": ["x"]}
+# The values PESU_AUTH_ENVIRONMENT may take, and ones the app must refuse to start with
+ENVIRONMENTS = ("development", "staging", "production")
+INVALID_ENVIRONMENTS = {"empty": "", "typo": "prod", "wrong_case": "Development"}
 AGENT_FRONTMATTER = '---\nname: reviewer\ndescription: Reviews diffs. Read-only.\ntools: ["read"]\n---\n'
 
 # What every response must agree with the OpenAPI schema on, whatever its status
@@ -290,6 +293,18 @@ def credential_variable(request):
 @pytest.fixture(params=list(UNUSABLE_TOKENS.values()), ids=list(UNUSABLE_TOKENS))
 def unusable_token(request):
     """Each accessToken that gives no token, one per test; None means the key is absent."""
+    return request.param
+
+
+@pytest.fixture(params=ENVIRONMENTS)
+def environment(request):
+    """Each value PESU_AUTH_ENVIRONMENT may take, one per test."""
+    return request.param
+
+
+@pytest.fixture(params=list(INVALID_ENVIRONMENTS.values()), ids=list(INVALID_ENVIRONMENTS))
+def invalid_environment(request):
+    """Each value of PESU_AUTH_ENVIRONMENT the app must refuse to start with, one per test."""
     return request.param
 
 

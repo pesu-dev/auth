@@ -38,24 +38,22 @@ def test_head_cache_no_store_header(client):
     assert head_response.headers.get("Cache-Control") == "no-store"
 
 
-@pytest.mark.parametrize("valid_cases", ("development", "production", "staging"))
-def test_valid_cases_for_pesu_auth_environment(monkeypatch, valid_cases):
-    monkeypatch.setenv("PESU_AUTH_ENVIRONMENT", valid_cases)
+def test_each_environment_is_reported(monkeypatch, environment):
+    monkeypatch.setenv("PESU_AUTH_ENVIRONMENT", environment)
     with TestClient(app) as client:
         response = client.get("/health")
-    assert response.json()["environment"] == valid_cases
+    assert response.json()["environment"] == environment
 
 
-def test_default_fallback_pesu_auth_environment(monkeypatch):
+def test_the_environment_defaults_to_development(monkeypatch):
     monkeypatch.delenv("PESU_AUTH_ENVIRONMENT", raising=False)
     with TestClient(app) as client:
         response = client.get("/health")
     assert response.json()["environment"] == "development"
 
 
-@pytest.mark.parametrize("invalid_cases", ("", "prod", "Development"))
-def test_invalid_cases_for_pesu_auth_environment(monkeypatch, invalid_cases):
-    monkeypatch.setenv("PESU_AUTH_ENVIRONMENT", invalid_cases)
+def test_an_invalid_environment_stops_startup(monkeypatch, invalid_environment):
+    monkeypatch.setenv("PESU_AUTH_ENVIRONMENT", invalid_environment)
     with pytest.raises(ValueError, match="PESU_AUTH_ENVIRONMENT must be development, staging or production"):
         with TestClient(app):
             pass
