@@ -52,18 +52,18 @@ The standard workflow for contributing is as follows:
 1. Clone the repository from Github directly to your local machine with `--recurse-submodules` (see
    [Coding Agents](#-coding-agents)).
 1. Ensure dev branch on your local machine is up to date with the repository (`git checkout dev && git pull origin dev`).
-2. Create a new branch for your issue (`git checkout -b BranchName`).
-3. Make your changes and commit them with clear, descriptive messages.
-4. Push your branch to the repository directly (`git push origin your-feature-name`).
-5. Create a Pull Request (PR) against the repository's `dev` branch (not `main`).
-6. Wait for review and feedback from the maintainers, address any comments or suggestions.
-7. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
-8. Once merged into `dev` and CI passes, deployment to staging is triggered automatically.
-9. Production deployment is performed manually by authorized maintainers after successful staging validation.
+1. Create a new branch for your issue (`git checkout -b BranchName`).
+1. Make your changes and commit them with clear, descriptive messages.
+1. Push your branch to the repository directly (`git push origin your-feature-name`).
+1. Create a Pull Request (PR) against the repository's `dev` branch (not `main`).
+1. Wait for review and feedback from the maintainers, address any comments or suggestions.
+1. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
+1. Once merged into `dev` and CI passes, deployment to staging is triggered automatically.
+1. Production deployment is performed manually by authorized maintainers after successful staging validation.
 
 > [!WARNING]
-> Please note that direct pushes to either the `dev` or `main` branches are restricted. All pull requests must be 
-> raised from an internal feature branch directly within the repository and target the `dev` branch. External forks 
+> Please note that direct pushes to either the `dev` or `main` branches are restricted. All pull requests must be
+> raised from an internal feature branch directly within the repository and target the `dev` branch. External forks
 > are no longer used or allowed.
 
 ## 🛠️ Development Environment Setup
@@ -102,7 +102,7 @@ How the submodule, the generated agents and Dependabot's submodule updates work 
 - Never let a unit test reach PESU Academy; use the fixtures in `tests/unit/conftest.py`.
 - Run the live tests locally before you open a pull request. Live tests run automatically
   once your changes merge into the `dev` branch.
-- Every live test run and benchmark makes real logins to PESU Academy: run them when you need them, not in a loop, 
+- Every live test run and benchmark makes real logins to PESU Academy: run them when you need them, not in a loop,
   and never alongside each other.
 
 How to run the tests, the live tests and the benchmarks, and how to write tests, is in
