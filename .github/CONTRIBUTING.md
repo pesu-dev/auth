@@ -31,7 +31,8 @@ policies contributions follow. How the service works, and how it is developed, t
 
 ## 🚧 Getting Started
 
-We encourage developers to work on their own forks of the repository. This allows you to work on features or fixes
+We maintain an internal branch-and-PR workflow for all contributions. This allows you to work on local feature branches
+within the repository to develop features or fixes,
 without affecting the main codebase until your changes are ready to be merged.
 
 ### 🌐 Deployment Environment
@@ -48,11 +49,12 @@ been validated on staging. How both pipelines work is described in [docs/deploym
 
 The standard workflow for contributing is as follows:
 
-1. Fork the repository on GitHub and clone it to your local machine with `--recurse-submodules` (see
+1. Clone the repository from Github directly to your local machine with `--recurse-submodules` (see
    [Coding Agents](#-coding-agents)).
-1. Create a new branch for your feature or bug fix.
+1. Ensure dev branch on your local machine is up to date with the repository (`git checkout dev && git pull origin dev`).
+1. Create a new branch for your issue (`git checkout -b BranchName`).
 1. Make your changes and commit them with clear, descriptive messages.
-1. Push your branch to your fork on GitHub.
+1. Push your branch to the repository directly (`git push origin your-feature-name`).
 1. Create a Pull Request (PR) against the repository's `dev` branch (not `main`).
 1. Wait for review and feedback from the maintainers, address any comments or suggestions.
 1. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
@@ -60,14 +62,13 @@ The standard workflow for contributing is as follows:
 1. Production deployment is performed manually by authorized maintainers after successful staging validation.
 
 > [!WARNING]
-> Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository. All
-> PRs
-> must be raised from a feature branch of your forked repository and target the `dev` branch. Direct PRs to `main` will be
-> closed.
+> Please note that direct pushes to either the `dev` or `main` branches are restricted. All pull requests must be
+> raised from an internal feature branch directly within the repository and target the `dev` branch. External forks
+> are no longer used or allowed.
 
 ## 🛠️ Development Environment Setup
 
-You need Python 3.14 or higher, [`uv`](https://docs.astral.sh/uv/), Git and Docker. In a clone of your fork:
+You need Python 3.14 or higher, [`uv`](https://docs.astral.sh/uv/), Git and Docker. In a clone of the repository:
 
 ```bash
 uv sync --all-groups
@@ -86,23 +87,23 @@ with `--recurse-submodules`.
 
 - Do not edit `AGENTS.md` or `.agents/` here: open a pull request against pesu-dev/skills instead.
 - Do not edit `.github/agents/` by hand: it is generated from the roles by `uv run python scripts/sync_agents.py`.
-- Hand an issue to Copilot's cloud agent on **your fork**, not here, since pull requests to pesu-dev/auth must come from
-  a fork.
+- Hand an issue to Copilot's cloud agent on **your clone of the repository**, since pull requests to pesu-dev/auth must
+  come from an internal branch.
 
 How the submodule, the generated agents and Dependabot's submodule updates work is described in
 [docs/development.md](../docs/development.md#coding-agents).
 
 ## 🧪 Testing and Code Quality
 
-- Every commit must pass the pre-commit hooks, which run the linters, formatters and the full test suite. You will not
-  be able to commit code that fails them, and CI runs the same hooks.
-- Add tests with every feature and bug fix. Coverage is measured over every Python file outside `tests/`, counting
-  branches, and the gate is **100%**.
+- Every commit must pre-commit hooks, which run the linters, formatters and the full test suite. You will not be able
+  to commit code that fails them, and CI runs the same hooks.
+- Add tests with every feature and bug fix. Coverage is measured over every Python file outside tests/, counting
+  branches, and the gate is 100%.
 - Never let a unit test reach PESU Academy; use the fixtures in `tests/unit/conftest.py`.
-- Run the live tests locally before you open a pull request. GitHub withholds secrets from fork pull requests, so CI
-  only runs them once the change reaches `dev`.
-- Every live test run and benchmark makes real logins to PESU Academy: run them when you need them, not in a loop, and
-  never alongside each other.
+- Run the live tests locally before you open a pull request. Live tests run automatically
+  once your changes merge into the `dev` branch.
+- Every live test run and benchmark makes real logins to PESU Academy: run them when you need them, not in a loop,
+  and never alongside each other.
 
 How to run the tests, the live tests and the benchmarks, and how to write tests, is in
 [docs/testing.md](../docs/testing.md). The hooks, and how to run the checks that only run in CI, are in
@@ -159,7 +160,7 @@ does not reset the numbers to its right, such as `4.19.1`.
 
 ### 📤 Push and Open a Pull Request
 
-1. Push your branch to your fork:
+1. Push your branch directly to the repository:
 
    ```bash
    git push origin your-feature-name

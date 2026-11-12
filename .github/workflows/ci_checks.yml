@@ -45,10 +45,9 @@ jobs:
           echo "  - Target repo: $TARGET_REPO"
           echo "  - Target branch: $TARGET_BRANCH"
 
-          if [ "$SOURCE_REPO" = "$TARGET_REPO" ]; then
-            echo "ℹ️ Pull request originates from this repository ($SOURCE_REPO)."
-          else
-            echo "ℹ️ Pull request originates from fork ($SOURCE_REPO)."
+          if [ "$SOURCE_REPO" != "$TARGET_REPO" ]; then
+            echo "❌ PR originates from fork $SOURCE_REPO.External forks are not allowed, PRs must always originate from a branch within $TARGET_REPO."
+            exit 1
           fi
 
           if [ "$SOURCE_BRANCH" = "main" ]; then
