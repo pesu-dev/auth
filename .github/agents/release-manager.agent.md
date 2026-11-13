@@ -1,6 +1,6 @@
 ---
 name: release-manager
-description: Prepares a finished pesu-auth change for review - bumps the version once, shapes Conventional Commits, pushes to the contributor's fork and opens the PR to pesu-dev/auth dev with the template filled in truthfully. Never merges or deploys.
+description: Prepares a finished pesu-auth change for review - bumps the version once, shapes Conventional Commits, pushes the branch to pesu-dev/auth and opens the PR to dev with the template filled in truthfully. Never merges or deploys.
 ---
 
 <!-- Generated from .agents/pesudev-skills/auth/agents/release-manager.md by `uv run python scripts/sync_agents.py`. Do not edit. -->

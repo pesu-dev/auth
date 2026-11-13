@@ -80,10 +80,21 @@ locations agents read.
 Clone with the submodule, or the links point at nothing and agents see no instructions:
 
 ```bash
-git clone --recurse-submodules https://github.com/<your-username>/auth.git
+git clone --recurse-submodules https://github.com/pesu-dev/auth.git
 # already cloned without it:
 git submodule update --init
 ```
+
+A clone made from a fork, before pull requests moved to branches of this repository, has the fork as `origin` and this
+repository as `upstream`. Point `origin` at this repository instead:
+
+```bash
+git remote rename origin fork && git remote rename upstream origin
+git fetch origin && git branch -u origin/dev dev
+```
+
+If the clone has no `upstream` remote, run `git remote add origin https://github.com/pesu-dev/auth.git` instead of the
+second rename.
 
 On Windows, turn on Developer Mode and run `git config --global core.symlinks true` before cloning,
 so the links are checked out as links.
@@ -102,13 +113,15 @@ regenerate them and commit the result:
 uv run python scripts/sync_agents.py
 ```
 
-Dependabot's submodule pull requests cannot do that themselves. If one fails `sync-agents`, open a
-pull request from your fork that bumps the submodule to the same commit and regenerates the agents
-(with the usual version bump); Dependabot then closes its own.
+Dependabot's submodule pull requests cannot do that themselves. If one fails `sync-agents`, a
+maintainer can push the regenerated agents and a version bump to Dependabot's branch (the Version
+check skips only the runs Dependabot itself triggers, so it checks that push), or anyone can open a
+pull request from a new branch that bumps the submodule to the same commit and regenerates the
+agents (with the usual version bump); Dependabot then closes its own.
 
-To hand an issue to Copilot's cloud agent, assign it on **your fork**, not here: the agent opens its
-pull request in the repository it runs in, and pull requests to pesu-dev/auth must come from a fork.
-Open the pull request from your fork to `dev` yourself once Copilot's is ready.
+To hand an issue to Copilot's cloud agent, assign it here: the agent opens its pull request from a
+`copilot/` branch of this repository, which is a pull request like any other. A maintainer may need
+to approve its workflow runs before CI starts.
 
 ## Code quality
 
@@ -140,15 +153,14 @@ CI runs the same hooks in the `Pre-commit hooks` job, except `pytest`, because t
 A few checks require the PR itself or Docker and cannot be run as pre-commit hooks. Here is how to run each one
 locally:
 
-- **PR source checker:** verifies the PR does not come from the `main` branch and targets `dev`. There is nothing to
-  run; just open the PR that way.
+- **PR source checker:** verifies the PR comes from a branch of this repository (not a fork) other than `dev` or `main`,
+  and targets `dev`. There is nothing to run; just open the PR that way.
 
 - **Version check:** verifies the version in `pyproject.toml` was bumped relative to `dev`:
 
   ```bash
-  git remote add upstream https://github.com/pesu-dev/auth.git   # skip if you already have it
-  git fetch upstream
-  git show upstream/dev:pyproject.toml > /tmp/base_pyproject.toml
+  git fetch origin
+  git show origin/dev:pyproject.toml > /tmp/base_pyproject.toml
   python3 .github/scripts/check_version_bump.py --base-pyproject /tmp/base_pyproject.toml \
     --head-pyproject pyproject.toml --head-lock uv.lock --base-ref dev
   ```

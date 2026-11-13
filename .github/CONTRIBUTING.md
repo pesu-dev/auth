@@ -31,8 +31,11 @@ policies contributions follow. How the service works, and how it is developed, t
 
 ## 🚧 Getting Started
 
-We encourage developers to work on their own forks of the repository. This allows you to work on features or fixes
-without affecting the main codebase until your changes are ready to be merged.
+Contributors work in this repository itself: clone it, push your work to a branch of your own, and open a pull request
+from that branch. Your changes stay out of `dev` until they are reviewed and merged. Forks are not accepted.
+
+To push branches here, you need write access to the repository. Ask the maintainers in the `#pesu-auth` channel on
+PESU Discord to add you to the developer team.
 
 ### 🌐 Deployment Environment
 
@@ -42,18 +45,19 @@ We maintain two deployment environments:
 - **Production**: https://pesuauth.onrender.com - [Status Page](https://xzlk85cp.status.cron-job.org/)
 
 Merges to `dev` deploy to staging automatically. Production is deployed manually by maintainers, after the change has
-been validated on staging. How both pipelines work is described in [docs/deployment.md](../docs/deployment.md).
+been validated on staging. Every pull request also gets its own preview at
+`https://pesuauth-dev-pr-<number>.onrender.com` while it is open; it runs unreviewed code, so never sign in to it with
+your own PESU Academy credentials. How all of this works is described in [docs/deployment.md](../docs/deployment.md).
 
 ### 🔄 Development Workflow
 
 The standard workflow for contributing is as follows:
 
-1. Fork the repository on GitHub and clone it to your local machine with `--recurse-submodules` (see
-   [Coding Agents](#-coding-agents)).
-1. Create a new branch for your feature or bug fix.
+1. Clone the repository to your local machine with `--recurse-submodules` (see [Coding Agents](#-coding-agents)).
+1. Create a new branch for your feature or bug fix from the latest `dev`.
 1. Make your changes and commit them with clear, descriptive messages.
-1. Push your branch to your fork on GitHub.
-1. Create a Pull Request (PR) against the repository's `dev` branch (not `main`).
+1. Push your branch to the repository.
+1. Create a Pull Request (PR) from your branch against the `dev` branch (not `main`).
 1. Wait for review and feedback from the maintainers, address any comments or suggestions.
 1. Once approved, your changes will be merged into the `dev` branch and deployed to staging for testing.
 1. Once merged into `dev` and CI passes, deployment to staging is triggered automatically.
@@ -61,13 +65,12 @@ The standard workflow for contributing is as follows:
 
 > [!WARNING]
 > Please note that you will not be able to push directly to either the `dev` or `main` branches of the repository. All
-> PRs
-> must be raised from a feature branch of your forked repository and target the `dev` branch. Direct PRs to `main` will be
-> closed.
+> PRs must be raised from your own feature branch in this repository and target the `dev` branch. CI fails PRs from a
+> fork, from `dev` or `main`, or to any branch other than `dev`. Only push to your own branches.
 
 ## 🛠️ Development Environment Setup
 
-You need Python 3.14 or higher, [`uv`](https://docs.astral.sh/uv/), Git and Docker. In a clone of your fork:
+You need Python 3.14 or higher, [`uv`](https://docs.astral.sh/uv/), Git and Docker. In your clone of the repository:
 
 ```bash
 uv sync --all-groups
@@ -86,8 +89,8 @@ with `--recurse-submodules`.
 
 - Do not edit `AGENTS.md` or `.agents/` here: open a pull request against pesu-dev/skills instead.
 - Do not edit `.github/agents/` by hand: it is generated from the roles by `uv run python scripts/sync_agents.py`.
-- Hand an issue to Copilot's cloud agent on **your fork**, not here, since pull requests to pesu-dev/auth must come from
-  a fork.
+- To hand an issue to Copilot's cloud agent, assign it here. Copilot opens its pull request from a branch of this
+  repository, and a maintainer may need to approve its workflow runs.
 
 How the submodule, the generated agents and Dependabot's submodule updates work is described in
 [docs/development.md](../docs/development.md#coding-agents).
@@ -99,8 +102,8 @@ How the submodule, the generated agents and Dependabot's submodule updates work 
 - Add tests with every feature and bug fix. Coverage is measured over every Python file outside `tests/`, counting
   branches, and the gate is **100%**.
 - Never let a unit test reach PESU Academy; use the fixtures in `tests/unit/conftest.py`.
-- Run the live tests locally before you open a pull request. GitHub withholds secrets from fork pull requests, so CI
-  only runs them once the change reaches `dev`.
+- CI runs the live tests on every pull request. If you have a PESU Academy account to test with, run them locally too
+  before you push a change to how the service talks to PESU Academy.
 - Every live test run and benchmark makes real logins to PESU Academy: run them when you need them, not in a loop, and
   never alongside each other.
 
@@ -112,14 +115,15 @@ How to run the tests, the live tests and the benchmarks, and how to write tests,
 
 ### 🔀 Create a Branch
 
-Start by creating a new branch for your work:
+Start by creating a new branch for your work from the latest `dev`:
 
 ```bash
-git checkout -b your-feature-name
+git fetch origin
+git switch -c your-feature-name origin/dev
 ```
 
-Replace `your-feature-name` with a descriptive name related to the change (e.g., `fix-token-expiry-bug` or
-`docs-update-readme`).
+Replace `your-feature-name` with a descriptive name related to the change (e.g., `fix/token-expiry-bug` or
+`docs/update-readme`). Everyone pushes branches to the same repository, so pick a name nobody else is using.
 
 ### ✏️ Make and Commit Changes
 
@@ -159,10 +163,10 @@ does not reset the numbers to its right, such as `4.19.1`.
 
 ### 📤 Push and Open a Pull Request
 
-1. Push your branch to your fork:
+1. Push your branch to the repository:
 
    ```bash
-   git push origin your-feature-name
+   git push -u origin your-feature-name
    ```
 
 1. Open a Pull Request (PR) on GitHub targeting the `dev` branch.

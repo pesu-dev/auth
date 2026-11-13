@@ -61,10 +61,10 @@ failure there after a PESU Academy release usually means their API changed rathe
 The tests that are not marked `secret_required` still call PESU Academy (with invalid credentials), so
 only `tests/unit/` runs offline.
 
-In CI, pull requests come from forks, and GitHub withholds secrets from fork pull requests. So
-the *Test suite & coverage* job of the *CI Checks* workflow runs the reduced suite on every pull request -- it says so in the run's summary
--- and the live tests only run once the change reaches `dev`. Run them locally before you open a
-pull request; CI will not cover them for you.
+In CI, pull requests come from branches of this repository, which receive the repository's secrets. So the *Test suite &
+coverage* job of the *CI Checks* workflow runs the live tests on every pull request, again in the merge queue, and on
+every push to `dev`. Dependabot's pull requests are the exception: GitHub gives the runs Dependabot triggers no
+repository secrets. A run without the secrets runs the reduced suite and says so in the run's summary.
 
 ## Benchmarks
 
