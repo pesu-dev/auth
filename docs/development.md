@@ -93,6 +93,9 @@ git remote rename origin fork && git remote rename upstream origin
 git fetch origin && git branch -u origin/dev dev
 ```
 
+If the clone has no `upstream` remote, run `git remote add origin https://github.com/pesu-dev/auth.git` instead of the
+second rename.
+
 On Windows, turn on Developer Mode and run `git config --global core.symlinks true` before cloning,
 so the links are checked out as links.
 
@@ -111,9 +114,10 @@ uv run python scripts/sync_agents.py
 ```
 
 Dependabot's submodule pull requests cannot do that themselves. If one fails `sync-agents`, a
-maintainer can push the regenerated agents to Dependabot's branch, or anyone can open a pull request
-from a new branch that bumps the submodule to the same commit and regenerates the agents (with the
-usual version bump); Dependabot then closes its own.
+maintainer can push the regenerated agents and a version bump to Dependabot's branch (the Version
+check skips only the runs Dependabot itself triggers, so it checks that push), or anyone can open a
+pull request from a new branch that bumps the submodule to the same commit and regenerates the
+agents (with the usual version bump); Dependabot then closes its own.
 
 To hand an issue to Copilot's cloud agent, assign it here: the agent opens its pull request from a
 `copilot/` branch of this repository, which is a pull request like any other. A maintainer may need

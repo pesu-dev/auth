@@ -17,6 +17,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
+# Pull requests come from branches of this repository and run their own, unreviewed code here, so the token
+# stays read-only; the repository's default would let that code write to the repository.
+permissions:
+  contents: read
+
 jobs:
   pr_source_checker:
     name: PR source checker
@@ -46,7 +51,7 @@ jobs:
           echo "  - Target branch: $TARGET_BRANCH"
 
           if [ "$SOURCE_REPO" != "$TARGET_REPO" ]; then
-            echo "❌ PR comes from the fork $SOURCE_REPO. Forks are not accepted: push your branch to $TARGET_REPO and open the PR from there."
+            echo "❌ PR comes from the fork $SOURCE_REPO. Forks are not accepted: push your branch to $TARGET_REPO and open the PR from there. Pushing needs write access; .github/CONTRIBUTING.md says how to get it."
             exit 1
           fi
 
@@ -136,6 +141,11 @@ jobs:
     name: Build image on PR
     needs: [pr_source_checker]
     if: github.event_name == 'pull_request'
+    # The reusable workflow's job asks for packages: write (it can push), and a called job cannot get more than its
+    # caller grants. With push: false nothing is published.
+    permissions:
+      contents: read
+      packages: write
     uses: pesu-dev/actions/.github/workflows/build_push_image.yml@v1
     with:
       image_name: pesu-auth

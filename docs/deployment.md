@@ -17,7 +17,8 @@ meantime, only the newest one is deployed. You can also deploy the latest `dev` 
 Render deploys every pull request to its own preview, `https://pesuauth-dev-pr-<number>.onrender.com`, and removes it
 when the pull request is closed or merged. A preview is a copy of the staging service running the pull request's code,
 with staging's environment variables, so its `/health` reports `staging`. It runs code nobody has reviewed yet: use it
-to check a change, never as an API to depend on.
+to check a change, never as an API to depend on, and never sign in to it with your own PESU Academy credentials, since
+the pull request's code could log them.
 
 ## Production
 

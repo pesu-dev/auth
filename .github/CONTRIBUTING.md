@@ -45,8 +45,9 @@ We maintain two deployment environments:
 - **Production**: https://pesuauth.onrender.com - [Status Page](https://xzlk85cp.status.cron-job.org/)
 
 Merges to `dev` deploy to staging automatically. Production is deployed manually by maintainers, after the change has
-been validated on staging. Every pull request also gets its own preview at `https://pesuauth-dev-pr-<number>.onrender.com`
-while it is open. How all of this works is described in [docs/deployment.md](../docs/deployment.md).
+been validated on staging. Every pull request also gets its own preview at
+`https://pesuauth-dev-pr-<number>.onrender.com` while it is open; it runs unreviewed code, so never sign in to it with
+your own PESU Academy credentials. How all of this works is described in [docs/deployment.md](../docs/deployment.md).
 
 ### 🔄 Development Workflow
 

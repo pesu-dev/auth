@@ -63,7 +63,8 @@ only `tests/unit/` runs offline.
 
 In CI, pull requests come from branches of this repository, which receive the repository's secrets. So the *Test suite &
 coverage* job of the *CI Checks* workflow runs the live tests on every pull request, again in the merge queue, and on
-every push to `dev`. A run without the secrets runs the reduced suite and says so in the run's summary.
+every push to `dev`. Dependabot's pull requests are the exception: GitHub gives the runs Dependabot triggers no
+repository secrets. A run without the secrets runs the reduced suite and says so in the run's summary.
 
 ## Benchmarks
 
