@@ -42,8 +42,8 @@ def run_tests() -> int:
     command = ["pytest", *COVERAGE_ARGS, "--disable-warnings", "-v", "-s"]
     if not test_username or not test_password:
         # The coverage gate applies here too. It used to be dropped along with the live tests,
-        # which meant a pull request could lower coverage without any check noticing -- and every
-        # pull request takes this path, since fork PRs never receive secrets.
+        # which meant a run without credentials, such as a local one without a .env, could lower
+        # coverage without any check noticing.
         announce_skipped_live_tests()
         command += ["-m", "not secret_required"]
     else:

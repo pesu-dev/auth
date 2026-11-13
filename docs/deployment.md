@@ -12,6 +12,13 @@ Both deploy workflows only run on `dev`, so always pick `dev` when starting one 
 Every merge to `dev` is deployed to staging automatically, once CI passes. If newer commits have landed on `dev` in the
 meantime, only the newest one is deployed. You can also deploy the latest `dev` by hand.
 
+## Pull request previews
+
+Render deploys every pull request to its own preview, `https://pesuauth-dev-pr-<number>.onrender.com`, and removes it
+when the pull request is closed or merged. A preview is a copy of the staging service running the pull request's code,
+with staging's environment variables, so its `/health` reports `staging`. It runs code nobody has reviewed yet: use it
+to check a change, never as an API to depend on.
+
 ## Production
 
 Maintainers release to production by hand. A release always deploys the latest commit on `dev`:
