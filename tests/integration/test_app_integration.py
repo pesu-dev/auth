@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 
 import pytest
@@ -6,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.app import app
 from app.exceptions.authentication import AuthenticationError
+from app.request_id import REQUEST_ID_HEADER, RequestIdFilter
 
 unhandled_router = APIRouter()
 
@@ -633,3 +636,85 @@ def test_integration_profile_is_false(client):
     data = response.json()
     assert response.status_code == 400
     assert "Fields can only be requested when profile is true" in data["message"]
+
+
+def test_integration_error_responses_include_request_id(client, monkeypatch):
+    """400, 401, and 502 error responses include X-Request-ID."""
+    resp_400 = client.post("/authenticate", json={})
+    assert resp_400.status_code == 400
+    assert resp_400.headers.get(REQUEST_ID_HEADER)
+
+    async def fake_401(*args, **kwargs):
+        raise AuthenticationError("Invalid credentials")
+
+    monkeypatch.setattr("app.app.pesu_academy.authenticate", fake_401)
+    resp_401 = client.post(
+        "/authenticate",
+        json={"username": "dummy_user", "password": "wrong_password"},
+    )
+    assert resp_401.status_code == 401
+    assert resp_401.headers.get(REQUEST_ID_HEADER)
+
+    async def fake_502(*args, **kwargs):
+        raise ConnectionError("Upstream unavailable")
+
+    monkeypatch.setattr("app.app.pesu_academy.authenticate", fake_502)
+    resp_502 = client.post(
+        "/authenticate",
+        json={"username": "dummy_user", "password": "dummy_password"},
+    )
+    assert resp_502.status_code in (500, 502)
+    assert resp_502.headers.get(REQUEST_ID_HEADER)
+
+
+def test_integration_caplog_request_id_and_outside_dash(client, caplog):
+    """Logs inside a request carry its request_id; logs outside use '-'."""
+    req_filter = RequestIdFilter()
+    caplog.handler.addFilter(req_filter)
+    caplog.set_level(logging.DEBUG)
+
+    try:
+        logging.getLogger("app").info("test outside log")
+        response = client.get("/health")
+        assert response.status_code == 200
+        req_id = response.headers[REQUEST_ID_HEADER]
+
+        outside_logs = [r for r in caplog.records if r.getMessage() == "test outside log"]
+        assert outside_logs
+        assert getattr(outside_logs[-1], "request_id", None) == "-"
+
+        request_logs = [r for r in caplog.records if getattr(r, "request_id", None) == req_id]
+        assert request_logs
+    finally:
+        caplog.handler.removeFilter(req_filter)
+
+
+def test_integration_concurrent_requests_isolate_ids_and_logs(caplog):
+    """Concurrent requests get distinct request IDs and don't mix log IDs."""
+    req_filter = RequestIdFilter()
+    caplog.handler.addFilter(req_filter)
+    caplog.set_level(logging.DEBUG)
+
+    try:
+
+        async def run_both():
+            with TestClient(app, raise_server_exceptions=False) as c:
+                return await asyncio.gather(
+                    asyncio.to_thread(c.get, "/health"),
+                    asyncio.to_thread(c.get, "/health"),
+                )
+
+        resp_a, resp_b = asyncio.run(run_both())
+        id_a = resp_a.headers[REQUEST_ID_HEADER]
+        id_b = resp_b.headers[REQUEST_ID_HEADER]
+
+        assert id_a != id_b
+
+        logs_a = [r.getMessage() for r in caplog.records if getattr(r, "request_id", None) == id_a]
+        logs_b = [r.getMessage() for r in caplog.records if getattr(r, "request_id", None) == id_b]
+        assert logs_a
+        assert logs_b
+        assert id_b not in " ".join(logs_a)
+        assert id_a not in " ".join(logs_b)
+    finally:
+        caplog.handler.removeFilter(req_filter)

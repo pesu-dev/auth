@@ -1,4 +1,7 @@
 import asyncio
+import logging
+import uuid
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,6 +23,13 @@ from app.metrics.middleware import (
     method_label,
     record_request_metrics,
     route_label,
+)
+from app.request_id import (
+    REQUEST_ID_HEADER,
+    RequestIdFilter,
+    request_id_middleware,
+    request_id_var,
+    resolve_request_id,
 )
 
 
@@ -199,3 +209,181 @@ def test_method_label_clamps_an_unknown_verb():
 
 def test_method_label_handles_a_scope_without_a_method():
     assert method_label({}) == OTHER_METHOD
+
+
+def test_valid_id_string():
+    assert resolve_request_id("abcABC.123_12-14") == "abcABC.123_12-14"
+    assert resolve_request_id("x" * 128) == "x" * 128
+
+
+def test_invalid_id_falls_back_to_uuid():
+    bad_values = [None, "", "x" * 129, "bad\nid", "bad\rid", "bad id"]
+    for bad_value in bad_values:
+        result = resolve_request_id(bad_value)
+        assert result != bad_value
+        assert uuid.UUID(result, version=4).hex == result
+
+
+def test_request_id_filter_outside_request():
+    token = request_id_var.set(None)
+    try:
+        record = logging.LogRecord(
+            name="test name",
+            level=logging.INFO,
+            pathname="test_metrics_middleware.py",
+            lineno=1,
+            msg="test message",
+            args=(),
+            exc_info=None,
+        )
+        allowed = RequestIdFilter().filter(record)
+        assert allowed is True
+        assert record.request_id == "-"
+    finally:
+        request_id_var.reset(token)
+
+
+def test_request_id_filter_with_active_id():
+    token = request_id_var.set("req_id12.3-4")
+    try:
+        record = logging.LogRecord(
+            name="test name",
+            level=logging.INFO,
+            pathname="test_metrics_middleware.py",
+            lineno=1,
+            msg="test message",
+            args=(),
+            exc_info=None,
+        )
+        allowed = RequestIdFilter().filter(record)
+        assert allowed is True
+        assert record.request_id == "req_id12.3-4"
+    finally:
+        request_id_var.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_request_id_middleware_echoes_valid_header():
+    incoming_id = "trace-abc_123.ok"
+    request = SimpleNamespace(headers={REQUEST_ID_HEADER: "test id"})
+    response = SimpleNamespace(headers={})
+    response.headers = {}
+    seen_ids = []
+
+    async def call_next(_req):
+        seen_ids.append(request_id_var.get())
+        return response
+
+    result = await request_id_middleware(request, call_next)
+
+    assert result is response
+    assert seen_ids == [incoming_id]
+    assert response.headers[REQUEST_ID_HEADER] == incoming_id
+    assert request_id_var.get() is None
+
+
+@pytest.mark.asyncio
+async def test_request_id_middleware_echoes_valid_header():
+    incoming_id = "trace-abc_123.ok"
+    request = SimpleNamespace(headers={REQUEST_ID_HEADER: incoming_id})
+    response = SimpleNamespace(headers={})
+    seen_ids = []
+
+    async def call_next(_req):
+        seen_ids.append(request_id_var.get())
+        return response
+
+    result = await request_id_middleware(request, call_next)
+
+    assert result is response
+    assert seen_ids == [incoming_id]
+    assert response.headers[REQUEST_ID_HEADER] == incoming_id
+    assert request_id_var.get() is None
+
+
+@pytest.mark.asyncio
+async def test_request_id_middleware_generates_uuid_on_invalid_header():
+    bad_headers = [
+        {},
+        {REQUEST_ID_HEADER: ""},
+        {REQUEST_ID_HEADER: "x" * 129},
+        {REQUEST_ID_HEADER: "test\nid"},
+        {REQUEST_ID_HEADER: "test\rid"},
+        {REQUEST_ID_HEADER: "bad id"},
+    ]
+
+    for headers in bad_headers:
+        request = SimpleNamespace(headers=headers)
+        response = SimpleNamespace(headers={})
+        seen = []
+
+        async def call_next(_req):
+            seen.append(request_id_var.get())
+            return response
+
+        result = await request_id_middleware(request, call_next)
+        req_id = response.headers[REQUEST_ID_HEADER]
+
+        assert result is response
+        assert seen == [req_id]
+        assert req_id != headers.get(REQUEST_ID_HEADER)
+        assert uuid.UUID(req_id, version=4).hex == req_id
+        assert request_id_var.get() is None
+
+
+@pytest.mark.asyncio
+async def test_request_id_middleware_isolates_concurrent_requests():
+    seen = {}
+
+    async def run_one(name, req_id):
+        request = SimpleNamespace(headers={REQUEST_ID_HEADER: req_id})
+        response = SimpleNamespace(headers={})
+
+        async def call_next(_req):
+            seen[name] = [request_id_var.get()]
+            await asyncio.sleep(0)
+            seen[name].append(request_id_var.get())
+            return response
+
+        resp = await request_id_middleware(request, call_next)
+        return resp.headers[REQUEST_ID_HEADER]
+
+    first, second = await asyncio.gather(
+        run_one("first", "req-id-1"),
+        run_one("second", "req-id-2"),
+    )
+
+    assert first == "req-id-1"
+    assert second == "req-id-2"
+    assert seen["first"] == ["req-id-1", "req-id-1"]
+    assert seen["second"] == ["req-id-2", "req-id-2"]
+    assert request_id_var.get() is None
+
+
+@pytest.mark.asyncio
+async def test_request_id_middleware_isolates_concurrent_requests():
+    seen = {}
+
+    async def run_one(name, req_id):
+        request = SimpleNamespace(headers={REQUEST_ID_HEADER: req_id})
+        response = SimpleNamespace(headers={})
+
+        async def call_next(_req):
+            seen[name] = [request_id_var.get()]
+            await asyncio.sleep(0)
+            seen[name].append(request_id_var.get())
+            return response
+
+        resp = await request_id_middleware(request, call_next)
+        return resp.headers[REQUEST_ID_HEADER]
+
+    first, second = await asyncio.gather(
+        run_one("first", "req-id-1"),
+        run_one("second", "req-id-2"),
+    )
+
+    assert first == "req-id-1"
+    assert second == "req-id-2"
+    assert seen["first"] == ["req-id-1", "req-id-1"]
+    assert seen["second"] == ["req-id-2", "req-id-2"]
+    assert request_id_var.get() is None

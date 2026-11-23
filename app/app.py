@@ -46,6 +46,7 @@ from app.metrics.prometheus import PROMETHEUS_CONTENT_TYPE, MetricsFormat, rende
 from app.models import HealthModel, MetricsModel, RequestModel, ResponseModel
 from app.models.health import Environment
 from app.pesu import PESUAcademy
+from app.request_id import REQUEST_ID_HEADER, RequestIdFilter, request_id_middleware, request_id_var, resolve_request_id
 
 IST = ZoneInfo("Asia/Kolkata")
 # Validation failures are labelled by field, so the label set has to be closed against a caller who
@@ -217,6 +218,11 @@ async def security_headers_middleware(request: Request, call_next: RequestRespon
     return response
 
 
+@app.middleware("http")
+async def request_id_middleware_http(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    return await request_id_middleware(request, call_next)
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Handler for request validation errors."""
@@ -316,6 +322,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     """Handler for unhandled exceptions."""
     metrics.increment(ERRORS_BY_TYPE, type=type(exc).__name__)
     logging.exception("Unhandled exception occurred.")
+    headers = _security_headers(request)
+    headers[REQUEST_ID_HEADER] = request_id_var.get() or resolve_request_id(request.headers.get(REQUEST_ID_HEADER))
     return JSONResponse(
         status_code=500,
         content={
@@ -323,7 +331,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             "message": "Internal Server Error. Please try again later.",
             "timestamp": datetime.datetime.now(IST).isoformat(),
         },
-        headers=_security_headers(request),
+        headers=headers,
     )
 
 
@@ -520,9 +528,12 @@ def main() -> None:
 
     # Set up logging configuration
     logging_level = logging.DEBUG if args.debug else logging.INFO
+    handler = logging.StreamHandler()
+    handler.addFilter(RequestIdFilter())
     logging.basicConfig(
         level=logging_level,
-        format="%(asctime)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s",
+        format="%(request_id)s - %(asctime)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s",
+        handlers=[handler],
     )
 
     # Run the app
