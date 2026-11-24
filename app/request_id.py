@@ -4,6 +4,9 @@ import contextvars
 import logging
 import re
 import uuid
+
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
