@@ -220,6 +220,7 @@ async def security_headers_middleware(request: Request, call_next: RequestRespon
 
 @app.middleware("http")
 async def request_id_middleware_http(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    """Configure logging and start the Uvicorn server."""
     return await request_id_middleware(request, call_next)
 
 

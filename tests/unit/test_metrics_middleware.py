@@ -283,25 +283,6 @@ async def test_request_id_middleware_echoes_valid_header():
 
 
 @pytest.mark.asyncio
-async def test_request_id_middleware_echoes_valid_header():
-    incoming_id = "trace-abc_123.ok"
-    request = SimpleNamespace(headers={REQUEST_ID_HEADER: incoming_id})
-    response = SimpleNamespace(headers={})
-    seen_ids = []
-
-    async def call_next(_req):
-        seen_ids.append(request_id_var.get())
-        return response
-
-    result = await request_id_middleware(request, call_next)
-
-    assert result is response
-    assert seen_ids == [incoming_id]
-    assert response.headers[REQUEST_ID_HEADER] == incoming_id
-    assert request_id_var.get() is None
-
-
-@pytest.mark.asyncio
 async def test_request_id_middleware_generates_uuid_on_invalid_header():
     bad_headers = [
         {},
@@ -359,31 +340,3 @@ async def test_request_id_middleware_isolates_concurrent_requests():
     assert seen["second"] == ["req-id-2", "req-id-2"]
     assert request_id_var.get() is None
 
-
-@pytest.mark.asyncio
-async def test_request_id_middleware_isolates_concurrent_requests():
-    seen = {}
-
-    async def run_one(name, req_id):
-        request = SimpleNamespace(headers={REQUEST_ID_HEADER: req_id})
-        response = SimpleNamespace(headers={})
-
-        async def call_next(_req):
-            seen[name] = [request_id_var.get()]
-            await asyncio.sleep(0)
-            seen[name].append(request_id_var.get())
-            return response
-
-        resp = await request_id_middleware(request, call_next)
-        return resp.headers[REQUEST_ID_HEADER]
-
-    first, second = await asyncio.gather(
-        run_one("first", "req-id-1"),
-        run_one("second", "req-id-2"),
-    )
-
-    assert first == "req-id-1"
-    assert second == "req-id-2"
-    assert seen["first"] == ["req-id-1", "req-id-1"]
-    assert seen["second"] == ["req-id-2", "req-id-2"]
-    assert request_id_var.get() is None
