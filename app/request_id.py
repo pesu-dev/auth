@@ -4,7 +4,6 @@ import contextvars
 import logging
 import re
 import uuid
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -32,6 +31,7 @@ def resolve_request_id(incoming_id: str | None) -> str:
 
 class RequestIdFilter(logging.Filter):
     """Attach the active request ID from context to log records."""
+
     def filter(self, record: logging.LogRecord) -> bool:
         """Populate `record.request_id` and always allow the record through."""
         record.request_id = request_id_var.get() or "-"

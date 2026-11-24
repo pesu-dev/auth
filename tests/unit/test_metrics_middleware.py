@@ -265,7 +265,7 @@ def test_request_id_filter_with_active_id():
 @pytest.mark.asyncio
 async def test_request_id_middleware_echoes_valid_header():
     incoming_id = "trace-abc_123.ok"
-    request = SimpleNamespace(headers={REQUEST_ID_HEADER: "test id"})
+    request = SimpleNamespace(headers={REQUEST_ID_HEADER: incoming_id})
     response = SimpleNamespace(headers={})
     response.headers = {}
     seen_ids = []
@@ -339,4 +339,3 @@ async def test_request_id_middleware_isolates_concurrent_requests():
     assert seen["first"] == ["req-id-1", "req-id-1"]
     assert seen["second"] == ["req-id-2", "req-id-2"]
     assert request_id_var.get() is None
-
