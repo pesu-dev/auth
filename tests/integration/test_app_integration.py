@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
 from app.app import app
-from app.exceptions.authentication import AuthenticationError
+from app.exceptions.authentication import AuthenticationError, UpstreamError
 from app.request_id import REQUEST_ID_HEADER, RequestIdFilter
 
 unhandled_router = APIRouter()
@@ -645,7 +645,7 @@ def test_integration_error_responses_include_request_id(client, monkeypatch):
     assert resp_400.headers.get(REQUEST_ID_HEADER)
 
     async def fake_401(*args, **kwargs):
-        raise AuthenticationError("Invalid credentials")
+        raise AuthenticationError
 
     monkeypatch.setattr("app.app.pesu_academy.authenticate", fake_401)
     resp_401 = client.post(
@@ -656,15 +656,31 @@ def test_integration_error_responses_include_request_id(client, monkeypatch):
     assert resp_401.headers.get(REQUEST_ID_HEADER)
 
     async def fake_502(*args, **kwargs):
-        raise ConnectionError("Upstream unavailable")
+        raise UpstreamError
 
     monkeypatch.setattr("app.app.pesu_academy.authenticate", fake_502)
     resp_502 = client.post(
         "/authenticate",
         json={"username": "dummy_user", "password": "dummy_password"},
     )
-    assert resp_502.status_code in (500, 502)
+    assert resp_502.status_code == 502
     assert resp_502.headers.get(REQUEST_ID_HEADER)
+
+
+def test_integration_unhandled_error_keeps_the_request_id(client, caplog):
+    """A 500 answers with the request's ID, sent or generated, and logs the exception under the same one."""
+    req_filter = RequestIdFilter()
+    caplog.handler.addFilter(req_filter)
+
+    try:
+        sent = client.get("/raiseUnhandled", headers={REQUEST_ID_HEADER: "trace-500"})
+        generated = client.get("/raiseUnhandled")
+    finally:
+        caplog.handler.removeFilter(req_filter)
+
+    assert sent.headers[REQUEST_ID_HEADER] == "trace-500"
+    logged = [r.request_id for r in caplog.records if r.getMessage() == "Unhandled exception occurred."]
+    assert logged == ["trace-500", generated.headers[REQUEST_ID_HEADER]]
 
 
 def test_integration_caplog_request_id_and_outside_dash(client, caplog):
@@ -712,9 +728,7 @@ def test_integration_concurrent_requests_isolate_ids_and_logs(caplog):
 
         logs_a = [r.getMessage() for r in caplog.records if getattr(r, "request_id", None) == id_a]
         logs_b = [r.getMessage() for r in caplog.records if getattr(r, "request_id", None) == id_b]
-        assert logs_a
-        assert logs_b
-        assert id_b not in " ".join(logs_a)
-        assert id_a not in " ".join(logs_b)
+        assert logs_a == ["Health check requested."]
+        assert logs_b == ["Health check requested."]
     finally:
         caplog.handler.removeFilter(req_filter)

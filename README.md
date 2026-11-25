@@ -159,11 +159,9 @@ Responses to `/authenticate` and `/health` also include:
 
 - `Cache-Control: no-store`
 
-Every response also includes an `X-Request-ID` header for correlating requests and log lines:
-
-- If a request sends a valid `X-Request-ID` (up to 128 characters using letters, numbers, `.`, `_`, or `-`), PESUAuth echoes that value back.
-- If the header is missing or invalid, PESUAuth generates a UUIDv4 hex string and returns it in `X-Request-ID`.
-- Log entries include the active request ID (`%(request_id)s`), or `-` when logged outside a request.
+Every response also includes an `X-Request-ID` header. Quote it when you report a problem: every log line written for
+your request carries the same ID. To trace a request with an ID of your own, send it in `X-Request-ID`. It is returned
+as sent if it has at most 128 letters, digits, `.`, `_` or `-`, and replaced with a new ID otherwise.
 
 ### `/authenticate`
 
