@@ -683,8 +683,8 @@ def test_integration_unhandled_error_keeps_the_request_id(client, caplog):
     assert logged == ["trace-500", generated.headers[REQUEST_ID_HEADER]]
 
 
-def test_integration_caplog_request_id_and_outside_dash(client, caplog):
-    """Logs inside a request carry its request_id; logs outside use '-'."""
+def test_integration_log_lines_carry_the_request_id_and_a_dash_outside_requests(client, caplog):
+    """Lines logged while a request is handled carry its ID, and lines logged outside a request carry `-`."""
     req_filter = RequestIdFilter()
     caplog.handler.addFilter(req_filter)
     caplog.set_level(logging.DEBUG)
@@ -692,17 +692,14 @@ def test_integration_caplog_request_id_and_outside_dash(client, caplog):
     try:
         logging.getLogger("app").info("test outside log")
         response = client.get("/health")
-        assert response.status_code == 200
-        req_id = response.headers[REQUEST_ID_HEADER]
-
-        outside_logs = [r for r in caplog.records if r.getMessage() == "test outside log"]
-        assert outside_logs
-        assert getattr(outside_logs[-1], "request_id", None) == "-"
-
-        request_logs = [r for r in caplog.records if getattr(r, "request_id", None) == req_id]
-        assert request_logs
     finally:
         caplog.handler.removeFilter(req_filter)
+
+    assert response.status_code == 200
+    outside = [r.request_id for r in caplog.records if r.getMessage() == "test outside log"]
+    inside = [r.getMessage() for r in caplog.records if r.request_id == response.headers[REQUEST_ID_HEADER]]
+    assert outside == ["-"]
+    assert inside == ["Health check requested."]
 
 
 def test_integration_concurrent_requests_isolate_ids_and_logs(caplog):

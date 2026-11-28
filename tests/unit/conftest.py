@@ -76,6 +76,19 @@ UNREADABLE_BODIES = {
     "form": (b"username=u", "application/x-www-form-urlencoded"),
 }
 
+# X-Request-ID values the API returns as sent
+VALID_REQUEST_IDS = {"every_allowed_character": "abcABC.123_12-14", "longest": "x" * 128}
+
+# X-Request-ID values the API replaces with its own; None is a request without the header
+INVALID_REQUEST_IDS = {
+    "missing": None,
+    "empty": "",
+    "too_long": "x" * 129,
+    "line_feed": "bad\nid",
+    "carriage_return": "bad\rid",
+    "space": "bad id",
+}
+
 # Every route that takes no input, with the status a GET of it answers: the docs pages, which are not in
 # the OpenAPI schema, and the two that are
 PAGES = {
@@ -276,6 +289,18 @@ def unprintable_username(request):
 @pytest.fixture(params=list(UNREADABLE_BODIES.values()), ids=list(UNREADABLE_BODIES))
 def unreadable_body(request):
     """Each body that never gets past FastAPI's parsing or validation, with its Content-Type, one per test."""
+    return request.param
+
+
+@pytest.fixture(params=list(VALID_REQUEST_IDS.values()), ids=list(VALID_REQUEST_IDS))
+def valid_request_id(request):
+    """Each X-Request-ID the API returns as sent, one per test."""
+    return request.param
+
+
+@pytest.fixture(params=list(INVALID_REQUEST_IDS.values()), ids=list(INVALID_REQUEST_IDS))
+def invalid_request_id(request):
+    """Each X-Request-ID the API replaces with its own, None for a missing header, one per test."""
     return request.param
 
 
