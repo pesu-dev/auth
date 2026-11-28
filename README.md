@@ -159,6 +159,10 @@ Responses to `/authenticate` and `/health` also include:
 
 - `Cache-Control: no-store`
 
+Every response also includes an `X-Request-ID` header. Quote it when you report a problem: every log line written for
+your request carries the same ID. To trace a request with an ID of your own, send it in `X-Request-ID`. It is returned
+as sent if it has at most 128 letters, digits, `.`, `_` or `-`, and replaced with a new ID otherwise.
+
 ### `/authenticate`
 
 You can send a request to the `/authenticate` endpoint with the user's credentials and the API will return a JSON

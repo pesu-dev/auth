@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -118,8 +118,13 @@ def test_main_function_default_args(mock_run, mock_logging, mock_parse_args):
 
     mock_logging.assert_called_once_with(
         level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s",
+        format="%(request_id)s - %(asctime)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s",
+        handlers=ANY,
     )
+    (handler,) = mock_logging.call_args.kwargs["handlers"]
+    record = logging.makeLogRecord({})
+    assert handler.filter(record)
+    assert record.request_id == "-"
     mock_run.assert_called_once_with("app.app:app", host="0.0.0.0", port=5000, reload=False)
 
 
@@ -137,8 +142,13 @@ def test_main_function_debug_mode(mock_run, mock_logging, mock_parse_args):
 
     mock_logging.assert_called_once_with(
         level=logging.DEBUG,
-        format="%(asctime)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s",
+        format="%(request_id)s - %(asctime)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s",
+        handlers=ANY,
     )
+    (handler,) = mock_logging.call_args.kwargs["handlers"]
+    record = logging.makeLogRecord({})
+    assert handler.filter(record)
+    assert record.request_id == "-"
     mock_run.assert_called_once_with("app.app:app", host="127.0.0.1", port=8000, reload=True)
 
 

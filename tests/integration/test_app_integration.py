@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 
 import pytest
@@ -5,7 +7,8 @@ from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
 from app.app import app
-from app.exceptions.authentication import AuthenticationError
+from app.exceptions.authentication import AuthenticationError, UpstreamError
+from app.request_id import REQUEST_ID_HEADER, RequestIdFilter
 
 unhandled_router = APIRouter()
 
@@ -633,3 +636,96 @@ def test_integration_profile_is_false(client):
     data = response.json()
     assert response.status_code == 400
     assert "Fields can only be requested when profile is true" in data["message"]
+
+
+def test_integration_error_responses_include_request_id(client, monkeypatch):
+    """400, 401, and 502 error responses include X-Request-ID."""
+    resp_400 = client.post("/authenticate", json={})
+    assert resp_400.status_code == 400
+    assert resp_400.headers.get(REQUEST_ID_HEADER)
+
+    async def fake_401(*args, **kwargs):
+        raise AuthenticationError
+
+    monkeypatch.setattr("app.app.pesu_academy.authenticate", fake_401)
+    resp_401 = client.post(
+        "/authenticate",
+        json={"username": "dummy_user", "password": "wrong_password"},
+    )
+    assert resp_401.status_code == 401
+    assert resp_401.headers.get(REQUEST_ID_HEADER)
+
+    async def fake_502(*args, **kwargs):
+        raise UpstreamError
+
+    monkeypatch.setattr("app.app.pesu_academy.authenticate", fake_502)
+    resp_502 = client.post(
+        "/authenticate",
+        json={"username": "dummy_user", "password": "dummy_password"},
+    )
+    assert resp_502.status_code == 502
+    assert resp_502.headers.get(REQUEST_ID_HEADER)
+
+
+def test_integration_unhandled_error_keeps_the_request_id(client, caplog):
+    """A 500 answers with the request's ID, sent or generated, and logs the exception under the same one."""
+    req_filter = RequestIdFilter()
+    caplog.handler.addFilter(req_filter)
+
+    try:
+        sent = client.get("/raiseUnhandled", headers={REQUEST_ID_HEADER: "trace-500"})
+        generated = client.get("/raiseUnhandled")
+    finally:
+        caplog.handler.removeFilter(req_filter)
+
+    assert sent.headers[REQUEST_ID_HEADER] == "trace-500"
+    logged = [r.request_id for r in caplog.records if r.getMessage() == "Unhandled exception occurred."]
+    assert logged == ["trace-500", generated.headers[REQUEST_ID_HEADER]]
+
+
+def test_integration_log_lines_carry_the_request_id_and_a_dash_outside_requests(client, caplog):
+    """Lines logged while a request is handled carry its ID, and lines logged outside a request carry `-`."""
+    req_filter = RequestIdFilter()
+    caplog.handler.addFilter(req_filter)
+    caplog.set_level(logging.DEBUG)
+
+    try:
+        logging.getLogger("app").info("test outside log")
+        response = client.get("/health")
+    finally:
+        caplog.handler.removeFilter(req_filter)
+
+    assert response.status_code == 200
+    outside = [r.request_id for r in caplog.records if r.getMessage() == "test outside log"]
+    inside = [r.getMessage() for r in caplog.records if r.request_id == response.headers[REQUEST_ID_HEADER]]
+    assert outside == ["-"]
+    assert inside == ["Health check requested."]
+
+
+def test_integration_concurrent_requests_isolate_ids_and_logs(caplog):
+    """Concurrent requests get distinct request IDs and don't mix log IDs."""
+    req_filter = RequestIdFilter()
+    caplog.handler.addFilter(req_filter)
+    caplog.set_level(logging.DEBUG)
+
+    try:
+
+        async def run_both():
+            with TestClient(app, raise_server_exceptions=False) as c:
+                return await asyncio.gather(
+                    asyncio.to_thread(c.get, "/health"),
+                    asyncio.to_thread(c.get, "/health"),
+                )
+
+        resp_a, resp_b = asyncio.run(run_both())
+        id_a = resp_a.headers[REQUEST_ID_HEADER]
+        id_b = resp_b.headers[REQUEST_ID_HEADER]
+
+        assert id_a != id_b
+
+        logs_a = [r.getMessage() for r in caplog.records if getattr(r, "request_id", None) == id_a]
+        logs_b = [r.getMessage() for r in caplog.records if getattr(r, "request_id", None) == id_b]
+        assert logs_a == ["Health check requested."]
+        assert logs_b == ["Health check requested."]
+    finally:
+        caplog.handler.removeFilter(req_filter)

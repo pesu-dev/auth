@@ -137,6 +137,8 @@ async def _close_client_quietly(client: httpx2.AsyncClient, metrics: MetricsColl
         client (httpx2.AsyncClient): The client to close.
         metrics (MetricsCollector): The collector to record the outcome into.
     """
+    # asyncio.ensure_future copies the active contextvars context into the scheduled task,
+    # so any log line emitted by _aclose_client automatically inherits the request's ID.
     task = asyncio.ensure_future(_aclose_client(client, metrics))
     _CLOSE_TASKS.add(task)
     task.add_done_callback(_CLOSE_TASKS.discard)

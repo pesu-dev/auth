@@ -5,22 +5,24 @@ PESUAuth is a small, stateless FastAPI service. It has no database and keeps not
 
 ## Layout
 
-| Path              | What it holds                                                                     |
-| ----------------- | --------------------------------------------------------------------------------- |
-| `app/app.py`      | The FastAPI app: routes, middleware, exception handlers, the OpenAPI schema, CLI  |
-| `app/pesu.py`     | `PESUAcademy`: the login and profile calls to PESU Academy, and building profiles |
-| `app/models/`     | Request, response, profile and metrics models, and the upstream response models   |
-| `app/exceptions/` | `PESUAcademyError` and its subclasses, one per failure the API reports            |
-| `app/metrics/`    | The metrics collector, its middleware, the Prometheus renderer and token check    |
-| `app/docs/`       | The OpenAPI request and response examples for each route                          |
-| `app/templates/`  | `playground.html`, the API Explorer served at `/`                                 |
-| `scripts/`        | The test runner, the coding agent generator and the benchmarks                    |
-| `tests/`          | Unit, functional and integration tests (see [testing.md](testing.md))             |
+| Path                | What it holds                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| `app/app.py`        | The FastAPI app: routes, middleware, exception handlers, the OpenAPI schema, CLI                       |
+| `app/pesu.py`       | `PESUAcademy`: the login and profile calls to PESU Academy, and building profiles                      |
+| `app/models/`       | Request, response, profile and metrics models, and the upstream response models                        |
+| `app/exceptions/`   | `PESUAcademyError` and its subclasses, one per failure the API reports                                 |
+| `app/metrics/`      | The metrics collector, its middleware, the Prometheus renderer and token check                         |
+| `app/docs/`         | The OpenAPI request and response examples for each route                                               |
+| `app/templates/`    | `playground.html`, the API Explorer served at `/`                                                      |
+| `app/request_id.py` | Request ID validation, UUIDv4 fallback, `request_id_var`, `RequestIdFilter`, and request ID middleware |
+| `scripts/`          | The test runner, the coding agent generator and the benchmarks                                         |
+| `tests/`            | Unit, functional and integration tests (see [testing.md](testing.md))                                  |
 
 ## How a request is handled
 
 A call to `/authenticate` goes through these steps:
 
+1. **Request ID resolution & binding:** `request_id_middleware_http` runs first, validates/echoes `X-Request-ID` (or generates a UUIDv4 hex string), binds `request_id_var` for log lines (`-` outside requests), and sets `X-Request-ID` on the response.
 1. The metrics middleware counts the request and starts timing it.
 1. FastAPI validates the body against `RequestModel`. A body that fails is answered with a `400`.
 1. The route calls `PESUAcademy.authenticate`, which opens a new HTTP client for this request only.
